@@ -1,13 +1,9 @@
-use crate::fm_io::data_offset::ChunkOffset;
+use crate::fm_io::data_location::DataLocation;
+
 
 #[derive(Debug)]
 pub struct FMTable {
-    pub table_name: String,
-}
-
-#[derive(Debug)]
-pub struct FMTableRef {
-    pub table_name: ChunkOffset,
+    pub table_name: DataLocation,
 }
 
 #[derive(Debug)]

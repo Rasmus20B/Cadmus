@@ -1,18 +1,21 @@
-use crate::{fm_core::{component::FMTableRef, file_repr::FmpFileView}, fm_io::{chunk::Chunk, data_offset::ChunkOffset}};
-use super::instruction::InstructionType;
+use crate::{fm_core::{component::FMTable, file_repr::FmpFileView}, fm_io::{chunk::Chunk, data_location::DataLocation}};
+use super::block::InstructionType;
 
 pub fn read_chunk(chunk: &Chunk, file: &mut FmpFileView) {
-    for (i, instruction) in chunk.instructions.iter().enumerate() {
-        match &instruction.path.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
+    for (i, block) in chunk.instructions.iter().enumerate() {
+        match &block.path.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
             ["3", "16", "5", x] => {
-                if instruction.ctype == InstructionType::RefSimple {
-                    match instruction.ref_simple.unwrap_or(0) {
+                if block.ctype == InstructionType::RefSimple {
+                    match block.ref_simple.unwrap_or(0) {
                         16 => { 
-                            println!("instruction: {} / {} for chunk {}", i, chunk.instructions.len(), chunk.index);
+                            let data_uw = block.data.unwrap();
                             file.tables.insert(
                                 x.parse().unwrap(),
-                                FMTableRef {
-                                    table_name: ChunkOffset::new(chunk.index, i as u32)
+                                FMTable {
+                                    table_name: DataLocation::new(chunk.index,
+                                                    i as u16,
+                                                    (data_uw.offset - block.offset as u32) as u8,
+                                                    data_uw.length as u8)
                                 },
                             );
                         },

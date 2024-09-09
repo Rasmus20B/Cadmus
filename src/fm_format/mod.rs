@@ -1,2 +1,2 @@
 pub(crate) mod interpreter;
-pub(crate) mod instruction;
+pub(crate) mod block;
