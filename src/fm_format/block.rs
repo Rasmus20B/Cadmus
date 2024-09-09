@@ -13,7 +13,7 @@ pub enum InstructionType {
     Noop = 6,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BlockErr {
     EndChunk,
     UnrecognizedOpcode(u8),
@@ -111,6 +111,8 @@ impl Block {
             chunk_code &= 0x3F;
             delayed += 1;
         }
+
+        // println!("Chunk: {:x}", chunk_code);
 
         if chunk_code == 0x00 {
             ctype = InstructionType::DataSimple;

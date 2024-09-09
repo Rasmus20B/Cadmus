@@ -10,7 +10,7 @@ mod util;
 fn main() {
 
     let file = FmpFileView::new(Path::new("test_data/input/blank.fmp12"));
-    for table in &file.tables {
+    for table in &file.objects.read().expect("Unable to read from objects.").tables {
         let t = file.get_table_name(*table.0);
         println!("table: {}", t);
     }

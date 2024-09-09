@@ -1,8 +1,7 @@
 use std::{fs::File, io::{BufReader, BufWriter, Read, Seek}, path::Path};
-
 use crate::fm_format::block::Block;
-
 use super::{chunk::Chunk, data_location::DataLocation};
+use rayon::prelude::*;
 
 pub struct FmpFileHandle {
     read_handle: BufReader<File>,
@@ -24,7 +23,7 @@ impl FmpFileHandle {
         // TODO: Implement cache to call first.
         let block_handle = self.get_chunk(location.chunk)
             .expect("Chunk does not exist.")
-                .instructions.get(location.block as usize)
+                .blocks.get(location.block as usize)
                 .expect("Block does not exist.");
 
         let block_offset = block_handle.offset;
@@ -53,7 +52,7 @@ impl FmpFileHandle {
         let mut ammended_buffer = Vec::new();
         ammended_buffer.extend(self.get_chunk(index as u32).unwrap().to_bytes());
 
-        for instruction in &self.chunks[index].instructions {
+        for instruction in &self.chunks[index].blocks {
             ammended_buffer.extend(instruction.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
         }
 
@@ -77,28 +76,55 @@ impl FmpFileHandle {
         let write_handle_ = BufWriter::new(File::open(path).expect("[-] Unable to open file."));
         let mut chunks_ = vec![];
 
-        let mut offset = Chunk::CAPACITY;
-        let mut chunk_index: u32 = 2;
-        let mut buffer = vec![0u8; 4096];
+        let mut buffer = Vec::new();
+        read_handle_.read_to_end(&mut buffer).expect("[-] Unable to read from File.");
 
-        read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
-        read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
+        // let mut offset = Chunk::CAPACITY;
+        let mut chunk_index: u32 = 2;
+        // let mut buffer = vec![0u8; 4096];
+
+        let mut offset = Chunk::CAPACITY;
+
+        // read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
+        // read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
 
         /* The first chunk stores metadata about the rest of the file */
-        let meta_chunk = Chunk::from_bytes(offset, chunk_index, &buffer);
+        let meta_chunk = Chunk::from_bytes(offset, Some(chunk_index), &buffer[offset..offset+4096]);
         /* total chunks is stored at the same offset as the "next" index in a regular chunk */
         let n_chunks = meta_chunk.next;
 
         chunks_.resize(n_chunks as usize + 1, Chunk::default());
+        // let mut chunks = buffer.chunks(Chunk::CAPACITY).skip(2).map(|segment| {
+        //     let res = Chunk::header_from_bytes(&segment);
+        //     res
+        // })
+        // .collect::<Vec<_>>();
+        //
+        // chunk_index = chunks.binary_search_by(|x| x.next.cmp(&(0))).expect("Less chunks found than specified in header.") as u32;
+        // while chunk_index != 0 {
+        //     print!("index: {} :: ", chunk_index);
+        //     chunks[chunk_index as usize].index = chunk_index;
+        //     let prev = chunks[chunk_index as usize].previous;
+        //     println!("chunk: {}, previous: {}", chunks[chunk_index as usize].index, chunks[chunk_index as usize].previous);
+        //     chunk_index = chunks.binary_search_by(|x| x.next.cmp(&(prev))).expect("Less chunks found than specified in header.") as u32;
+        //     chunk_index = chunks[chunk_index as usize].previous;
+        // }
+        chunk_index = 2;
         while chunk_index != 0 {
             offset = chunk_index as usize * Chunk::CAPACITY;
-            read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
-            read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
-            let current_chunk = Chunk::from_bytes(offset, chunk_index, &buffer);
+            // read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
+            // read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
+            let mut current_chunk = Chunk::header_from_bytes(&buffer[offset..offset+4096]);
+            current_chunk.index = chunk_index;
             let next = current_chunk.next;
             chunks_[chunk_index as usize] = current_chunk;
             chunk_index = next;
         }
+
+        chunks_.par_iter_mut().for_each(|chunk| {
+            let offset = (chunk.index as usize) * Chunk::CAPACITY;
+            chunk.read_blocks(&buffer[offset..offset+Chunk::CAPACITY]).expect("Unable to read block.");
+        });
 
         Self {
             read_handle: read_handle_,

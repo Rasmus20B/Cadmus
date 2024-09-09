@@ -9,12 +9,55 @@ pub struct Chunk {
     pub level: u32,
     pub previous: u32,
     pub next: u32,
-    pub instructions: Vec<Block>,
+    pub blocks: Vec<Block>,
     pub size: u16,
 }
 
 impl Chunk {
-    pub fn from_bytes(offset_: usize, index_: u32, buffer: &[u8]) -> Self {
+    pub fn header_from_bytes(buffer: &[u8]) -> Self {
+        Self {
+            offset: 0,
+            index: 0,
+            deleted: buffer[0] != 0,
+            level: buffer[1] as u32 & 0x00FFFFFF,
+            previous: get_int(&buffer[4..8]) as u32,
+            next: get_int(&buffer[8..12]) as u32,
+            blocks: vec![],
+            size: 0,
+        }
+    }
+
+    pub fn read_blocks(&mut self, buffer: &[u8]) -> Result<(), String> {
+        let mut offset = 20;
+        let mut path = vec![];
+        let mut instructions_ = vec![];
+        let mut size_ = 0;
+        while offset < Chunk::CAPACITY {
+            let instruction_res = Block::from_bytes(&buffer, &mut offset, &mut path);
+            if instruction_res.is_err() {
+                let error = instruction_res.clone().unwrap_err();
+                match error {
+                    BlockErr::EndChunk => {
+                        break;
+                    },
+                    BlockErr::UnrecognizedOpcode(op) => {
+                        return Err(format!("Unable to read instruction {}. {:?}", op, error));
+                    }
+                    _ => return Err(format!("{:?}, Chunk Sample: {:x?}", error, &buffer[0..30]))
+                }
+            }
+
+            let instruction_bind = instruction_res.unwrap();
+            size_ += instruction_bind.size() as u16;
+            instructions_.push(instruction_bind);
+        }
+
+        self.blocks = instructions_;
+        
+        return Ok(());
+    }
+
+    pub fn from_bytes(offset_: usize, index_: Option<u32>, buffer: &[u8]) -> Self {
         let mut offset = 20;
         let mut path = vec![];
         let mut instructions_ = vec![];
@@ -41,12 +84,12 @@ impl Chunk {
 
         Self {
             offset: offset_,
-            index: index_,
+            index: index_.unwrap_or(0),
             deleted: buffer[0] != 0,
             level: buffer[1] as u32 & 0x00FFFFFF,
             previous: get_int(&buffer[4..8]) as u32,
             next: get_int(&buffer[8..12]) as u32,
-            instructions: instructions_,
+            blocks: instructions_,
             size: size_,
         }
     }
