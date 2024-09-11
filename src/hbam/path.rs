@@ -27,21 +27,13 @@ impl PartialOrd for HBAMPath {
             .iter()
                 .zip(&other.components)
                 .map(|p| (p.0.parse::<usize>().unwrap_or(0), p.1.parse::<usize>().unwrap_or(0))) {
-                    println!("a: {:?}, b: {:?}", a, b);
                     if a > b {
-                        println!("{:?} > {:?}", a, b);
                         return Some(Ordering::Greater);
                     } else if b > a {
-                        println!("{:?} > {:?}", b, a);
                         return Some(Ordering::Less);
                     }
         }
-        if self.components.len() > other.components.len() {
-            return Some(Ordering::Greater);
-        } else if self.components.len() < other.components.len() {
-            return Some(Ordering::Less);
-        }
-        return None
+        Some(self.components.len().cmp(&other.components.len()))
     }
 }
 
