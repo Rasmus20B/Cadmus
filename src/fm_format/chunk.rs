@@ -1,6 +1,6 @@
 use core::fmt;
 use std::fmt::Formatter;
-use crate::{fm_io::{chunk::Chunk, storage::BlockStorage}, util::encoding_util::{get_int, get_path_int}};
+use crate::{fm_io::{block::Block, storage::BlockStorage}, util::encoding_util::{get_int, get_path_int}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionType {
@@ -22,7 +22,7 @@ pub enum BlockErr {
 }
 
 #[derive(Clone, Debug)]
-pub struct Block {
+pub struct Chunk {
     pub offset: u16,
     pub ctype: InstructionType,
     pub opcode: u16,
@@ -33,7 +33,7 @@ pub struct Block {
     pub segment_idx: Option<u8>,
 }
 
-impl Block {
+impl Chunk {
     pub fn new(
         offset: u16,
         ctype: InstructionType,
@@ -97,7 +97,7 @@ impl Block {
         Ok(buffer)
     }
 
-    pub fn from_bytes(code: &[u8], offset: &mut usize, path: &mut Vec<String>) -> Result<Block, BlockErr> {
+    pub fn from_bytes(code: &[u8], offset: &mut usize, path: &mut Vec<String>) -> Result<Chunk, BlockErr> {
         let mut chunk_code = code[*offset];
         let mut ctype = InstructionType::Noop;
         let mut data: Option<BlockStorage> = None;
@@ -117,7 +117,7 @@ impl Block {
         if chunk_code == 0x00 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY || code[*offset] == 0x0 {
+            if *offset >= Block::CAPACITY || code[*offset] == 0x0 {
                 return Err(BlockErr::EndChunk);
             }
             data = Some(BlockStorage{ offset: *offset as u32, length: 1});
@@ -125,7 +125,7 @@ impl Block {
         } else if chunk_code <= 0x05 {
             ctype = InstructionType::RefSimple;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             ref_simple = Some(code[*offset] as u16);
@@ -136,7 +136,7 @@ impl Block {
         } else if chunk_code == 0x06 {
             ctype = InstructionType::RefSimple;
             *offset += 1;
-            if *offset + 2 > Chunk::CAPACITY {
+            if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             ref_simple = Some(code[*offset] as u16);
@@ -148,7 +148,7 @@ impl Block {
         } else if chunk_code == 0x07 {
             ctype = InstructionType::DataSegment;
             *offset += 1;
-            if *offset +3 > Chunk::CAPACITY {
+            if *offset +3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             segidx = Some(code[*offset]);
@@ -170,7 +170,7 @@ impl Block {
         } else if chunk_code <= 0x0D {
             ctype = InstructionType::RefSimple;
             *offset += 1;
-            if *offset + 2 > Chunk::CAPACITY {
+            if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
@@ -181,7 +181,7 @@ impl Block {
         } else if chunk_code == 0x0E {
             ctype = InstructionType::RefSimple;
             *offset += 1;
-            if *offset + 3 > Chunk::CAPACITY {
+            if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
@@ -193,7 +193,7 @@ impl Block {
         } else if chunk_code == 0x0F && (code[21] & 0x80 > 0 || (code[*offset+1] & 0x80) > 0) {
             ctype = InstructionType::DataSegment;
             *offset += 2;
-            if *offset + 3 > Chunk::CAPACITY {
+            if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             segidx = Some(code[*offset]);
@@ -218,7 +218,7 @@ impl Block {
             *offset += 1;
             ref_data = Some(BlockStorage { offset: *offset as u32, length: 3 });
             *offset += 3;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             let len = code[*offset] as usize;
@@ -230,14 +230,14 @@ impl Block {
             *offset += 1;
             ref_data = Some(BlockStorage { offset: *offset as u32, length: 3 });
             *offset += 3;
-            if *offset + 2 > Chunk::CAPACITY {
+            if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             let len = get_int(&code[*offset..*offset+2]);
             *offset += 2;
             data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
             *offset += len;
-        } else if chunk_code == 0x1B && code[21] == 0 {
+        } else if chunk_code == 0x1B && code[*offset+1] == 0 {
             ctype = InstructionType::RefSimple;
             *offset += 2;
             ref_simple = Some(code[*offset] as u16);
@@ -247,7 +247,7 @@ impl Block {
         } else if chunk_code >= 0x19 && chunk_code <= 0x1D {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            if *offset > Chunk::CAPACITY {
+            if *offset > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let len = code[*offset];
@@ -257,7 +257,7 @@ impl Block {
         } else if chunk_code == 0x1E {
             ctype = InstructionType::RefLong;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let ref_len = code[*offset] as usize;
@@ -265,7 +265,7 @@ impl Block {
             ref_data = Some(BlockStorage { offset: *offset as u32, length: ref_len as u16 });
             *offset += ref_len;
 
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let len = code[*offset] as usize;
@@ -275,14 +275,14 @@ impl Block {
         } else if chunk_code == 0x1F {
             ctype = InstructionType::RefLong;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let ref_len = code[*offset] as usize;
             *offset += 1;
             ref_data = Some(BlockStorage { offset: *offset as u32, length: ref_len as u16 });
             *offset += ref_len;
-            if *offset + 2 > Chunk::CAPACITY {
+            if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let len = get_int(&code[*offset..*offset+2]);
@@ -292,7 +292,7 @@ impl Block {
         } else if chunk_code == 0x20 {
             ctype = InstructionType::PathPush;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             if code[*offset] == 0xFE {
@@ -307,7 +307,7 @@ impl Block {
         } else if chunk_code == 0x23 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let len = code[*offset] as usize;
@@ -331,7 +331,7 @@ impl Block {
         } else if chunk_code == 0x38 {
             ctype = InstructionType::PathPush;
             *offset += 1;
-            if *offset >= Chunk::CAPACITY {
+            if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             let len = code[*offset] as usize;
@@ -351,23 +351,24 @@ impl Block {
             return Err(BlockErr::UnrecognizedOpcode(chunk_code));
         };
 
+        let chunk = Chunk::new(
+                        saved_offset as u16,
+                        ctype,
+                        chunk_code.into(),
+                        data,
+                        ref_data,
+                        path.clone(),
+                        segidx,
+                        ref_simple);
         while delayed > 0 {
             path.pop();
             delayed -= 1;
         }
-        return Ok(Block::new(
-            saved_offset as u16,
-            ctype,
-            chunk_code.into(),
-            data,
-            ref_data,
-            path.clone(),
-            segidx,
-            ref_simple));
+        return Ok(chunk)
     }
 }
 
-impl fmt::Display for Block {
+impl fmt::Display for Chunk {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self.ctype {
         InstructionType::DataSegment => {

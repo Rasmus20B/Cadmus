@@ -42,8 +42,8 @@ impl FmpFileView {
         let table_name_ref = table_ref.table_name;
 
         let mut handle_ref = self.handle.borrow_mut();
-        let chunk_ref = handle_ref.chunks[table_name_ref.chunk as usize].clone();
-        let instr = chunk_ref.blocks[table_name_ref.block as usize].borrow();
+        let block_ref = handle_ref.blocks[table_name_ref.chunk as usize].clone();
+        let instr = block_ref.chunks[table_name_ref.block as usize].borrow();
         let name = handle_ref
             .fetch_data(table_name_ref);
         fm_string_decrypt(&name)

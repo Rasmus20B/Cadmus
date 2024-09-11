@@ -1,19 +1,20 @@
-use crate::fm_format::block::{Block, BlockErr};
+use crate::fm_format::chunk::{Chunk, BlockErr};
 use crate::util::encoding_util::{get_int, put_int};
 
 #[derive(Clone, Debug, Default)]
-pub struct Chunk {
+pub struct Block {
     pub offset: usize,
     pub index: u32,
     pub deleted: bool,
     pub level: u32,
     pub previous: u32,
     pub next: u32,
-    pub blocks: Vec<Block>,
+    pub block_type: u8,
+    pub chunks: Vec<Chunk>,
     pub size: u16,
 }
 
-impl Chunk {
+impl Block {
     pub fn header_from_bytes(buffer: &[u8]) -> Self {
         Self {
             offset: 0,
@@ -22,18 +23,26 @@ impl Chunk {
             level: buffer[1] as u32 & 0x00FFFFFF,
             previous: get_int(&buffer[4..8]) as u32,
             next: get_int(&buffer[8..12]) as u32,
-            blocks: vec![],
+            block_type: buffer[13],
+            chunks: vec![],
             size: 0,
         }
     }
 
-    pub fn read_blocks(&mut self, buffer: &[u8]) -> Result<(), String> {
+    pub fn new(buffer: &[u8]) -> Self {
+        let mut res = Self::header_from_bytes(&buffer);
+        println!("Level: {}", res.level);
+        res.read_chunks(&buffer).expect("Unable to read chunks.");
+        res
+    }
+
+    pub fn read_chunks(&mut self, buffer: &[u8]) -> Result<(), String> {
         let mut offset = 20;
         let mut path = vec![];
         let mut instructions_ = vec![];
         let mut size_ = 0;
-        while offset < Chunk::CAPACITY {
-            let instruction_res = Block::from_bytes(&buffer, &mut offset, &mut path);
+        while offset < Block::CAPACITY {
+            let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
             if instruction_res.is_err() {
                 let error = instruction_res.clone().unwrap_err();
                 match error {
@@ -41,7 +50,7 @@ impl Chunk {
                         break;
                     },
                     BlockErr::UnrecognizedOpcode(op) => {
-                        return Err(format!("Unable to read instruction {}. {:?}", op, error));
+                        return Err(format!("Unable to read instruction {:x}. {:?}", op, error));
                     }
                     _ => return Err(format!("{:?}, Chunk Sample: {:x?}", error, &buffer[0..30]))
                 }
@@ -52,7 +61,7 @@ impl Chunk {
             instructions_.push(instruction_bind);
         }
 
-        self.blocks = instructions_;
+        self.chunks = instructions_;
         
         return Ok(());
     }
@@ -62,8 +71,8 @@ impl Chunk {
         let mut path = vec![];
         let mut instructions_ = vec![];
         let mut size_ = 0;
-        while offset < Chunk::CAPACITY {
-            let instruction_res = Block::from_bytes(&buffer, &mut offset, &mut path);
+        while offset < Block::CAPACITY {
+            let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
             if instruction_res.is_err() {
                 let error = instruction_res.unwrap_err();
                 match error {
@@ -89,7 +98,8 @@ impl Chunk {
             level: buffer[1] as u32 & 0x00FFFFFF,
             previous: get_int(&buffer[4..8]) as u32,
             next: get_int(&buffer[8..12]) as u32,
-            blocks: instructions_,
+            block_type: buffer[13],
+            chunks: instructions_,
             size: size_,
         }
     }

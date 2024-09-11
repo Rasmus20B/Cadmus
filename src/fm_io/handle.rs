@@ -1,19 +1,19 @@
 use std::{fs::File, io::{BufReader, BufWriter, Read, Seek}, path::Path};
-use crate::fm_format::block::Block;
-use super::{chunk::Chunk, data_location::DataLocation};
+use crate::fm_format::chunk::Chunk;
+use super::{block::Block, data_location::DataLocation};
 use rayon::prelude::*;
 
 pub struct FmpFileHandle {
     read_handle: BufReader<File>,
     write_handle: BufWriter<File>,
-    pub chunks: Vec<Chunk>,
+    pub blocks: Vec<Block>,
 }
 
 impl FmpFileHandle {
 
     pub(crate) fn get_chunk_payload(&mut self, index: u32) -> Result<Vec<u8>, &str> {
         let mut buffer = [0u8; 4096];
-        self.read_handle.seek(std::io::SeekFrom::Start(index as u64 * Chunk::CAPACITY as u64)).expect("Unable to seek from file.");
+        self.read_handle.seek(std::io::SeekFrom::Start(index as u64 * Block::CAPACITY as u64)).expect("Unable to seek from file.");
         self.read_handle.read_exact(&mut buffer).expect("Unable to read from file.");
         Ok(buffer.to_vec())
     }
@@ -23,7 +23,7 @@ impl FmpFileHandle {
         // TODO: Implement cache to call first.
         let block_handle = self.get_chunk(location.chunk)
             .expect("Chunk does not exist.")
-                .blocks.get(location.block as usize)
+                .chunks.get(location.block as usize)
                 .expect("Block does not exist.");
 
         let block_offset = block_handle.offset;
@@ -33,8 +33,8 @@ impl FmpFileHandle {
         buffer[start as usize..start as usize +location.length as usize].to_vec()
     }
 
-    pub(crate) fn get_chunk(&self, index: u32) -> Result<&Chunk, &str> {
-        let res = &self.chunks.get(index as usize);
+    pub(crate) fn get_chunk(&self, index: u32) -> Result<&Block, &str> {
+        let res = &self.blocks.get(index as usize);
 
         if res.is_none() {
             return Err("Invalid chunk index.")
@@ -42,8 +42,8 @@ impl FmpFileHandle {
         Ok(res.unwrap())
     }
 
-    pub(crate) fn get_chunks(&self) -> &Vec<Chunk> {
-        &self.chunks
+    pub(crate) fn get_chunks(&self) -> &Vec<Block> {
+        &self.blocks
     }
 
     pub fn update_chunk(&mut self, index: usize) -> Result<(), &str> {
@@ -52,11 +52,11 @@ impl FmpFileHandle {
         let mut ammended_buffer = Vec::new();
         ammended_buffer.extend(self.get_chunk(index as u32).unwrap().to_bytes());
 
-        for instruction in &self.chunks[index].blocks {
+        for instruction in &self.blocks[index].chunks {
             ammended_buffer.extend(instruction.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
         }
 
-        self.write_handle.seek(std::io::SeekFrom::Start(index as u64 * Chunk::CAPACITY as u64))
+        self.write_handle.seek(std::io::SeekFrom::Start(index as u64 * Block::CAPACITY as u64))
             .expect("Unable to seek from file.");
 
 
@@ -64,7 +64,7 @@ impl FmpFileHandle {
         Ok(())
     }
 
-    pub fn get_data_from_instruction(&mut self, chunk_index: u32, instruction: Block) -> Result<Vec<u8>, &str> {
+    pub fn get_data_from_instruction(&mut self, chunk_index: u32, instruction: Chunk) -> Result<Vec<u8>, &str> {
         let data_bind = instruction.data.unwrap();
         let buffer = self.get_chunk_payload(chunk_index).expect("Invalid Chunk ID.");
         Ok(buffer[data_bind.offset as usize..data_bind.offset as usize +data_bind.length as usize].to_vec())
@@ -83,17 +83,17 @@ impl FmpFileHandle {
         let mut chunk_index: u32 = 2;
         // let mut buffer = vec![0u8; 4096];
 
-        let mut offset = Chunk::CAPACITY;
+        let mut offset = Block::CAPACITY;
 
         // read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
         // read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
 
         /* The first chunk stores metadata about the rest of the file */
-        let meta_chunk = Chunk::from_bytes(offset, Some(chunk_index), &buffer[offset..offset+4096]);
+        let meta_chunk = Block::from_bytes(offset, Some(chunk_index), &buffer[offset..offset+4096]);
         /* total chunks is stored at the same offset as the "next" index in a regular chunk */
         let n_chunks = meta_chunk.next;
 
-        chunks_.resize(n_chunks as usize + 1, Chunk::default());
+        chunks_.resize(n_chunks as usize + 1, Block::default());
         // let mut chunks = buffer.chunks(Chunk::CAPACITY).skip(2).map(|segment| {
         //     let res = Chunk::header_from_bytes(&segment);
         //     res
@@ -111,10 +111,10 @@ impl FmpFileHandle {
         // }
         chunk_index = 2;
         while chunk_index != 0 {
-            offset = chunk_index as usize * Chunk::CAPACITY;
+            offset = chunk_index as usize * Block::CAPACITY;
             // read_handle_.seek(std::io::SeekFrom::Start(offset as u64)).expect("Unable to seek in file.");
             // read_handle_.read_exact(&mut buffer).expect("Unable to read from file.");
-            let mut current_chunk = Chunk::header_from_bytes(&buffer[offset..offset+4096]);
+            let mut current_chunk = Block::header_from_bytes(&buffer[offset..offset+4096]);
             current_chunk.index = chunk_index;
             let next = current_chunk.next;
             chunks_[chunk_index as usize] = current_chunk;
@@ -122,14 +122,14 @@ impl FmpFileHandle {
         }
 
         chunks_.par_iter_mut().for_each(|chunk| {
-            let offset = (chunk.index as usize) * Chunk::CAPACITY;
-            chunk.read_blocks(&buffer[offset..offset+Chunk::CAPACITY]).expect("Unable to read block.");
+            let offset = (chunk.index as usize) * Block::CAPACITY;
+            chunk.read_chunks(&buffer[offset..offset+Block::CAPACITY]).expect("Unable to read block.");
         });
 
         Self {
             read_handle: read_handle_,
             write_handle: write_handle_,
-            chunks: chunks_,
+            blocks: chunks_,
         }
     }
 }
