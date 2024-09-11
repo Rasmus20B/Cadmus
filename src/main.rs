@@ -12,7 +12,7 @@ mod hbam;
 fn main() {
 
     let mut file = HBAMFile::new(Path::new("../fm_vc/databases/Quotes.fmp12"));
-    let leaf = file.get_leaf(vec!["3".to_string(), "17".to_string()]);
+    let leaf = file.get_leaf(vec!["134".to_string()]);
     // let leaf =  file.get_leaf_n(453);
 
     println!("GOT BLOCK.");

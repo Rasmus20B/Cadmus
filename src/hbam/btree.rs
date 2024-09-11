@@ -46,7 +46,7 @@ impl HBAMFile {
                     if chunk.ctype == InstructionType::RefSimple {
                         next = n;
                         // println!("next: {}", next);
-                    } else if chunk.path == hbam_path || chunk.path.first() > hbam_path.first() {
+                    } else if chunk.path <= hbam_path {
                         // println!("jumping to block {}", next);
                         self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
                         self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
