@@ -55,7 +55,7 @@ impl FmpFileHandle {
 
         for chunk_wrapper in &self.blocks[index].chunks {
             let chunk = Chunk::from(chunk_wrapper.clone());
-            ammended_buffer.extend(chunk.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
+            // ammended_buffer.extend(chunk.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
         }
 
         self.write_handle.seek(std::io::SeekFrom::Start(index as u64 * Block::CAPACITY as u64))

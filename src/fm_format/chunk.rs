@@ -1,6 +1,6 @@
 use core::fmt;
 use std::{fmt::Formatter, ops::RangeBounds};
-use crate::{fm_io::{block::Block, storage::BlockStorage}, util::encoding_util::{get_int, get_path_int}};
+use crate::{fm_io::{block::Block, storage::BlockStorage}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionType {
@@ -32,7 +32,6 @@ impl From<ChunkType> for Chunk {
             ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk,
         }
     }
-
 }
 
 #[derive(Clone, Debug)]
@@ -93,7 +92,7 @@ impl Chunk {
         Ok(bytes[range].to_vec())
     }
 
-    pub fn to_bytes(&self, chunk_bytes: &Vec<u8>) -> Result<Vec<u8>, BlockErr> {
+    pub fn to_bytes(&self, chunk_bytes: &DataStaging) -> Result<Vec<u8>, BlockErr> {
         let mut buffer: Vec<u8> = vec![];
         if (self.opcode & 0xFF00) == 0 {
             buffer.push(self.opcode as u8);
@@ -116,7 +115,7 @@ impl Chunk {
         }
         if self.ref_data.is_some() {
             buffer.push(self.ref_data.unwrap().length as u8);
-            buffer.extend(self.ref_data.unwrap().lookup_from_buffer(&chunk_bytes).expect("Unable to read offset from buffer."));
+            buffer.extend(chunk_bytes.load(self.ref_data.unwrap()));
         }
         if self.data.is_some() {
             if self.ctype != InstructionType::PathPush &&
@@ -129,7 +128,7 @@ impl Chunk {
                 }
             } 
 
-            buffer.extend(self.data.unwrap().lookup_from_buffer(&chunk_bytes).expect("Unable to read offset from buffer."));
+            buffer.extend(chunk_bytes.load(self.data.unwrap()));
         }
         Ok(buffer)
     }
@@ -158,7 +157,7 @@ impl Chunk {
             if *offset >= Block::CAPACITY || code[*offset] == 0x0 {
                 return Err(BlockErr::EndChunk);
             }
-            data = Some(BlockStorage{ offset: *offset as u32, length: 1});
+            data = Some(BlockStorage{ offset: *offset as u16, length: 1});
             *offset += 1;
         } else if chunk_code <= 0x05 {
             ctype = InstructionType::RefSimple;
@@ -169,7 +168,7 @@ impl Chunk {
             ref_simple = Some(code[*offset] as u16);
             *offset += 1;
             let len = (chunk_code == 0x01) as usize + (2 * (chunk_code - 0x01) as usize);
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16});
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16});
             *offset += len;
         } else if chunk_code == 0x06 {
             ctype = InstructionType::RefSimple;
@@ -181,7 +180,7 @@ impl Chunk {
             *offset += 1;
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16});
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16});
             *offset += len;
         } else if chunk_code == 0x07 {
             ctype = InstructionType::DataSegment;
@@ -193,17 +192,17 @@ impl Chunk {
             *offset += 1;
             let len = get_int(&code[*offset..*offset+2]);
             *offset += 2;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16});
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16});
             *offset += len;
         } else if chunk_code == 0x08 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: 2 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: 2 });
             *offset += 2;
         } else if chunk_code == 0x0E && code[21] == 0xFF {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: 6 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: 6 });
             *offset += 6;
         } else if chunk_code <= 0x0D {
             ctype = InstructionType::RefSimple;
@@ -214,7 +213,7 @@ impl Chunk {
             ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
             *offset += 2;
             let len = (chunk_code == 0x09) as usize + (2 *(chunk_code - 0x09) as usize);
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x0E {
             ctype = InstructionType::RefSimple;
@@ -226,7 +225,7 @@ impl Chunk {
             *offset += 2;
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x0F && (code[21] & 0x80 > 0 || (code[*offset+1] & 0x80) > 0) {
             ctype = InstructionType::DataSegment;
@@ -241,42 +240,42 @@ impl Chunk {
             *offset += 1;
             let len = get_int(&code[*offset..*offset+2]);
             *offset += 2;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x10 {
                 ctype = InstructionType::DataSimple;
                 *offset += 1;
-                data = Some(BlockStorage{ offset: *offset as u32, length: 3 });
+                data = Some(BlockStorage{ offset: *offset as u16, length: 3 });
                 *offset += 3;
         } else if chunk_code >= 0x11 && chunk_code <= 0x15 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
             let len = 3 + ((chunk_code == 0x11) as usize) + (2 * (chunk_code as usize - 0x11));
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x16 {
             ctype = InstructionType::RefLong;
             *offset += 1;
-            ref_data = Some(BlockStorage { offset: *offset as u32, length: 3 });
+            ref_data = Some(BlockStorage { offset: *offset as u16, length: 3 });
             *offset += 3;
             if *offset >= Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x17 {
             ctype = InstructionType::RefLong;
             *offset += 1;
-            ref_data = Some(BlockStorage { offset: *offset as u32, length: 3 });
+            ref_data = Some(BlockStorage { offset: *offset as u16, length: 3 });
             *offset += 3;
             if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
             let len = get_int(&code[*offset..*offset+2]);
             *offset += 2;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x1B && code[*offset+1] == 0 {
             saved_chunk_code = (saved_chunk_code << 8) + code[*offset+1] as u16;
@@ -284,7 +283,7 @@ impl Chunk {
             *offset += 2;
             ref_simple = Some(code[*offset] as u16);
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: 4 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: 4 });
             *offset += 4;
         } else if chunk_code >= 0x19 && chunk_code <= 0x1D {
             ctype = InstructionType::DataSimple;
@@ -294,7 +293,7 @@ impl Chunk {
             }
             let len = code[*offset] + (((chunk_code == 0x19) as usize) + (2*(chunk_code-0x19) as usize)) as u8;
             *offset += 1;
-            data = Some(BlockStorage { offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage { offset: *offset as u16, length: len as u16 });
             *offset += len as usize;
         } else if chunk_code == 0x1E {
             ctype = InstructionType::RefLong;
@@ -304,7 +303,7 @@ impl Chunk {
             }
             let ref_len = code[*offset] as usize;
             *offset += 1;
-            ref_data = Some(BlockStorage { offset: *offset as u32, length: ref_len as u16 });
+            ref_data = Some(BlockStorage { offset: *offset as u16, length: ref_len as u16 });
             *offset += ref_len;
 
             if *offset >= Block::CAPACITY {
@@ -312,7 +311,7 @@ impl Chunk {
             }
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x1F {
             ctype = InstructionType::RefLong;
@@ -322,14 +321,14 @@ impl Chunk {
             }
             let ref_len = code[*offset] as usize;
             *offset += 1;
-            ref_data = Some(BlockStorage { offset: *offset as u32, length: ref_len as u16 });
+            ref_data = Some(BlockStorage { offset: *offset as u16, length: ref_len as u16 });
             *offset += ref_len;
             if *offset + 2 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
             let len = get_int(&code[*offset..*offset+2]);
             *offset += 2;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x20 {
             ctype = InstructionType::PathPush;
@@ -339,9 +338,9 @@ impl Chunk {
             }
             if code[*offset] == 0xFE {
                 *offset += 1;
-                data = Some(BlockStorage{ offset: *offset as u32, length: 8 });
+                data = Some(BlockStorage{ offset: *offset as u16, length: 8 });
             } else {
-                data = Some(BlockStorage{ offset: *offset as u32, length: 1 });
+                data = Some(BlockStorage{ offset: *offset as u16, length: 1 });
             }
             let idx = get_path_int(&code[*offset..*offset+1]);
             *offset += data.unwrap().length as usize;
@@ -354,19 +353,19 @@ impl Chunk {
             }
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x28 {
             ctype = InstructionType::PathPush;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: 2 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: 2 });
             let idx = get_path_int(&code[*offset..*offset+2]);
             *offset += 2;
             path.push(idx.to_string());
         } else if chunk_code == 0x30 {
             ctype = InstructionType::PathPush;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: 3 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: 3 });
             let dir = get_path_int(&code[*offset..*offset+3]).to_string();
             path.push(dir.to_string());
             *offset += 3;
@@ -378,7 +377,7 @@ impl Chunk {
             }
             let len = code[*offset] as usize;
             *offset += 1;
-            data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
+            data = Some(BlockStorage{ offset: *offset as u16, length: len as u16 });
             path.push(get_path_int(&code[*offset..*offset+len]).to_string());
             *offset += len;
         } else if chunk_code == 0x3d || chunk_code == 0x40 {

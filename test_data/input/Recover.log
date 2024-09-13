@@ -3,3 +3,39 @@
 2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	8432	Page 79 marked free but not in free list
 2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	0	Reset maximum block sequence number to 64960
 2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 12:32:13.885 +0100	blank.fmp12.patch	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 12:32:13.886 +0100	blank.fmp12.patch	8432	Page 79 marked free but not in free list
+2024-09-13 12:32:13.886 +0100	blank.fmp12.patch	0	Reset maximum block sequence number to 64960
+2024-09-13 12:32:13.886 +0100	blank.fmp12.patch	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 12:35:53.105 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 12:35:53.107 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 12:35:53.107 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 12:35:53.107 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 12:49:00.930 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 12:49:00.930 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 12:49:00.930 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 12:49:00.931 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 13:05:58.130 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 13:05:58.131 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 13:05:58.131 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 13:05:58.131 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 13:21:00.722 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 13:21:00.722 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 13:21:00.722 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 13:21:00.722 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 13:21:23.931 +0100	blank_patch_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 13:21:23.931 +0100	blank_patch_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 13:21:23.931 +0100	blank_patch_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 13:21:23.931 +0100	blank_patch_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 13:29:05.291 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 13:29:05.291 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 13:29:05.292 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 13:29:05.292 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 14:08:41.630 +0100	blank_patch.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 14:08:41.632 +0100	blank_patch.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 14:08:41.632 +0100	blank_patch.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 14:08:41.632 +0100	blank_patch.fmp12	0	*** Completed consistency check, checked 79 block(s)
+2024-09-13 14:09:04.340 +0100	blank.fmp12	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 14:09:04.340 +0100	blank.fmp12	8432	Page 79 marked free but not in free list
+2024-09-13 14:09:04.340 +0100	blank.fmp12	0	Reset maximum block sequence number to 64960
+2024-09-13 14:09:04.341 +0100	blank.fmp12	0	*** Completed consistency check, checked 79 block(s)

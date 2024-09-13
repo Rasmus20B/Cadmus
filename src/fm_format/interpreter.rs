@@ -19,7 +19,7 @@ pub fn read_chunk(block: &Block, objects: &RwLock<FmpObjectManager>) {
                                     table_name: DataLocation::new(
                                                     block.index,
                                                     i as u16,
-                                                    (data_uw.offset - chunk.offset as u32) as u8,
+                                                    (data_uw.offset - chunk.offset as u16) as u8,
                                                     data_uw.length as u8)
                                 },
                             );

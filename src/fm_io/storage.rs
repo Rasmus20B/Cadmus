@@ -1,7 +1,7 @@
 
 #[derive(Debug, Clone, Copy)]
 pub struct BlockStorage {
-    pub offset: u32,
+    pub offset: u16,
     pub length: u16,
 }
 
