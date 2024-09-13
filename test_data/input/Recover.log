@@ -1,0 +1,5 @@
+﻿Timestamp	Filename	Error	Message
+2024-09-13 01:50:50.177 +0100	blank.fmp12.patch	0	*** Started consistency check of improperly closed file, total of 79 block(s) to check
+2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	8432	Page 79 marked free but not in free list
+2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	0	Reset maximum block sequence number to 64960
+2024-09-13 01:50:50.178 +0100	blank.fmp12.patch	0	*** Completed consistency check, checked 79 block(s)

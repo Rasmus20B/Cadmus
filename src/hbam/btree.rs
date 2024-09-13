@@ -121,7 +121,7 @@ impl HBAMFile {
 mod tests {
     use std::path::Path;
 
-    use crate::{fm_format::chunk::Chunk, fm_io::block::Block, hbam::path::HBAMPath};
+    use crate::{fm_format::chunk::Chunk, hbam::path::HBAMPath};
 
     use super::HBAMFile;
 
@@ -143,13 +143,11 @@ mod tests {
         new = file.emit_binary_block(&old, &old_buffer).expect("Unable to emit binary block");
 
         for offset in 21..new.len() {
-            println!("offset: {}", offset);
-            let past_chunks = old.chunks.clone().into_iter().filter(|chunk_wrapper| ((Chunk::from(chunk_wrapper.clone()).offset) as usize) <= offset).collect::<Vec<_>>();
-            let current_chunk = past_chunks[past_chunks.len() - 1].clone();
-            // if past_chunks.len() > 1 {
-            //     current_chunk = past_chunks[past_chunks.len() - 2].clone();
-            // }
-            assert_eq!(new[offset], old_buffer[offset], "{offset} \n{:x?} \n!= \n{:x?}\nChunk: {}", &new[offset-59..offset+20], &old_buffer[offset-59..offset+20], Chunk::from(current_chunk.clone()));
+            if new[offset] != old_buffer[offset] {
+                let past_chunks = old.chunks.clone().into_iter().filter(|chunk_wrapper| ((Chunk::from(chunk_wrapper.clone()).offset) as usize) <= offset).collect::<Vec<_>>();
+                let current_chunk = past_chunks[past_chunks.len() - 1].clone();
+                assert_eq!(new[offset], old_buffer[offset], "{offset} \n{:x?} \n!= \n{:x?}\nChunk: {}", &new[offset-59..offset+20], &old_buffer[offset-59..offset+20], Chunk::from(current_chunk.clone()));
+            }
         }
 
 
