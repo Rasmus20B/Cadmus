@@ -21,12 +21,13 @@ impl FmpFileHandle {
     pub(crate) fn fetch_data(&mut self, location: DataLocation) -> Vec<u8> {
 
         // TODO: Implement cache to call first.
-        let block_handle = self.get_chunk(location.chunk)
+        let chunk_handle = self.get_chunk(location.chunk)
             .expect("Chunk does not exist.")
                 .chunks.get(location.block as usize)
                 .expect("Block does not exist.");
 
-        let block_offset = block_handle.offset;
+        let chunk = Chunk::from(chunk_handle.clone());
+        let block_offset = chunk.offset;
 
         let buffer = self.get_chunk_payload(location.chunk).expect("Invalid Chunk ID.");
         let start = block_offset + location.offset as u16;
@@ -52,8 +53,9 @@ impl FmpFileHandle {
         let mut ammended_buffer = Vec::new();
         ammended_buffer.extend(self.get_chunk(index as u32).unwrap().to_bytes());
 
-        for instruction in &self.blocks[index].chunks {
-            ammended_buffer.extend(instruction.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
+        for chunk_wrapper in &self.blocks[index].chunks {
+            let chunk = Chunk::from(chunk_wrapper.clone());
+            ammended_buffer.extend(chunk.to_bytes(&chunk_payload).expect("Unable to encode instruction."));
         }
 
         self.write_handle.seek(std::io::SeekFrom::Start(index as u64 * Block::CAPACITY as u64))

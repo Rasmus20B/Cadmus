@@ -1,4 +1,4 @@
-use crate::fm_format::chunk::{Chunk, BlockErr};
+use crate::fm_format::chunk::{Chunk, ChunkType, BlockErr};
 use crate::util::encoding_util::{get_int, put_int};
 
 #[derive(Clone, Debug, Default)]
@@ -10,7 +10,7 @@ pub struct Block {
     pub previous: u32,
     pub next: u32,
     pub block_type: u8,
-    pub chunks: Vec<Chunk>,
+    pub chunks: Vec<ChunkType>,
     pub size: u16,
 }
 
@@ -58,7 +58,7 @@ impl Block {
 
             let instruction_bind = instruction_res.unwrap();
             size_ += instruction_bind.size() as u16;
-            instructions_.push(instruction_bind);
+            instructions_.push(ChunkType::Unchanged(instruction_bind));
         }
 
         self.chunks = instructions_;
@@ -88,7 +88,7 @@ impl Block {
 
             let instruction_bind = instruction_res.unwrap();
             size_ += instruction_bind.size() as u16;
-            instructions_.push(instruction_bind);
+            instructions_.push(ChunkType::Unchanged(instruction_bind));
         }
 
         Self {
@@ -111,6 +111,7 @@ impl Block {
         /* level is 0 so no change necessary from default u8. */
         buffer.splice(4..8, put_int(self.previous as usize));
         buffer.splice(8..12, put_int(self.next as usize));
+        buffer[13] = self.block_type;
         buffer
     }
 }

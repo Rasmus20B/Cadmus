@@ -16,4 +16,8 @@ impl DataLocation {
             length: length_,
         }
     }
+    pub fn fetch_data(&self, bytes: &[u8]) -> Result<Vec<u8>, &str> {
+        let range = self.offset as usize..self.offset as usize +self.length as usize;
+        Ok(bytes[range].to_vec())
+    }
 }

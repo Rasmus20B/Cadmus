@@ -6,7 +6,7 @@ pub struct BlockStorage {
 }
 
 impl BlockStorage {
-    pub fn lookup_from_buffer(&self, buffer: &Vec<u8>) -> Result<Vec<u8>, &str> {
+    pub fn lookup_from_buffer(&self, buffer: &[u8]) -> Result<Vec<u8>, &str> {
         Ok(buffer
             .get(self.offset as usize..self.offset as usize+self.length as usize)
             .unwrap()

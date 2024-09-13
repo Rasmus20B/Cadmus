@@ -2,10 +2,11 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use std::sync::RwLock;
 
 use crate::{fm_core::{component::FMTable, file_repr::{FmpFileView, FmpObjectManager}}, fm_io::{block::Block, data_location::DataLocation}};
-use super::chunk::InstructionType;
+use super::chunk::{Chunk, InstructionType};
 
 pub fn read_chunk(block: &Block, objects: &RwLock<FmpObjectManager>) {
-    block.chunks.par_iter().enumerate().for_each(|(i, chunk)| { 
+    block.chunks.par_iter().enumerate().for_each(|(i, chunk_wrapper)| { 
+        let chunk = Chunk::from(chunk_wrapper.clone());
         match &chunk.path.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
             ["3", "16", "5", x] => {
                 if chunk.ctype == InstructionType::RefSimple {

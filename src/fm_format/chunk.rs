@@ -1,5 +1,5 @@
 use core::fmt;
-use std::fmt::Formatter;
+use std::{fmt::Formatter, ops::RangeBounds};
 use crate::{fm_io::{block::Block, storage::BlockStorage}, util::encoding_util::{get_int, get_path_int}};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +19,20 @@ pub enum BlockErr {
     UnrecognizedOpcode(u8),
     DataExceedsSectorSize,
     MalformedInstruction,
+}
+
+#[derive(Debug, Clone)]
+pub enum ChunkType {
+    Modification(Chunk),
+    Unchanged(Chunk),
+}
+impl From<ChunkType> for Chunk {
+    fn from(chunk_wrapper: ChunkType) -> Chunk {
+        match chunk_wrapper {
+            ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk,
+        }
+    }
+
 }
 
 #[derive(Clone, Debug)]
@@ -81,17 +95,40 @@ impl Chunk {
 
     pub fn to_bytes(&self, chunk_bytes: &Vec<u8>) -> Result<Vec<u8>, BlockErr> {
         let mut buffer: Vec<u8> = vec![];
-        buffer.push(self.opcode as u8);
+        if (self.opcode & 0xFF00) == 0 {
+            buffer.push(self.opcode as u8);
+        } else {
+            println!("here.");
+            buffer.push((self.opcode &0x00FF) as u8);
+            buffer.push((self.opcode << 8) as u8);
+        }
         if self.ref_simple.is_some() {
-            buffer.push(self.ref_simple.unwrap() as u8);
+            let ref_uw = self.ref_simple.unwrap();
+            if ref_uw > u8::max_value().into() {
+                let bytes = self.ref_simple.unwrap().to_be_bytes();
+                buffer.extend(bytes);
+            } else {
+                buffer.push(self.ref_simple.unwrap() as u8);
+            }
         }
         if self.segment_idx.is_some() {
             buffer.push(self.segment_idx.unwrap());
         }
         if self.ref_data.is_some() {
+            buffer.push(self.ref_data.unwrap().length as u8);
             buffer.extend(self.ref_data.unwrap().lookup_from_buffer(&chunk_bytes).expect("Unable to read offset from buffer."));
         }
         if self.data.is_some() {
+            if self.ctype != InstructionType::PathPush &&
+                !(0x00..0x05).contains(&self.opcode) &&
+                !(0x11..0x15).contains(&self.opcode) {
+                if self.opcode == 0x1b {
+                    buffer.push((self.data.unwrap().length - 4) as u8);
+                } else {
+                    buffer.push(self.data.unwrap().length as u8);
+                }
+            } 
+
             buffer.extend(self.data.unwrap().lookup_from_buffer(&chunk_bytes).expect("Unable to read offset from buffer."));
         }
         Ok(buffer)
@@ -106,6 +143,7 @@ impl Chunk {
         let mut ref_simple: Option<u16> = None;
         let mut delayed = 0;
         let saved_offset = offset.clone();
+        let mut saved_chunk_code = chunk_code as u16;
         
         if (chunk_code & 0xC0) == 0xC0 {
             chunk_code &= 0x3F;
@@ -184,7 +222,7 @@ impl Chunk {
             if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
-            ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
+            ref_simple = Some(u16::from_be_bytes(code[*offset..*offset+2].try_into().expect("CN")));
             *offset += 2;
             let len = code[*offset] as usize;
             *offset += 1;
@@ -192,6 +230,9 @@ impl Chunk {
             *offset += len;
         } else if chunk_code == 0x0F && (code[21] & 0x80 > 0 || (code[*offset+1] & 0x80) > 0) {
             ctype = InstructionType::DataSegment;
+            if (code[*offset+1] & 0x80) > 0 {
+                saved_chunk_code = (saved_chunk_code << 8) + code[*offset+1] as u16;
+            }
             *offset += 2;
             if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
@@ -210,7 +251,7 @@ impl Chunk {
         } else if chunk_code >= 0x11 && chunk_code <= 0x15 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
-            let len = 3 + (chunk_code == 0x11) as usize + (2 * (chunk_code as usize - 0x11));
+            let len = 3 + ((chunk_code == 0x11) as usize) + (2 * (chunk_code as usize - 0x11));
             data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x16 {
@@ -238,6 +279,7 @@ impl Chunk {
             data = Some(BlockStorage{ offset: *offset as u32, length: len as u16 });
             *offset += len;
         } else if chunk_code == 0x1B && code[*offset+1] == 0 {
+            saved_chunk_code = (saved_chunk_code << 8) + code[*offset+1] as u16;
             ctype = InstructionType::RefSimple;
             *offset += 2;
             ref_simple = Some(code[*offset] as u16);
@@ -250,10 +292,10 @@ impl Chunk {
             if *offset > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize)
             }
-            let len = code[*offset];
+            let len = code[*offset] + (((chunk_code == 0x19) as usize) + (2*(chunk_code-0x19) as usize)) as u8;
             *offset += 1;
             data = Some(BlockStorage { offset: *offset as u32, length: len as u16 });
-            *offset += len as usize + (chunk_code == 0x19) as usize + 2*(chunk_code-0x19) as usize;
+            *offset += len as usize;
         } else if chunk_code == 0x1E {
             ctype = InstructionType::RefLong;
             *offset += 1;
@@ -354,15 +396,14 @@ impl Chunk {
         let chunk = Chunk::new(
                         saved_offset as u16,
                         ctype,
-                        chunk_code.into(),
+                        saved_chunk_code.into(),
                         data,
                         ref_data,
                         path.clone(),
                         segidx,
                         ref_simple);
-        while delayed > 0 {
+        if delayed > 0 {
             path.pop();
-            delayed -= 1;
         }
         return Ok(chunk)
     }
@@ -388,14 +429,15 @@ impl fmt::Display for Chunk {
                  self.opcode)
         }
         InstructionType::DataSimple => {
-            write!(f, "path:{:?}::reference:na::ref_data:{:?}::size:{}::ins:{:x}", 
+            write!(f, "path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
                  self.path,
                  self.data.unwrap(),
                  self.data.unwrap().length,
                  self.opcode)
         }
         InstructionType::RefLong => {
-            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+            write!(f, "path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+                 self.path,
                  self.ref_data.unwrap(),
                  self.data.unwrap(),
                  self.data.unwrap().length,
