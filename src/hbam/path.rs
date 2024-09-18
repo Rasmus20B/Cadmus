@@ -21,6 +21,17 @@ impl From<&[&str]> for HBAMPath {
     }
 }
 
+impl From<String> for HBAMPath {
+    fn from(components: String) -> Self {
+        let components_ = components
+            .split(',')
+            .map(|s| s.trim().parse::<usize>().expect("Unable to parse directory component.").to_string())
+            .collect::<Vec<String>>();
+
+        HBAMPath::new(components_)
+    }
+}
+
 impl PartialOrd for HBAMPath {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         for (a, b) in self.components

@@ -31,7 +31,6 @@ impl Block {
 
     pub fn new(buffer: &[u8]) -> Self {
         let mut res = Self::header_from_bytes(&buffer);
-        println!("Level: {}", res.level);
         res.read_chunks(&buffer).expect("Unable to read chunks.");
         res
     }
@@ -43,6 +42,7 @@ impl Block {
         let mut size_ = 0;
         while offset < Block::CAPACITY {
             let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
+            // println!("{:?}", instruction_res.clone());
             if instruction_res.is_err() {
                 let error = instruction_res.clone().unwrap_err();
                 match error {

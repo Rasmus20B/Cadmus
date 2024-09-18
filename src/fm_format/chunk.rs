@@ -28,6 +28,7 @@ pub enum ChunkType {
 }
 impl From<ChunkType> for Chunk {
     fn from(chunk_wrapper: ChunkType) -> Chunk {
+        println!("inside");
         match chunk_wrapper {
             ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk,
         }
@@ -97,7 +98,6 @@ impl Chunk {
         if (self.opcode & 0xFF00) == 0 {
             buffer.push(self.opcode as u8);
         } else {
-            println!("here.");
             buffer.push((self.opcode &0x00FF) as u8);
             buffer.push((self.opcode << 8) as u8);
         }
@@ -405,6 +405,61 @@ impl Chunk {
             path.pop();
         }
         return Ok(chunk)
+    }
+
+    pub fn chunk_to_string(&self, buffer: &[u8]) -> String {
+        match self.ctype {
+            InstructionType::DataSegment => {
+                format!("path:{:?}::segment:{:?}::data:{:?}::size:{:?}::ins:{:x}", 
+                    self.path,
+                     self.segment_idx.unwrap(),
+                     self.data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().length,
+                     self.opcode)
+            },
+            InstructionType::RefSimple => {
+                format!("path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+                     self.path,
+                     self.ref_simple.unwrap(),
+                     self.data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().length,
+                     self.opcode)
+            }
+            InstructionType::DataSimple => {
+                format!("path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
+                     self.path,
+                     self.data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().length,
+                     self.opcode)
+            }
+            InstructionType::RefLong => {
+                format!("path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+                     self.path,
+                     self.ref_data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().length,
+                     self.opcode)
+            }
+            InstructionType::PathPush => {
+                format!("path:{:?}::reference:PUSH::ref_data:{:?}::size:{}::ins:{:x}", 
+                     self.path,
+                     self.data.unwrap().lookup_from_buffer(buffer),
+                     self.data.unwrap().length,
+                     self.opcode)
+            }
+            InstructionType::PathPop => {
+                format!("path:{:?}::reference:POP::ref_data:None::size:{}::ins:{:x}", 
+                     self.path,
+                     0,
+                     self.opcode)
+            }
+            InstructionType::Noop => {
+                format!("path:{:?}::reference:NOOP::ref_data:None::size:{}::ins:{:x}", 
+                     self.path,
+                     0,
+                     self.opcode)
+            }
+        }
     }
 }
 

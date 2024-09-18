@@ -1,6 +1,6 @@
-use std::{ffi::OsString, fs::{File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, path::Path};
+use std::{ffi::OsString, fs::{File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, path::Path, thread::current};
 
-use crate::{fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
+use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
 
 use color_print::cprint;
 use super::path::HBAMPath;
@@ -16,7 +16,7 @@ impl HBAMFile {
         std::fs::copy(path, &copy_path).expect("Unable to make new file.");
         println!("Copied file to: {:?}", copy_path);
         Self {
-            reader: BufReader::new(File::open(&copy_path).expect("Unable to open file.")),
+            reader: BufReader::new(File::open(&path).expect("Unable to open file.")),
             writer: BufWriter::new(
                 OpenOptions::new()
                 .write(true)
@@ -96,7 +96,7 @@ impl HBAMFile {
         if self.writer.write(&out_buffer).expect("Unable to write to file.") != 4096 {
             println!("DIDNT WRITE THE WHOLE BUFFER TBH");
         }
-        // self.writer.flush().expect("Unable to flush the buffer");
+        self.writer.flush().expect("Unable to flush the buffer");
         Ok(())
     }
 
@@ -133,6 +133,70 @@ impl HBAMFile {
         }
         (current_block, buffer.to_vec())
     }
+    
+    pub fn get_node(&mut self, hbam_path: &HBAMPath) -> Block {
+        let mut buffer = [0u8; 4096];
+        self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
+        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+
+        let mut current_block = Block::new(&buffer);
+        let mut next = 0;
+
+        loop {
+            for chunk_wrapper in &current_block.chunks {
+                let chunk = Chunk::from(chunk_wrapper.clone());
+                let n: usize;
+                if chunk.data.is_some() {
+                    let data_uw = chunk.data.unwrap();
+                    n = get_int(&buffer[data_uw.offset as usize..data_uw.offset as usize+data_uw.length as usize]);
+                    if chunk.ctype == InstructionType::RefSimple {
+                        next = n;
+                    } else if *hbam_path <= HBAMPath::new(chunk.path.clone()) {
+                        self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+                        current_block = Block::new(&buffer);
+                        current_block.index = next as u32;
+                        break;
+                    }
+                }
+            }
+
+            if current_block.block_type == 0x1 || current_block.block_type == 0x3 {
+                println!("FTypw: {}", current_block.block_type);
+                break;
+            }
+        }
+        current_block
+    }
+
+    pub fn print_all_chunks(&mut self) {
+        let mut buffer = [0u8; 4096];
+        self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
+        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+
+        let mut index = 2;
+
+        while index != 0 {
+            println!("======================");
+            println!("Block: {}", index);
+            self.reader.seek(std::io::SeekFrom::Start(index * 4096)).expect("Could not seek into file.");
+            self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
+            let leaf = Block::new(&buffer);
+            for chunk in leaf.chunks {
+                let unwrapped = Chunk::from(chunk).chunk_to_string(&buffer);
+                println!("{}", unwrapped);
+            }
+            index = leaf.next.into();
+        }
+
+    }
+
+    pub fn get_root(&mut self) -> Block {
+        let mut buffer = [0u8; 4096];
+        self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
+        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+        Block::new(&buffer)
+    }
 
     pub fn get_leaf(&mut self, hbam_path: &HBAMPath) -> Block {
         let mut buffer = [0u8; 4096];
@@ -166,6 +230,27 @@ impl HBAMFile {
             }
         }
         current_block
+    }
+    pub fn commit_changes(&mut self, diffs: &DiffCollection) {
+        unimplemented!()
+        // let location = tmp.store(fm_string_encrypt(table.name.clone()));
+        // let mut chunk_copy = leaf.chunks.iter()
+        //     .map(|chunk_wrapper| Chunk::from(chunk_wrapper.clone()))
+        //     .enumerate()
+        //     .filter(|(i, chunk)| {
+        //         chunk.ref_simple.is_some_and(|chunk| chunk == 16) 
+        //             && 
+        //         chunk.path == (&["3".to_string(), "16".to_string(), "5".to_string(), table.id.to_string()])})
+        //     .collect::<Vec<_>>()[0].clone();
+        // chunk_copy.1.data = Some(location);
+        // println!("FOUND IT");
+        // chunk_copy.1.opcode = match location.length {
+        //     1..=5 => location.length,
+        //     _ => 6,
+        // };
+        // let old_data_offset = Chunk::from(leaf.chunks[chunk_copy.0].clone()).data.unwrap();
+        // leaf.chunks[chunk_copy.0] = ChunkType::Modification(chunk_copy.1);
+        // file.write_node(block, data_store)
     }
 }
 
