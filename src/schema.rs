@@ -13,8 +13,8 @@ pub enum DBObjectKind {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DBObject {
     pub id: usize,
-    pub name: String,
     pub kind: DBObjectKind,
+    pub name: String,
 }
 
 pub struct Schema {

@@ -254,7 +254,6 @@ impl HBAMFile {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
