@@ -10,7 +10,7 @@ use schema::{DBObject, DBObjectKind, Schema};
 use serde::{Deserialize, Serialize};
 use util::encoding_util::fm_string_decrypt;
 
-use crate::{fm_format::chunk::ChunkType, staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_encrypt, get_int}}};
+use crate::{staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_encrypt, get_int}}};
 
 mod data_cache;
 mod fm_core;
@@ -68,19 +68,30 @@ fn main() -> Result<(), std::io::Error>{
 
     let args = CLI::parse();
     if args.input.is_some() {
-        let in_file = File::open(Path::new(&args.input.as_ref().unwrap()))?;
+        let in_file = File::open(Path::new(&args.input.clone().unwrap()))?;
         let reader = BufReader::new(in_file);
-        ctx.cad.objects.extend(serde_json::from_reader(reader));
+        let objects: Vec<DBObject> = serde_json::from_reader(reader).expect("Unable to read text input file");
+        ctx.cad.objects.extend(objects);
     }
 
     if args.fmp.is_some() {
         file = Some(HBAMFile::new(Path::new(&args.fmp.as_ref().unwrap())));
         ctx.fmp.objects.extend(load_tables(&mut file.as_mut().unwrap()));
+
+        if args.print_directory.is_some() {
+            let dir = HBAMPath::from(args.print_directory.unwrap());
+            let (leaf, buffer) = file.as_mut().unwrap().get_leaf_with_buffer(&dir);
+            for wrapper in leaf.chunks {
+                let chunk = Chunk::from(wrapper);
+                println!("{}", chunk.chunk_to_string(&buffer))
+            }
+        }
     }
 
     if args.sync {
         let diffs = get_diff(&ctx.fmp, &ctx.cad);
-        file.unwrap().commit_changes(&diffs);
+        let mut data_buffer = DataStaging::new();
+        file.unwrap().commit_changes(&diffs, &mut data_buffer);
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */
     }

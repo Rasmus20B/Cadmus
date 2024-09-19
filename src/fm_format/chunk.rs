@@ -28,7 +28,6 @@ pub enum ChunkType {
 }
 impl From<ChunkType> for Chunk {
     fn from(chunk_wrapper: ChunkType) -> Chunk {
-        println!("inside");
         match chunk_wrapper {
             ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk,
         }

@@ -1,6 +1,6 @@
 use std::{ffi::OsString, fs::{File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, path::Path, thread::current};
 
-use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
+use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int}};
 
 use color_print::cprint;
 use super::path::HBAMPath;
@@ -16,7 +16,7 @@ impl HBAMFile {
         std::fs::copy(path, &copy_path).expect("Unable to make new file.");
         println!("Copied file to: {:?}", copy_path);
         Self {
-            reader: BufReader::new(File::open(&path).expect("Unable to open file.")),
+            reader: BufReader::new(File::open(&copy_path).expect("Unable to open file.")),
             writer: BufWriter::new(
                 OpenOptions::new()
                 .write(true)
@@ -43,8 +43,6 @@ impl HBAMFile {
 
     pub fn emit_binary_chunk(&self, chunk: &Chunk, data_store: &DataStaging) -> Result<Vec<u8>, &str> {
         let mut out = vec![];
-        if chunk.ref_simple.is_some_and(|val| val == 16) {
-        }
         out.extend(chunk.to_bytes(data_store).expect("Unable to translate chunk to binary representation."));
         Ok(out)
     }
@@ -68,6 +66,7 @@ impl HBAMFile {
                 ChunkType::Modification(chunk) => {
                     // Look up from staging buffer
                     self.emit_binary_chunk(&chunk, data_store).expect("Unable to emit binary chunk.")
+                        
                 }
             };
             out_buffer.append(&mut bin_chunk);
@@ -76,15 +75,7 @@ impl HBAMFile {
         // Add padding if needed
         let padding = vec![0u8; 4096 - out_buffer.len()];
         out_buffer.extend(padding);
-        if out_buffer != in_buffer.buffer {
-            for i in out_buffer.iter().zip(in_buffer.buffer) {
-                if *i.0 != i.1 {
-                } else {
-                }
-            }
-        }
         debug_assert!(out_buffer.len() == 4096);
-        println!("\nCHANGES HAVE BEEN MADE");
         Ok(out_buffer)
     }
 
@@ -96,7 +87,8 @@ impl HBAMFile {
         if self.writer.write(&out_buffer).expect("Unable to write to file.") != 4096 {
             println!("DIDNT WRITE THE WHOLE BUFFER TBH");
         }
-        self.writer.flush().expect("Unable to flush the buffer");
+        // self.writer.flush().unwrap();
+        println!("Successfully wrote changes to file.");
         Ok(())
     }
 
@@ -231,26 +223,29 @@ impl HBAMFile {
         }
         current_block
     }
-    pub fn commit_changes(&mut self, diffs: &DiffCollection) {
-        unimplemented!()
-        // let location = tmp.store(fm_string_encrypt(table.name.clone()));
-        // let mut chunk_copy = leaf.chunks.iter()
-        //     .map(|chunk_wrapper| Chunk::from(chunk_wrapper.clone()))
-        //     .enumerate()
-        //     .filter(|(i, chunk)| {
-        //         chunk.ref_simple.is_some_and(|chunk| chunk == 16) 
-        //             && 
-        //         chunk.path == (&["3".to_string(), "16".to_string(), "5".to_string(), table.id.to_string()])})
-        //     .collect::<Vec<_>>()[0].clone();
-        // chunk_copy.1.data = Some(location);
-        // println!("FOUND IT");
-        // chunk_copy.1.opcode = match location.length {
-        //     1..=5 => location.length,
-        //     _ => 6,
-        // };
-        // let old_data_offset = Chunk::from(leaf.chunks[chunk_copy.0].clone()).data.unwrap();
-        // leaf.chunks[chunk_copy.0] = ChunkType::Modification(chunk_copy.1);
-        // file.write_node(block, data_store)
+
+    pub fn commit_table_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) -> Block {
+        let mut table_leaf = self.get_leaf(&HBAMPath::new(vec!["3", "16"]));
+        for object in &diffs.modified {
+            let location = data_store.store(fm_string_encrypt(object.name.clone()));
+            let mut chunk_copy = table_leaf.chunks.iter()
+                .map(|chunk_wrapper| Chunk::from(chunk_wrapper.clone()))
+                .enumerate()
+                .filter(|(_i, chunk)| {
+                    chunk.ref_simple.is_some_and(|chunk| chunk == 16) 
+                        && 
+                    chunk.path == (&["3".to_string(), "16".to_string(), "5".to_string(), object.id.to_string()])})
+                .collect::<Vec<_>>()[0].clone();
+            chunk_copy.1.data = Some(location);
+            chunk_copy.1.opcode = 6;
+            table_leaf.chunks[chunk_copy.0] = ChunkType::Modification(chunk_copy.1);
+        }
+        table_leaf
+    }
+
+    pub fn commit_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) {
+        let new_leaf = self.commit_table_changes(diffs, data_store);
+        self.write_node(&new_leaf, data_store).expect("Unable to write table block to file.")
     }
 }
 
@@ -258,7 +253,7 @@ impl HBAMFile {
 mod tests {
     use std::path::Path;
 
-    use crate::{fm_format::chunk::Chunk, hbam::path::HBAMPath, staging_buffer::DataStaging};
+    use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, hbam::path::HBAMPath, staging_buffer::DataStaging};
 
     use super::HBAMFile;
 
@@ -290,11 +285,13 @@ mod tests {
                     Chunk::from(current_chunk.clone()));
             }
         }
+    }
 
+    #[test]
+    fn changes_test() {
 
     }
 }
-
 
 
 

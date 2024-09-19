@@ -2,10 +2,10 @@ use crate::schema::{DBObject, Schema};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DiffCollection {
-    created: Vec<DBObject>,
-    modified: Vec<DBObject>,
-    deleted: Vec<DBObject>,
-    unmodified: Vec<DBObject>,
+    pub created: Vec<DBObject>,
+    pub modified: Vec<DBObject>,
+    pub deleted: Vec<DBObject>,
+    pub unmodified: Vec<DBObject>,
 }
 impl DiffCollection {
     pub fn new() -> Self {

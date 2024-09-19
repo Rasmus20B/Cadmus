@@ -1,26 +1,32 @@
 [
   {
     "id": 129,
-    "name": "blanket"
+    "name": "blanket",
+    "kind": "Table"
   },
   {
     "id": 130,
-    "name": "second_table"
+    "name": "second_table",
+    "kind": "Table"
   },
   {
     "id": 131,
-    "name": "third_table"
+    "name": "third_table",
+    "kind": "Table"
   },
   {
     "id": 132,
-    "name": "appeenndding"
+    "name": "appeenndding",
+    "kind": "Table"
   },
   {
     "id": 133,
-    "name": "anotherone"
+    "name": "anotherone",
+    "kind": "Table"
   },
   {
     "id": 134,
-    "name": "A_BCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "name": "A_BCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "kind": "Table"
   }
 ]
