@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(PartialEq, Eq, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, Debug)]
 pub struct HBAMPath {
     pub components: Vec<String>,
 }

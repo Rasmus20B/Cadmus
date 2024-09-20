@@ -7,7 +7,7 @@ use super::chunk::{Chunk, InstructionType};
 pub fn read_chunk(block: &Block, objects: &RwLock<FmpObjectManager>) {
     block.chunks.par_iter().enumerate().for_each(|(i, chunk_wrapper)| { 
         let chunk = Chunk::from(chunk_wrapper.clone());
-        match &chunk.path.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
+        match &chunk.path.components.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
             ["3", "16", "5", x] => {
                 if chunk.ctype == InstructionType::RefSimple {
                     match chunk.ref_simple.unwrap_or(0) {

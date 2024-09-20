@@ -29,7 +29,7 @@ fn load_tables(file: &mut HBAMFile) -> Vec<DBObject> {
     let mut tables = vec![];
     for chunk_wrapper in &block.chunks {
         let chunk = Chunk::from(chunk_wrapper.clone());
-        match chunk.path[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
+        match chunk.path.components[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
             ["3", "16", "5", x] => {
                 if chunk.ref_simple.is_some() {
                     if chunk.ref_simple.unwrap() == 16 {
@@ -63,7 +63,7 @@ impl InputContext {
 
 
 fn main() -> Result<(), std::io::Error>{
-    let mut file: Option<HBAMFile> = None;
+    let mut base_file: Option<HBAMFile> = None;
     let mut ctx = InputContext::new();
 
     let args = CLI::parse();
@@ -75,23 +75,32 @@ fn main() -> Result<(), std::io::Error>{
     }
 
     if args.fmp.is_some() {
-        file = Some(HBAMFile::new(Path::new(&args.fmp.as_ref().unwrap())));
-        ctx.fmp.objects.extend(load_tables(&mut file.as_mut().unwrap()));
+        base_file = Some(HBAMFile::new(Path::new(&args.fmp.as_ref().unwrap())));
 
         if args.print_directory.is_some() {
             let dir = HBAMPath::from(args.print_directory.unwrap());
-            let (leaf, buffer) = file.as_mut().unwrap().get_leaf_with_buffer(&dir);
+            let (leaf, buffer) = base_file.as_mut().unwrap().get_leaf_with_buffer(&dir);
             for wrapper in leaf.chunks {
                 let chunk = Chunk::from(wrapper);
                 println!("{}", chunk.chunk_to_string(&buffer))
             }
         }
+
+        if args.print_all_blocks {
+            base_file.as_mut().unwrap().print_all_chunks();
+        }
     }
 
     if args.sync {
+        let path_text = args.fmp.clone().unwrap();
+        let path = Path::new(&path_text);
+        let copy_path = path.with_file_name(path.file_name().unwrap().to_str().unwrap().strip_suffix(".fmp12").unwrap().to_string() + "_patch.fmp12");
+        std::fs::copy(path, &copy_path).expect("Unable to create patch file.");
+        let mut patch_file = HBAMFile::new(Path::new(&copy_path));
+        ctx.fmp.objects.extend(load_tables(&mut patch_file));
         let diffs = get_diff(&ctx.fmp, &ctx.cad);
         let mut data_buffer = DataStaging::new();
-        file.unwrap().commit_changes(&diffs, &mut data_buffer);
+        patch_file.commit_changes(&diffs, &mut data_buffer);
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */
     }

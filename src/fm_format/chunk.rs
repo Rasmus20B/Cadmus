@@ -1,6 +1,6 @@
 use core::fmt;
 use std::{fmt::Formatter, ops::RangeBounds};
-use crate::{fm_io::{block::Block, storage::BlockStorage}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
+use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::path::HBAMPath, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InstructionType {
@@ -34,6 +34,14 @@ impl From<ChunkType> for Chunk {
     }
 }
 
+impl From<&ChunkType> for Chunk {
+    fn from(chunk_wrapper: &ChunkType) -> Chunk {
+        match chunk_wrapper {
+            ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Chunk {
     pub offset: u16,
@@ -41,7 +49,7 @@ pub struct Chunk {
     pub opcode: u16,
     pub data: Option<BlockStorage>,
     pub ref_data: Option<BlockStorage>,
-    pub path: Vec::<String>,
+    pub path: HBAMPath,
     pub ref_simple: Option<u16>,
     pub segment_idx: Option<u8>,
 }
@@ -53,7 +61,7 @@ impl Chunk {
            code: u16,
            data: Option<BlockStorage>,
            ref_data: Option<BlockStorage>,
-           path: Vec::<String>,
+           path: HBAMPath,
            segment_idx: Option<u8>,
            ref_simple: Option<u16>,
         ) -> Self {
@@ -397,7 +405,7 @@ impl Chunk {
                         saved_chunk_code.into(),
                         data,
                         ref_data,
-                        path.clone(),
+                        HBAMPath::new(path.to_vec()),
                         segidx,
                         ref_simple);
         if delayed > 0 {
@@ -410,7 +418,7 @@ impl Chunk {
         match self.ctype {
             InstructionType::DataSegment => {
                 format!("path:{:?}::segment:{:?}::data:{:?}::size:{:?}::ins:{:x}", 
-                    self.path,
+                    self.path.components,
                      self.segment_idx.unwrap(),
                      self.data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().length,
@@ -418,7 +426,7 @@ impl Chunk {
             },
             InstructionType::RefSimple => {
                 format!("path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      self.ref_simple.unwrap(),
                      self.data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().length,
@@ -426,14 +434,14 @@ impl Chunk {
             }
             InstructionType::DataSimple => {
                 format!("path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      self.data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().length,
                      self.opcode)
             }
             InstructionType::RefLong => {
                 format!("path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      self.ref_data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().length,
@@ -441,20 +449,20 @@ impl Chunk {
             }
             InstructionType::PathPush => {
                 format!("path:{:?}::reference:PUSH::ref_data:{:?}::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      self.data.unwrap().lookup_from_buffer(buffer),
                      self.data.unwrap().length,
                      self.opcode)
             }
             InstructionType::PathPop => {
                 format!("path:{:?}::reference:POP::ref_data:None::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      0,
                      self.opcode)
             }
             InstructionType::Noop => {
                 format!("path:{:?}::reference:NOOP::ref_data:None::size:{}::ins:{:x}", 
-                     self.path,
+                     self.path.components,
                      0,
                      self.opcode)
             }
@@ -467,7 +475,7 @@ impl fmt::Display for Chunk {
     match self.ctype {
         InstructionType::DataSegment => {
             write!(f, "path:{:?}::segment:{:?}::data:{:?}::size:{:?}::ins:{:x}", 
-                self.path,
+                self.path.components,
                  self.segment_idx.unwrap(),
                  self.data.unwrap(),
                  self.data.unwrap().length,
@@ -475,7 +483,7 @@ impl fmt::Display for Chunk {
         },
         InstructionType::RefSimple => {
             write!(f, "path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  self.ref_simple.unwrap(),
                  self.data.unwrap(),
                  self.data.unwrap().length,
@@ -483,14 +491,14 @@ impl fmt::Display for Chunk {
         }
         InstructionType::DataSimple => {
             write!(f, "path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  self.data.unwrap(),
                  self.data.unwrap().length,
                  self.opcode)
         }
         InstructionType::RefLong => {
             write!(f, "path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  self.ref_data.unwrap(),
                  self.data.unwrap(),
                  self.data.unwrap().length,
@@ -498,20 +506,20 @@ impl fmt::Display for Chunk {
         }
         InstructionType::PathPush => {
             write!(f, "path:{:?}::reference:PUSH::ref_data:{:?}::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  self.data.unwrap(),
                  self.data.unwrap().length,
                  self.opcode)
         }
         InstructionType::PathPop => {
             write!(f, "path:{:?}::reference:POP::ref_data:None::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  0,
                  self.opcode)
         }
         InstructionType::Noop => {
             write!(f, "path:{:?}::reference:NOOP::ref_data:None::size:{}::ins:{:x}", 
-                 self.path,
+                 self.path.components,
                  0,
                  self.opcode)
         }
