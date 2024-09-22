@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 
-#[derive(Clone, PartialEq, Eq, Ord, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Ord, Debug, Clone)]
 pub struct HBAMPath {
     pub components: Vec<String>,
 }

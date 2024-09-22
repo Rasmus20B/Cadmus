@@ -1,8 +1,9 @@
-use std::{ffi::OsString, fs::{File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, path::Path, thread::current};
+use std::{ffi::OsString, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, ops::DerefMut, path::Path, thread::current};
 
 use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int}}};
 
 use color_print::cprint;
+use rayon::iter::Zip;
 use super::path::HBAMPath;
 
 pub struct HBAMFile {
@@ -55,17 +56,12 @@ impl HBAMFile {
         let mut out_buffer: Vec<u8> = vec![];
         out_buffer.append(&mut self.emit_binary_block_header(&block).expect("Unable to emit block header to buffer"));
         for chunk_wrapper in &block.chunks {
-            let mut bin_chunk = match chunk_wrapper {
-                ChunkType::Unchanged(chunk) => {
-                    // Look up from old file.
-                    self.emit_binary_chunk(&chunk, &in_buffer).expect("Unable to emit binary chunk.")
-                }
-                ChunkType::Modification(chunk) => {
-                    // Look up from staging buffer
-                    self.emit_binary_chunk(&chunk, data_store).expect("Unable to emit binary chunk.")
-                        
-                }
-            };
+            let mut bin_chunk = self.emit_binary_chunk(
+                chunk_wrapper.chunk(), 
+                match chunk_wrapper {
+                    ChunkType::Unchanged(..) => &in_buffer,
+                    ChunkType::Modification(..) => data_store
+                }).expect("Unable to emit binary chunk.");
             out_buffer.append(&mut bin_chunk);
         }
 
@@ -157,9 +153,19 @@ impl HBAMFile {
         current_block
     }
 
+    pub fn write_dir_chunks_json(&mut self, path: &HBAMPath) {
+        let (leaf, _buffer) = self.get_leaf_with_buffer(path);
+        let json = serde_json::to_string_pretty(&leaf.chunks).expect("Unable to serialize chunks.");
+        write("table_chunks.json", json).expect("Unable to write chunks to json file.");
+    }
+    
+    pub fn write_all_chunks_json(&mut self) {
+        unimplemented!()
+    }
+
     pub fn print_all_chunks(&mut self) {
-        let mut buffer = [0u8; 4096];
-        self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
+        let mut buffer = [0u8; Block::CAPACITY];
+        self.reader.seek(std::io::SeekFrom::Start(Block::CAPACITY as u64)).expect("Could not seek into file.");
         self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
 
         let mut index = 2;
@@ -167,7 +173,7 @@ impl HBAMFile {
         while index != 0 {
             println!("======================");
             println!("Block: {}", index);
-            self.reader.seek(std::io::SeekFrom::Start(index * 4096)).expect("Could not seek into file.");
+            self.reader.seek(std::io::SeekFrom::Start(index * Block::CAPACITY as u64)).expect("Could not seek into file.");
             self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
             let leaf = Block::new(&buffer);
             for chunk in leaf.chunks {
@@ -220,64 +226,89 @@ impl HBAMFile {
         current_block
     }
 
-    pub fn commit_table_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) -> Block {
-        let (mut table_leaf, buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["3", "16"]));
-        let meta_search_path = HBAMPath::new(vec!["3", "16", "1", "1"]);
-        let mut directory = table_leaf.chunks
+    pub fn get_directory_bounds<'a>(&self, leaf: &'a Block, path: &HBAMPath) -> (usize, usize) {
+        let mut full = leaf.chunks
             .iter()
+            .map(|wrapper| wrapper.chunk())
             .enumerate()
-            .skip_while(|c| Chunk::from(c.1).path != meta_search_path)
+            .skip_while(|c| c.1.path != *path)
             .scan(false, |_found, wrapper| {
-                let chunk = Chunk::from(wrapper.1);
-                if chunk.path != meta_search_path {
+                let chunk = wrapper.1;
+                if chunk.path != *path {
                     return None;
                 } else {
                     Some((wrapper.0, chunk))
                 }
             })
-            .skip(2)
-            .collect::<Vec<_>>();
+            .skip(2);
+        (full.nth(0).unwrap().0, full.last().unwrap().0)
+    }
+
+    pub fn get_keyref<'a>(&self, directory: &'a [ChunkType], key: u16) -> Option<&'a ChunkType> {
+        for wrapper in directory {
+            let chunk = wrapper.chunk();
+            println!("ref: {:?}", chunk.ref_simple);
+            if chunk.ref_simple == Some(key as u16) {
+                return Some(wrapper);
+            }
+        }
+        None
+    }
+    
+    pub fn get_keyref_mut<'a>(&self, directory: &'a mut [ChunkType], key: u16) -> Option<&'a mut ChunkType> {
+        for wrapper in directory {
+            let chunk = wrapper.chunk_mut();
+            println!("ref: {:?}", chunk.ref_simple);
+            if chunk.ref_simple == Some(key as u16) {
+                return Some(wrapper);
+            }
+        }
+        None
+    }
+
+    pub fn get_keyref_by_path(&self, directory: &HBAMPath, key: usize) -> &Chunk {
+        unimplemented!()
+    }
+
+    pub fn commit_table_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) -> Block {
+        let (mut table_leaf, buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["3", "16"]));
+        let meta_search_path = HBAMPath::new(vec!["3", "16", "1", "1"]);
+        let (meta_start, meta_end) = self.get_directory_bounds(&table_leaf, &meta_search_path);
 
         for object in &diffs.modified {
-            /* Double encoded table name */
             let mut double_encoded = encode_text(&object.name);
-            double_encoded.extend(vec![0, 0, 0]);
+            double_encoded.append(&mut vec![0, 0, 0]);
             let double_encoded_location = data_store.store(double_encoded);
-            let (index, file) = &mut directory
-                .iter_mut()
-                .find(|chunk| {
-                    let buf = chunk.1.data.unwrap().lookup_from_buffer(&buffer).expect("");
-                    let n = get_int(&buf[buf[0] as usize..]);
-                    if n + 128 == object.id {
-                        return true
-                    }
-                    return false
-                }).unwrap();
+            for ref mut wrapper in table_leaf.chunks[meta_start..=meta_end].iter_mut() {
+                let buf = match wrapper {
+                    ChunkType::Modification(chunk) => chunk.data.unwrap().lookup_from_buffer(&data_store.buffer).unwrap(),
+                    ChunkType::Unchanged(chunk) => chunk.data.unwrap().lookup_from_buffer(&buffer).unwrap(),
+                };
+                let n = get_int(&buf[buf[0] as usize..]) + 128;
+                let chunk = wrapper.chunk_mut();
+                let index_location = data_store.store(buf.clone());
+                if n == object.id {
+                    chunk.ref_data = Some(double_encoded_location);
+                    chunk.data = Some(index_location);
+                    let new = ChunkType::Modification(wrapper.chunk().clone());
+                    *wrapper.deref_mut() = new;
+                }
+            }
 
-            file.ref_data = Some(double_encoded_location);
-            file.data = Some(data_store.store(file.data.unwrap().lookup_from_buffer(&buffer).unwrap()));
-            table_leaf.chunks[*index] = ChunkType::Modification(file.clone());
-
-            /* Table metadata storage */
-            let location = data_store.store(fm_string_encrypt(object.name.clone()));
-            let mut chunk_copy = table_leaf.chunks.iter()
-                .map(|chunk_wrapper| Chunk::from(chunk_wrapper.clone()))
-                .enumerate()
-                .filter(|(_i, chunk)| {
-                    chunk.ref_simple.is_some_and(|chunk| chunk == 16) 
-                        && 
-                    chunk.path == HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()])})
-                .collect::<Vec<_>>()[0].clone();
-            chunk_copy.1.data = Some(location);
-            chunk_copy.1.opcode = 6;
-            table_leaf.chunks[chunk_copy.0] = ChunkType::Modification(chunk_copy.1);
+            let (store_start, store_end) = self.get_directory_bounds(&table_leaf, &HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()]));
+            let name_chunk = self.get_keyref_mut(&mut table_leaf.chunks[store_start..=store_end], 16);
+            if let Some(wrapper) = name_chunk {
+                let inner = wrapper.chunk_mut();
+                inner.data = Some(data_store.store(fm_string_encrypt(object.name.clone())));
+                *wrapper = ChunkType::Modification(inner.clone());
+            }
         }
         table_leaf
     }
 
     pub fn commit_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) {
         let new_leaf = self.commit_table_changes(diffs, data_store);
-        self.write_node(&new_leaf, data_store).expect("Unable to write table block to file.")
+        self.write_node(&new_leaf, data_store).expect("Unable to write table block to file.");
     }
 }
 

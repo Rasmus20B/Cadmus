@@ -35,15 +35,9 @@ pub fn encode_char(ch: char) -> (u8, u8) {
 }
 
 pub fn encode_text(text: &str) -> Vec<u8> {
-    let mut res = text.chars()
+    text.chars()
         .map(|c| encode_char(c))
-        .collect::<Vec<(u8, u8)>>();
-
-    unsafe {
-        res.set_len(res.len() * 2);
-        std::mem::transmute(res)
-    }
-
+        .flat_map(|pair| [pair.0, pair.1].iter().cloned().collect::<Vec<_>>()).collect()
 }
 
 #[cfg(test)]

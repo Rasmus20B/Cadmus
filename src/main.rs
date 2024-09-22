@@ -31,14 +31,12 @@ fn load_tables(file: &mut HBAMFile) -> Vec<DBObject> {
         let chunk = Chunk::from(chunk_wrapper.clone());
         match chunk.path.components[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
             ["3", "16", "5", x] => {
-                if chunk.ref_simple.is_some() {
-                    if chunk.ref_simple.unwrap() == 16 {
+                    if chunk.ref_simple == Some(16) {
                         let data_uw = chunk.data.unwrap();
                         let string = data_uw.lookup_from_buffer(&buffer.to_vec()).expect("Unable to lookup data from file.");
                         let decoded = fm_string_decrypt(&string);
                         tables.push(DBObject { id: x.parse().unwrap(), name: decoded, kind: DBObjectKind::Table });
                     }
-                }
             }
             _ => {}
         };

@@ -1,5 +1,7 @@
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy)]
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct BlockStorage {
     pub offset: u16,
     pub length: u16,

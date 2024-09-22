@@ -1,8 +1,10 @@
 use core::fmt;
+use serde_json;
+use serde::{self, Deserialize, Serialize};
 use std::{fmt::Formatter, ops::RangeBounds};
 use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::path::HBAMPath, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InstructionType {
     DataSimple = 0,
     RefSimple = 1,
@@ -21,11 +23,26 @@ pub enum BlockErr {
     MalformedInstruction,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ChunkType {
     Modification(Chunk),
     Unchanged(Chunk),
 }
+
+impl ChunkType {
+    pub const fn chunk(&self) -> &Chunk {
+        match self {
+            ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk
+        }
+    }
+
+    pub fn chunk_mut(&mut self) -> &mut Chunk {
+        match self {
+            ChunkType::Modification(chunk) | ChunkType::Unchanged(chunk) => chunk
+        }
+    }
+}
+
 impl From<ChunkType> for Chunk {
     fn from(chunk_wrapper: ChunkType) -> Chunk {
         match chunk_wrapper {
@@ -42,7 +59,7 @@ impl From<&ChunkType> for Chunk {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Chunk {
     pub offset: u16,
     pub ctype: InstructionType,
