@@ -1,6 +1,6 @@
 use std::{ffi::OsString, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, ops::DerefMut, path::Path, thread::current};
 
-use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::{self, DataStaging}, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use color_print::cprint;
 use rayon::iter::Zip;
@@ -9,6 +9,10 @@ use super::path::HBAMPath;
 pub struct HBAMFile {
     reader: BufReader<File>,
     writer: BufWriter<File>,
+    cursor: usize,
+    loaded_block: Option<Block>,
+    block_buffer: DataStaging,
+    staging_buffer: DataStaging,
 }
 
 impl HBAMFile {
@@ -20,6 +24,10 @@ impl HBAMFile {
                 .open(&path)
                 .expect("Unable to open file.")),
             reader: BufReader::new(File::open(&path).expect("Unable to open file.")),
+            cursor: 0,
+            loaded_block: None,
+            block_buffer: DataStaging::new(),
+            staging_buffer: DataStaging::new(),
         }
     }
 
@@ -226,6 +234,75 @@ impl HBAMFile {
         current_block
     }
 
+    fn goto_directory(&mut self, path: &HBAMPath) -> Result<(), String> {
+        self.loaded_block = Some(self.get_leaf(path));
+        loop {
+            for offset in 0..self.loaded_block.as_ref().unwrap().chunks.len() {
+                let chunk = self.loaded_block.as_ref().unwrap().chunks[offset].chunk();
+                if chunk.path == *path {
+                    self.cursor = offset;
+                    return Ok(())
+                } else if chunk.path > *path {
+                    return Err(format!("Directory {:?} not found.", path));
+                }
+            }
+            self.loaded_block = Some(self.get_leaf_n(self.loaded_block.as_ref().unwrap().next as u64));
+        }
+    }
+
+    fn get_kv(&mut self, key: u16) -> Result<ChunkType, String> {
+        let dir_path = self.loaded_block.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
+        loop {
+            for offset in self.cursor..self.loaded_block.as_ref().unwrap().chunks.len() {
+                let wrapper = &self.loaded_block.as_ref().unwrap().chunks[offset];
+                let chunk = wrapper.chunk();
+                if chunk.ref_simple == Some(key) {
+                    if dir_path == chunk.path {
+                        return Ok(wrapper.clone());
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.loaded_block = Some(self.get_leaf_n(self.loaded_block.as_ref().unwrap().next as u64));
+        }
+    }
+
+    fn set_kv(&mut self, key: u16, data: &[u8]) -> Result<(), String> {
+        let dir_path = self.loaded_block.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
+        loop {
+            for offset in self.cursor..self.loaded_block.as_ref().unwrap().chunks.len() {
+                let wrapper = &mut self.loaded_block.as_mut().unwrap().chunks[offset];
+                let chunk = wrapper.chunk_mut();
+                if chunk.ref_simple == Some(key) {
+                    if dir_path == chunk.path {
+                        let location = self.staging_buffer.store(data.to_vec());
+                        chunk.data = Some(location);
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.loaded_block = Some(self.get_leaf_n(self.loaded_block.as_ref().unwrap().next as u64));
+        }
+    }
+
+    fn set_long_kv(&mut self, key: Vec<u8>) -> Result<(), String> {
+        let dir_path = self.loaded_block.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
+        loop {
+            for offset in self.cursor..self.loaded_block.as_ref().unwrap().chunks.len() {
+                let wrapper = &self.loaded_block.as_ref().unwrap().chunks[offset];
+                let chunk = wrapper.chunk();
+                if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(&self.staging_buffer.buffer) {
+                    if dir_path == chunk.path {
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.loaded_block = Some(self.get_leaf_n(self.loaded_block.as_ref().unwrap().next as u64));
+        }
+    }
     pub fn get_directory_bounds<'a>(&self, leaf: &'a Block, path: &HBAMPath) -> (usize, usize) {
         let mut full = leaf.chunks
             .iter()
@@ -355,6 +432,10 @@ impl HBAMFile {
             copy[36] += 1;
             inner.data = Some(data_store.store(copy));
             **metachunk2 = ChunkType::Modification(inner.clone());
+
+            let (mut occurrence_leaf, buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["2"]));
+            let occurencechunk1 = &mut self.get_keyref_by_path_mut(&mut meta_leaf, &HBAMPath::new(vec!["2"]), 8).expect("Unable to get keyref.");
+
         }
         output_blocks.push(table_leaf);
         output_blocks
