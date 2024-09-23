@@ -390,7 +390,7 @@ impl Chunk {
             ctype = InstructionType::PathPush;
             *offset += 1;
             data = Some(BlockStorage{ offset: *offset as u16, length: 3 });
-            let dir = get_path_int(&code[*offset..*offset+3]).to_string();
+            let dir = get_path_int(&code[*offset+1..*offset+3]).to_string();
             path.push(dir.to_string());
             *offset += 3;
         } else if chunk_code == 0x38 {

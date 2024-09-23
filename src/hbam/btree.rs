@@ -345,6 +345,7 @@ impl HBAMFile {
             let inner = metachunk1.chunk_mut();
             let mut copy = inner.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to find offset in buffer.");
             copy[42] += 1;
+            copy[157] += 1;
             inner.data = Some(data_store.store(copy));
             **metachunk1 = ChunkType::Modification(inner.clone());
 
