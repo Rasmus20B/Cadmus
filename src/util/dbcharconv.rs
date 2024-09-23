@@ -37,7 +37,8 @@ pub fn encode_char(ch: char) -> (u8, u8) {
 pub fn encode_text(text: &str) -> Vec<u8> {
     text.chars()
         .map(|c| encode_char(c))
-        .flat_map(|pair| [pair.0, pair.1].iter().cloned().collect::<Vec<_>>()).collect()
+        .flat_map(|pair| [pair.0, pair.1].iter().cloned().collect::<Vec<_>>())
+        .collect()
 }
 
 #[cfg(test)]

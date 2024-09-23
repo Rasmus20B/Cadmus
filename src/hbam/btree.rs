@@ -1,6 +1,6 @@
 use std::{ffi::OsString, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, ops::DerefMut, path::Path, thread::current};
 
-use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int}}};
+use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::DataStaging, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use color_print::cprint;
 use rayon::iter::Zip;
@@ -232,14 +232,7 @@ impl HBAMFile {
             .map(|wrapper| wrapper.chunk())
             .enumerate()
             .skip_while(|c| c.1.path != *path)
-            .scan(false, |_found, wrapper| {
-                let chunk = wrapper.1;
-                if chunk.path != *path {
-                    return None;
-                } else {
-                    Some((wrapper.0, chunk))
-                }
-            })
+            .filter(|c| c.1.path == *path)
             .skip(2);
         (full.nth(0).unwrap().0, full.last().unwrap().0)
     }
@@ -247,7 +240,6 @@ impl HBAMFile {
     pub fn get_keyref<'a>(&self, directory: &'a [ChunkType], key: u16) -> Option<&'a ChunkType> {
         for wrapper in directory {
             let chunk = wrapper.chunk();
-            println!("ref: {:?}", chunk.ref_simple);
             if chunk.ref_simple == Some(key as u16) {
                 return Some(wrapper);
             }
@@ -258,7 +250,6 @@ impl HBAMFile {
     pub fn get_keyref_mut<'a>(&self, directory: &'a mut [ChunkType], key: u16) -> Option<&'a mut ChunkType> {
         for wrapper in directory {
             let chunk = wrapper.chunk_mut();
-            println!("ref: {:?}", chunk.ref_simple);
             if chunk.ref_simple == Some(key as u16) {
                 return Some(wrapper);
             }
@@ -266,11 +257,18 @@ impl HBAMFile {
         None
     }
 
-    pub fn get_keyref_by_path(&self, directory: &HBAMPath, key: usize) -> &Chunk {
-        unimplemented!()
+    pub fn get_keyref_by_path_mut<'a>(&self, leaf: &'a mut Block, directory: &HBAMPath, key: u16) -> Option<&'a mut ChunkType> {
+        for wrapper in &mut leaf.chunks {
+            let chunk = wrapper.chunk_mut();
+            if chunk.path == *directory && chunk.ref_simple == Some(key) {
+                return Some(wrapper);
+            }
+        }
+        None
     }
 
-    pub fn commit_table_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) -> Block {
+    pub fn commit_table_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) -> Vec<Block> {
+        let mut output_blocks = vec![];
         let (mut table_leaf, buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["3", "16"]));
         let meta_search_path = HBAMPath::new(vec!["3", "16", "1", "1"]);
         let (meta_start, meta_end) = self.get_directory_bounds(&table_leaf, &meta_search_path);
@@ -280,11 +278,15 @@ impl HBAMFile {
             double_encoded.append(&mut vec![0, 0, 0]);
             let double_encoded_location = data_store.store(double_encoded);
             for ref mut wrapper in table_leaf.chunks[meta_start..=meta_end].iter_mut() {
+                let inner_read = wrapper.chunk();
+                if inner_read.path != HBAMPath::new(vec!["3", "16", "1", "1"]) {
+                    continue;
+                }
                 let buf = match wrapper {
                     ChunkType::Modification(chunk) => chunk.data.unwrap().lookup_from_buffer(&data_store.buffer).unwrap(),
                     ChunkType::Unchanged(chunk) => chunk.data.unwrap().lookup_from_buffer(&buffer).unwrap(),
                 };
-                let n = get_int(&buf[buf[0] as usize..]) + 128;
+                let n = get_int(&buf[buf[0] as usize..]) + 127;
                 let chunk = wrapper.chunk_mut();
                 let index_location = data_store.store(buf.clone());
                 if n == object.id {
@@ -295,20 +297,73 @@ impl HBAMFile {
                 }
             }
 
+            for ref mut wrapper in &mut table_leaf.chunks {
+                let inner_read = wrapper.chunk();
+                if inner_read.path != HBAMPath::new(vec!["3", "16", "1"]) || inner_read.ref_simple != Some(252) {
+                    continue;
+                }
+                let buf = match wrapper {
+                    ChunkType::Modification(chunk) => chunk.data.unwrap().lookup_from_buffer(&data_store.buffer).unwrap(),
+                    ChunkType::Unchanged(chunk) => chunk.data.unwrap().lookup_from_buffer(&buffer).unwrap(),
+                };
+                let n = get_int(&buf[buf[0] as usize..]) + 1;
+                let mut new = put_path_int(n as u32);
+                new.insert(0, new.len() as u8);
+                let inner_write = wrapper.chunk_mut();
+                inner_write.data = Some(data_store.store(new));
+                let new = ChunkType::Modification(inner_write.clone());
+                **wrapper = new;
+                break;
+
+            }
+
             let (store_start, store_end) = self.get_directory_bounds(&table_leaf, &HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()]));
+
             let name_chunk = self.get_keyref_mut(&mut table_leaf.chunks[store_start..=store_end], 16);
             if let Some(wrapper) = name_chunk {
                 let inner = wrapper.chunk_mut();
                 inner.data = Some(data_store.store(fm_string_encrypt(object.name.clone())));
                 *wrapper = ChunkType::Modification(inner.clone());
             }
+
+            let change_chunk = self.get_keyref_mut(&mut table_leaf.chunks[store_start..=store_end], 252);
+            if let Some(wrapper) = change_chunk {
+                let buf = match wrapper {
+                    ChunkType::Modification(chunk) => chunk.data.unwrap().lookup_from_buffer(&data_store.buffer).unwrap(),
+                    ChunkType::Unchanged(chunk) => chunk.data.unwrap().lookup_from_buffer(&buffer).unwrap(),
+                };
+                let inner = wrapper.chunk_mut();
+                let n = get_int(&buf[buf[0] as usize..]) + 1;
+                let mut new = put_path_int(n as u32);
+                new.insert(0, new.len() as u8);
+                inner.data = Some(data_store.store(new));
+                *wrapper = ChunkType::Modification(inner.clone());
+            }
+
+            let (mut meta_leaf, buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["2"]));
+            let metachunk1 = &mut self.get_keyref_by_path_mut(&mut meta_leaf, &HBAMPath::new(vec!["2"]), 8).expect("Unable to get keyref.");
+            let inner = metachunk1.chunk_mut();
+            let mut copy = inner.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to find offset in buffer.");
+            copy[42] += 1;
+            inner.data = Some(data_store.store(copy));
+            **metachunk1 = ChunkType::Modification(inner.clone());
+
+            let metachunk2 = &mut self.get_keyref_by_path_mut(&mut meta_leaf, &HBAMPath::new(vec!["2"]), 9).expect("Unable to get keyref.");
+            let inner = metachunk2.chunk_mut();
+            let mut copy = inner.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to find offset in buffer.");
+            copy[36] += 1;
+            inner.data = Some(data_store.store(copy));
+            **metachunk2 = ChunkType::Modification(inner.clone());
         }
-        table_leaf
+        output_blocks.push(table_leaf);
+        output_blocks
     }
 
     pub fn commit_changes(&mut self, diffs: &DiffCollection, data_store: &mut DataStaging) {
-        let new_leaf = self.commit_table_changes(diffs, data_store);
-        self.write_node(&new_leaf, data_store).expect("Unable to write table block to file.");
+        let new_leaves = self.commit_table_changes(diffs, data_store);
+        for leaf in new_leaves {
+            self.write_node(&leaf, data_store).expect("Unable to write table block to file.");
+        }
     }
 }
 
