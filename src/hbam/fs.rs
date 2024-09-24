@@ -1,19 +1,21 @@
 use std::path::Path;
 
-use crate::{fm_format::chunk::ChunkType, hbam::btree::HBAMCursor};
+use crate::{fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, staging_buffer::DataStaging};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
 
 pub struct HBAMInterface {
     inner: HBAMFile,
+    staging_buffer: DataStaging,
 }
 
 impl HBAMInterface {
 
     pub fn new(path: &Path) -> Self {
         Self {
-            inner: HBAMFile::new(path)
+            inner: HBAMFile::new(path),
+            staging_buffer: DataStaging::new(),
         }
     }
 
@@ -54,27 +56,30 @@ impl HBAMInterface {
         }
     }
 
-//     fn set_kv(&mut self, key: u16, data: &[u8]) -> Result<(), String> {
-//         let dir_path = self.cached_blocks.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
-//         loop {
-//             for offset in self.cursor..self.cached_blocks.as_ref().unwrap().chunks.len() {
-//                 let ref mut wrapper = &mut self.cached_blocks.as_mut().unwrap().chunks[offset];
-//                 let chunk = wrapper.chunk_mut();
-//                 if chunk.ref_simple == Some(key) {
-//                     if dir_path == chunk.path {
-//                         println!("Setting {} to {:?} @ path {:?}", key, data, dir_path);
-//                         let location = self.staging_buffer.store(data.to_vec());
-//                         chunk.data = Some(location);
-//                         **wrapper = ChunkType::Modification(chunk.clone());
-//                         return Ok(())
-//                     }
-//                 } else if chunk.path > dir_path {
-//                     return Err(format!("Key {} not found in directory {:?}", key, dir_path));
-//                 }
-//             }
-//             self.cached_blocks = Some(self.load_leaf_n_from_disk(self.cached_blocks.as_ref().unwrap().next as u64));
-//         }
-//     }
+    fn set_kv(&mut self, key: u16, data: &[u8]) -> Result<(), String> {
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let mut block = self.inner.get_current_block_mut();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let ref mut wrapper = &mut block.chunks[offset];
+                let chunk = wrapper.chunk_mut();
+                if chunk.ref_simple == Some(key) {
+                    if dir_path == chunk.path {
+                        println!("Setting {} to {:?} @ path {:?}", key, data, dir_path);
+                        let location = self.staging_buffer.store(data.to_vec());
+                        chunk.data = Some(location);
+                        **wrapper = ChunkType::Modification(chunk.clone());
+                        return Ok(())
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {} not found in directory {:?}", key, dir_path));
+                }
+            }
+            block = self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            start = 0;
+        }
+    }
 //
 //     fn set_long_kv(&mut self, key: &Vec<u8>, data: &[u8]) -> Result<(), String> {
 //         let dir_path = self.cached_blocks.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
@@ -273,8 +278,8 @@ impl HBAMInterface {
 //         for leaf in new_leaves {
 //             self.write_node(&leaf).expect("Unable to write table block to file.");
 //         }
-//     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -321,6 +326,21 @@ mod tests {
         let kv = file.get_kv(4).unwrap();
         let buffer = file.inner.get_buffer_from_leaf(file.inner.cursor.block_index as u64);
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![0, 0, 0, 3]);
+    }
+
+    #[test]
+    fn kv_set_test() {
+        let mut file = HBAMInterface::new(Path::new("test_data/input/blank.fmp12"));
+        file.goto_directory(&HBAMPath::new(vec!["3", "16", "5", "129"])).expect("Unable to go to directory.");
+        let buffer = file.inner.get_buffer_from_leaf(file.inner.cursor.block_index as u64);
+
+        let kv = file.get_kv(16).unwrap();
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![56, 54, 59, 52, 49]);
+
+        file.set_kv(16, &[23, 15, 72, 112, 49]).expect("Unable to set keyvalue");
+        let kv = file.get_kv(16).unwrap();
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![23, 15, 72, 112, 49]);
+
     }
 }
 

@@ -28,8 +28,8 @@ pub struct HBAMFile {
     writer: BufWriter<File>,
     pub cursor: HBAMCursor,
     pub cached_blocks: HashMap<BlockIndex, Block>,
-    block_buffer: DataStaging,
-    staging_buffer: DataStaging,
+    pub block_buffer: DataStaging,
+    pub staging_buffer: DataStaging,
 }
 
 impl HBAMFile {
@@ -195,6 +195,10 @@ impl HBAMFile {
         self.cached_blocks.get(&self.cursor.block_index).unwrap()
     }
 
+    pub fn get_current_block_mut(&mut self) -> &mut Block {
+        self.cached_blocks.get_mut(&self.cursor.block_index).unwrap()
+    }
+
     pub fn get_block_chunks(&self) -> &Vec<ChunkType> {
         &self.get_current_block().chunks
     }
@@ -279,15 +283,28 @@ impl HBAMFile {
             self.cursor.chunk_index = 0;
             return Ok(self.cached_blocks.get(&next).unwrap());
         } else {
-            let block = self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
+            self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
             self.cursor.block_index = next;
             self.cursor.chunk_index = 0;
             return Ok(self.cached_blocks.get(&next).unwrap());
         }
     }
 
+    pub fn get_next_leaf_mut(&mut self) -> Result<&mut Block, String> {
+        debug_assert!(!self.cached_blocks.is_empty());
+        let next = self.cached_blocks[&self.cursor.block_index].next;
 
-    
+        if self.cached_blocks.contains_key(&(next)) {
+            self.cursor.block_index = next;
+            self.cursor.chunk_index = 0;
+            return Ok(self.cached_blocks.get_mut(&next).unwrap());
+        } else {
+            self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
+            self.cursor.block_index = next;
+            self.cursor.chunk_index = 0;
+            return Ok(self.cached_blocks.get_mut(&next).unwrap());
+        }
+    }
 }
 
 #[cfg(test)]
