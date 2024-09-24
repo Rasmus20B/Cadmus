@@ -40,8 +40,6 @@ impl PartialOrd for HBAMPath {
         if self.components.is_empty() && !other.components.is_empty() { return Some(Ordering::Less) }
         if !self.components.is_empty() && other.components.is_empty() { return Some(Ordering::Greater) }
 
-        println!("PATHS: {:?}, {:?}", self, other);
-
         let path1 = self.components.iter()
             .map(|component| component.parse::<usize>().expect("Unable to parse path."))
             .collect::<Vec<usize>>();
@@ -52,7 +50,6 @@ impl PartialOrd for HBAMPath {
 
         for i in 0..path1.len() {
             if i >= path2.len() { return Some(Ordering::Equal) }
-            println!("Comparing {} with {}", path1[i], path2[i]);
             if path1[i] > path2[i] { return Some(Ordering::Greater) }
             else if path1[i] < path2[i] { return Some(Ordering::Less) }
         }

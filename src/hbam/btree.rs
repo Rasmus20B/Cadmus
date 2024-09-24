@@ -261,7 +261,6 @@ impl HBAMFile {
         }
         let index = current_block.index;
         if !self.cached_blocks.contains_key(&index) {
-            println!("Adding block {} to cache.", index);
             self.cached_blocks.insert(index, current_block);
         }
         self.cached_blocks.get(&index).unwrap()
@@ -275,7 +274,6 @@ impl HBAMFile {
         debug_assert!(!self.cached_blocks.is_empty());
         let next = self.cached_blocks[&self.cursor.block_index].next;
 
-        println!("next: {}", next);
         if self.cached_blocks.contains_key(&(next)) {
             self.cursor.block_index = next;
             self.cursor.chunk_index = 0;

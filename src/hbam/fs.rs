@@ -37,12 +37,10 @@ impl HBAMInterface {
         let mut block = self.inner.get_current_block();
         let mut start = self.inner.cursor.chunk_index;
         let dir_path = block.chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
-        println!("Looking for kv in : @ {},{}", self.inner.cursor.block_index, self.inner.cursor.chunk_index);
         loop {
             for offset in start as usize..block.chunks.len() {
                 let wrapper = &block.chunks[offset];
                 let chunk = wrapper.chunk();
-                println!("chunk: {}", chunk);
                 if chunk.ref_simple == Some(key) {
                     if dir_path == chunk.path {
                         return Ok(wrapper.clone());
