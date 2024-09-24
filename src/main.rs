@@ -97,8 +97,7 @@ fn main() -> Result<(), std::io::Error>{
         let mut patch_file = HBAMFile::new(Path::new(&copy_path));
         ctx.fmp.objects.extend(load_tables(&mut patch_file));
         let diffs = get_diff(&ctx.fmp, &ctx.cad);
-        let mut data_buffer = DataStaging::new();
-        patch_file.commit_changes(&diffs, &mut data_buffer);
+        // patch_file.commit_changes(&diffs);
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */
     }

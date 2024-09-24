@@ -35,6 +35,13 @@ impl Block {
         res
     }
 
+    pub fn new_with_index(buffer: &[u8], index: u32) -> Self {
+        let mut res = Self::header_from_bytes(&buffer);
+        res.index = index;
+        res.read_chunks(&buffer).expect("Unable to read chunks.");
+        res
+    }
+
     pub fn read_chunks(&mut self, buffer: &[u8]) -> Result<(), String> {
         let mut offset = 20;
         let mut path = vec![];

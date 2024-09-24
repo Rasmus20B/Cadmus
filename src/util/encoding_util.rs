@@ -41,7 +41,7 @@ pub fn put_int(mut n: usize) -> Vec<u8> {
     return res;
 }
 
-pub fn fm_string_encrypt(text: String) -> Vec<u8> {
+pub fn fm_string_encrypt(text: &String) -> Vec<u8> {
     text
         .bytes()
         .into_iter()
