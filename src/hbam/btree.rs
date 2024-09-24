@@ -199,6 +199,20 @@ impl HBAMFile {
         self.cached_blocks.get_mut(&self.cursor.block_index).unwrap()
     }
 
+    pub fn get_current_block_with_buffer(&mut self) -> (&Block, Vec<u8>) {
+        let index = self.cursor.block_index;
+        let buffer = self.get_buffer_from_leaf(index as u64);
+        let block = self.cached_blocks.get(&index).unwrap();
+        (block, buffer)
+    }
+
+    pub fn get_current_block_with_buffer_mut(&mut self) -> (&mut Block, Vec<u8>) {
+        let index = self.cursor.block_index;
+        let buffer = self.get_buffer_from_leaf(index as u64);
+        let block = self.cached_blocks.get_mut(&index).unwrap();
+        (block, buffer)
+    }
+
     pub fn get_block_chunks(&self) -> &Vec<ChunkType> {
         &self.get_current_block().chunks
     }

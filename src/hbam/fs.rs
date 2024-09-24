@@ -8,6 +8,7 @@ use super::{btree::HBAMFile, path::HBAMPath};
 pub struct HBAMInterface {
     inner: HBAMFile,
     staging_buffer: DataStaging,
+    block_buffer: Vec<u8>,
 }
 
 impl HBAMInterface {
@@ -16,6 +17,7 @@ impl HBAMInterface {
         Self {
             inner: HBAMFile::new(path),
             staging_buffer: DataStaging::new(),
+            block_buffer: vec![],
         }
     }
 
@@ -80,59 +82,97 @@ impl HBAMInterface {
             start = 0;
         }
     }
-//
-//     fn set_long_kv(&mut self, key: &Vec<u8>, data: &[u8]) -> Result<(), String> {
-//         let dir_path = self.cached_blocks.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
-//         loop {
-//             for offset in self.cursor..self.cached_blocks.as_ref().unwrap().chunks.len() {
-//                 let wrapper = &mut self.cached_blocks.as_mut().unwrap().chunks[offset];
-//                 let chunk = &mut wrapper.chunk_mut();
-//                 if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(&self.staging_buffer.buffer) {
-//                     if dir_path == chunk.path {
-//                         let key_location = self.staging_buffer.store(key.to_vec());
-//                         chunk.ref_data = Some(key_location);
-//                         let data_location = self.staging_buffer.store(data.to_vec());
-//                         chunk.data = Some(data_location);
-//                         *wrapper = ChunkType::Modification(chunk.clone());
-//                         return Ok(())
-//                     }
-//                 } else if chunk.path > dir_path {
-//                     return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
-//                 }
-//             }
-//             self.cached_blocks = Some(self.load_leaf_n_from_disk(self.cached_blocks.as_ref().unwrap().next as u64));
-//         }
-//     }
-//
-//     fn set_long_kv_by_data(&mut self, key: &Vec<u8>, data: &[u8]) -> Result<(), String> {
-//         let dir_path = self.cached_blocks.as_ref().unwrap().chunks[self.cursor].chunk().path.clone();
-//         loop {
-//             for offset in self.cursor..self.cached_blocks.as_ref().unwrap().chunks.len() {
-//                 let wrapper = &mut self.cached_blocks.as_mut().unwrap().chunks[offset];
-//                 if wrapper.chunk().data.is_none() { continue; }
-//                 let buffer = match wrapper {
-//                     ChunkType::Modification(chunk) => chunk.data.unwrap().lookup_from_buffer(&self.staging_buffer.buffer).unwrap(),
-//                     ChunkType::Unchanged(chunk) => chunk.data.unwrap().lookup_from_buffer(&self.block_buffer.buffer).unwrap(),
-//                 };
-//                 let chunk = wrapper.chunk_mut();
-//                 println!("{}", chunk.chunk_to_string(&self.block_buffer.buffer));
-//                 if let Some(chunk_data) = chunk.data {
-//                     if dir_path == chunk.path && buffer == data {
-//                         let key_location = self.staging_buffer.store(key.to_vec());
-//                         chunk.ref_data = Some(key_location);
-//                         let data_location = self.staging_buffer.store(buffer);
-//                         chunk.data = Some(data_location);
-//                         let new = chunk.clone();
-//                         *wrapper = ChunkType::Modification(new);
-//                         return Ok(())
-//                     }
-//                 } else if chunk.path > dir_path {
-//                     return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
-//                 }
-//             }
-//             self.cached_blocks = Some(self.load_leaf_n_from_disk(self.cached_blocks.as_ref().unwrap().next as u64));
-//         }
-//     }
+
+    fn set_long_kv(&mut self, key: &Vec<u8>, data: &[u8]) -> Result<(), String> {
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let ref mut wrapper = &mut block.chunks[offset];
+                if wrapper.chunk().ref_data.is_none() { continue; }
+                let storage = match wrapper {
+                    ChunkType::Modification(..) => &self.staging_buffer.buffer,
+                    ChunkType::Unchanged(..) => &buffer,
+                };
+                let chunk = &mut wrapper.chunk_mut();
+                if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(&storage) {
+                    if dir_path == chunk.path {
+                        let key_location = self.staging_buffer.store(key.to_vec());
+                        chunk.ref_data = Some(key_location);
+                        let data_location = self.staging_buffer.store(data.to_vec());
+                        chunk.data = Some(data_location);
+                        **wrapper = ChunkType::Modification(chunk.clone());
+                        return Ok(())
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            (block, buffer) = self.inner.get_current_block_with_buffer_mut();
+            start = 0;
+        }
+    }
+
+    fn set_long_kv_by_data(&mut self, key: &Vec<u8>, data: &[u8]) -> Result<(), String> {
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let wrapper = &mut block.chunks[offset];
+                if wrapper.chunk().data.is_none() || wrapper.chunk().ref_data.is_none() { continue; }
+                let storage = match wrapper {
+                    ChunkType::Modification(..) => &self.staging_buffer.buffer,
+                    ChunkType::Unchanged(..) => &buffer,
+                };
+                let chunk = wrapper.chunk_mut();
+                if let Ok(chunk_data) = chunk.data.unwrap().lookup_from_buffer(storage) {
+                    if dir_path == chunk.path && data == data {
+                        let key_location = self.staging_buffer.store(key.to_vec());
+                        chunk.ref_data = Some(key_location);
+                        let data_location = self.staging_buffer.store(chunk_data);
+                        chunk.data = Some(data_location);
+                        let new = chunk.clone();
+                        *wrapper = ChunkType::Modification(new);
+                        return Ok(())
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.inner.get_next_leaf().unwrap();
+            (block, buffer) = self.inner.get_current_block_with_buffer_mut();
+            start = 0;
+        }
+    }
+
+    fn get_long_kv(&mut self, key: &Vec<u8>) -> Result<ChunkType, String> {
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let (mut block, buffer) = self.inner.get_current_block_with_buffer();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let wrapper = &block.chunks[offset];
+                if wrapper.chunk().ref_data.is_none() { continue; }
+                let storage = match wrapper {
+                    ChunkType::Modification(..) => &self.staging_buffer.buffer,
+                    ChunkType::Unchanged(..) => &buffer,
+                };
+                let chunk = wrapper.chunk();
+                if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(storage) {
+                    if dir_path == chunk.path {
+                        return Ok(wrapper.clone());
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {:?} not found in directory {:?}", key, dir_path));
+                }
+            }
+            block = self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            start = 0;
+        }
+    }
 //
 //     pub fn get_directory_bounds<'a>(&self, leaf: &'a Block, path: &HBAMPath) -> (usize, usize) {
 //         let mut full = leaf.chunks
@@ -341,6 +381,29 @@ mod tests {
         let kv = file.get_kv(16).unwrap();
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![23, 15, 72, 112, 49]);
 
+    }
+
+    #[test]
+    fn long_kv_set_test() {
+        let mut file = HBAMInterface::new(Path::new("test_data/input/blank.fmp12"));
+        file.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
+        let buffer = file.inner.get_buffer_from_leaf(file.inner.cursor.block_index as u64);
+
+        let key = &mut vec![18, 37, 19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0];
+        let kv = file.get_long_kv(&key).unwrap();
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![2, 128, 1]);
+
+        file.set_long_kv(key, &[2, 128, 2]).expect("Unable to set keyvalue");
+        let kv = file.get_long_kv(&key).unwrap();
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![2, 128, 2]);
+        file.set_long_kv(key, &[2, 128, 1]).expect("Unable to set keyvalue");
+        let kv = file.get_long_kv(&key).unwrap();
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![2, 128, 1]);
+
+        let key = &mut vec![19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0];
+        file.set_long_kv_by_data(key, &[2, 128, 1]).expect("Unable to set keyvalue.");
+        let kv = file.get_long_kv(&key).unwrap();
+        assert_eq!(kv.chunk().ref_data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0]);
     }
 }
 
