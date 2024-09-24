@@ -9,6 +9,7 @@ use super::path::HBAMPath;
 type BlockIndex = u32;
 type ChunkIndex = u16;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HBAMCursor {
     pub block_index: BlockIndex,
     pub chunk_index: ChunkIndex,

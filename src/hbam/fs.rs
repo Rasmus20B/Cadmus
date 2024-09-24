@@ -36,12 +36,13 @@ impl HBAMInterface {
     fn get_kv(&mut self, key: u16) -> Result<ChunkType, String> {
         let mut block = self.inner.get_current_block();
         let mut start = self.inner.cursor.chunk_index;
-        println!("Looking for kv in : @ {},{}", self.inner.cursor.block_index, self.inner.cursor.chunk_index);
         let dir_path = block.chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        println!("Looking for kv in : @ {},{}", self.inner.cursor.block_index, self.inner.cursor.chunk_index);
         loop {
             for offset in start as usize..block.chunks.len() {
                 let wrapper = &block.chunks[offset];
                 let chunk = wrapper.chunk();
+                println!("chunk: {}", chunk);
                 if chunk.ref_simple == Some(key) {
                     if dir_path == chunk.path {
                         return Ok(wrapper.clone());
@@ -313,7 +314,15 @@ mod tests {
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![56, 54, 59, 52, 49]);
 
         let kv = file.get_kv(800);
-        assert!(kv.is_err())
+        assert!(kv.is_err());   
+
+        // Fault line between block 8 and 7
+        file.goto_directory(&HBAMPath::new(vec!["23", "2", "1"])).expect("Unable to go to directory.");
+        let kv = file.get_kv(0);
+        assert!(kv.is_ok());
+        let kv = file.get_kv(4).unwrap();
+        let buffer = file.inner.get_buffer_from_leaf(file.inner.cursor.block_index as u64);
+        assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![0, 0, 0, 3]);
     }
 }
 

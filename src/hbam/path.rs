@@ -36,17 +36,27 @@ impl From<String> for HBAMPath {
 
 impl PartialOrd for HBAMPath {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        for (a, b) in self.components
-            .iter()
-                .zip(&other.components)
-                .map(|p| (p.0.parse::<usize>().unwrap_or(0), p.1.parse::<usize>().unwrap_or(0))) {
-                    if a > b {
-                        return Some(Ordering::Greater);
-                    } else if b > a {
-                        return Some(Ordering::Less);
-                    }
+        if self.components.is_empty() && other.components.is_empty() { return Some(Ordering::Equal) }
+        if self.components.is_empty() && !other.components.is_empty() { return Some(Ordering::Less) }
+        if !self.components.is_empty() && other.components.is_empty() { return Some(Ordering::Greater) }
+
+        println!("PATHS: {:?}, {:?}", self, other);
+
+        let path1 = self.components.iter()
+            .map(|component| component.parse::<usize>().expect("Unable to parse path."))
+            .collect::<Vec<usize>>();
+
+        let path2 = other.components.iter()
+            .map(|component| component.parse::<usize>().expect("Unable to parse path."))
+            .collect::<Vec<usize>>();
+
+        for i in 0..path1.len() {
+            if i >= path2.len() { return Some(Ordering::Equal) }
+            println!("Comparing {} with {}", path1[i], path2[i]);
+            if path1[i] > path2[i] { return Some(Ordering::Greater) }
+            else if path1[i] < path2[i] { return Some(Ordering::Less) }
         }
-        Some(self.components.len().cmp(&other.components.len()))
+        Some(Ordering::Equal)
     }
 }
 
@@ -60,8 +70,8 @@ mod tests {
     fn path_cmp() {
         assert!(HBAMPath::new(vec!["3", "17"]) > HBAMPath::new(vec!["2", "45"]));
         assert!(HBAMPath::new(vec!["1", "17", "19"]) < HBAMPath::new(vec!["2", "45"]));
-        assert!(HBAMPath::new(vec!["3", "17"]) > HBAMPath::new(vec!["3"]));
-        assert!(HBAMPath::new(vec!["3", "17"]).partial_cmp(&HBAMPath::new(vec!["3"])) == Some(Ordering::Greater));
+        assert!(HBAMPath::new(vec!["3", "17"]) != HBAMPath::new(vec!["3"]));
+        assert!(HBAMPath::new(vec!["3", "17"]).partial_cmp(&HBAMPath::new(vec!["3"])) == Some(Ordering::Equal));
         assert!(HBAMPath::new(vec!["3", "17"]).partial_cmp(&HBAMPath::new(vec!["17"])) == Some(Ordering::Less));
     }
 }
