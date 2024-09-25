@@ -5,7 +5,7 @@ use diff::{get_diff, DiffCollection};
 use fm_core::file_repr::FmpFileView;
 use fm_format::chunk::{Chunk, InstructionType};
 use fm_io::block::Block;
-use hbam::{btree::HBAMFile, path::HBAMPath};
+use hbam::{btree::HBAMFile, fs::HBAMInterface, path::HBAMPath};
 use schema::{DBObject, DBObjectKind, Schema};
 use serde::{Deserialize, Serialize};
 use util::encoding_util::fm_string_decrypt;
@@ -61,7 +61,7 @@ impl InputContext {
 
 
 fn main() -> Result<(), std::io::Error>{
-    let mut base_file: Option<HBAMFile> = None;
+    let mut base_file: Option<HBAMInterface> = None;
     let mut ctx = InputContext::new();
 
     let args = CLI::parse();
@@ -73,11 +73,11 @@ fn main() -> Result<(), std::io::Error>{
     }
 
     if args.fmp.is_some() {
-        base_file = Some(HBAMFile::new(Path::new(&args.fmp.as_ref().unwrap())));
+        base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
 
         if args.print_directory.is_some() {
             let dir = HBAMPath::from(args.print_directory.unwrap());
-            let (leaf, buffer) = base_file.as_mut().unwrap().get_leaf_with_buffer(&dir);
+            let (leaf, buffer) = base_file.as_mut().unwrap().inner.get_leaf_with_buffer(&dir);
             for wrapper in leaf.chunks {
                 let chunk = Chunk::from(wrapper);
                 println!("{}", chunk.chunk_to_string(&buffer))
@@ -85,7 +85,7 @@ fn main() -> Result<(), std::io::Error>{
         }
 
         if args.print_all_blocks {
-            base_file.as_mut().unwrap().print_all_chunks();
+            base_file.as_mut().unwrap().inner.print_all_chunks();
         }
     }
 
@@ -94,10 +94,10 @@ fn main() -> Result<(), std::io::Error>{
         let path = Path::new(&path_text);
         let copy_path = path.with_file_name(path.file_name().unwrap().to_str().unwrap().strip_suffix(".fmp12").unwrap().to_string() + "_patch.fmp12");
         std::fs::copy(path, &copy_path).expect("Unable to create patch file.");
-        let mut patch_file = HBAMFile::new(Path::new(&copy_path));
-        ctx.fmp.objects.extend(load_tables(&mut patch_file));
+        let mut patch_file = HBAMInterface::new(Path::new(&copy_path));
+        ctx.fmp.objects.extend(load_tables(&mut patch_file.inner));
         let diffs = get_diff(&ctx.fmp, &ctx.cad);
-        // patch_file.commit_changes(&diffs);
+        patch_file.commit_changes(&diffs);
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */
     }

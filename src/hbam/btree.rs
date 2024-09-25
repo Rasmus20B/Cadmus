@@ -73,7 +73,7 @@ impl HBAMFile {
         Ok(block.to_bytes())
     }
 
-    pub fn emit_binary_block(&mut self, block: &Block) -> Result<Vec<u8>, &str> {
+    pub fn emit_binary_block(&mut self, block: &Block, data_store: &DataStaging) -> Result<Vec<u8>, &str> {
         let mut in_buffer = DataStaging::new();
         self.reader.seek(std::io::SeekFrom::Start((Block::CAPACITY * block.index as usize) as u64)).expect("Unable to seek in fmp file.");
         self.reader.read(&mut in_buffer.buffer).expect("Unable to read block from file.");
@@ -84,8 +84,9 @@ impl HBAMFile {
                 chunk_wrapper.chunk(), 
                 match chunk_wrapper {
                     ChunkType::Unchanged(..) => &in_buffer,
-                    ChunkType::Modification(..) => { println!("Modified: {}", chunk_wrapper.chunk().chunk_to_string(&self.staging_buffer.buffer)); &self.staging_buffer }
+                    ChunkType::Modification(..) => { data_store }
                 }).expect("Unable to emit binary chunk.");
+            // println!("{:?}", out_buffer);
             out_buffer.append(&mut bin_chunk);
         }
 
@@ -96,8 +97,8 @@ impl HBAMFile {
         Ok(out_buffer)
     }
 
-    pub fn write_node(&mut self, block: &Block) -> Result<(), &str> {
-        let out_buffer = self.emit_binary_block(&block).expect("Unable to emit binary representation of block.");
+    pub fn write_node(&mut self, block: &Block, data_store: &DataStaging) -> Result<(), &str> {
+        let out_buffer = self.emit_binary_block(&block, &data_store).expect("Unable to emit binary representation of block.");
         // TODO: Block overflow must be tracked so indexes can be changed when required.
         self.writer.seek(std::io::SeekFrom::Start(4096 * block.index as u64)).expect("Could not seek into file.");
         if self.writer.write(&out_buffer).expect("Unable to write to file.") != 4096 {
@@ -108,6 +109,13 @@ impl HBAMFile {
         Ok(())
     }
 
+    pub fn write_nodes(&mut self, data_store: &DataStaging) -> Result<(), &str> {
+        let blocks = std::mem::take(&mut self.cached_blocks);
+        for block in blocks {
+            self.write_node(&block.1, &data_store).expect("Unable to write block to file.");
+        }
+        Ok(())
+    }
 
     pub fn get_leaf_with_buffer(&mut self, hbam_path: &HBAMPath) -> (Block, Vec<u8>) {
         let mut buffer = [0u8; 4096];
@@ -232,8 +240,9 @@ impl HBAMFile {
             self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
             let leaf = Block::new(&buffer);
             for chunk in leaf.chunks {
-                let unwrapped = Chunk::from(chunk).chunk_to_string(&buffer);
-                println!("{}", unwrapped);
+                let unwrapped = Chunk::from(chunk);
+                let text = unwrapped.chunk_to_string(&buffer);
+                println!("{}", text);
             }
             index = leaf.next.into();
         }

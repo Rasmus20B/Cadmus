@@ -119,12 +119,39 @@ impl Chunk {
 
     pub fn to_bytes(&self, chunk_bytes: &DataStaging) -> Result<Vec<u8>, BlockErr> {
         let mut buffer: Vec<u8> = vec![];
+
         if (self.opcode & 0xFF00) == 0 {
-            buffer.push(self.opcode as u8);
+            if (0x01..=0x05).contains(&self.opcode) {
+                let len = self.data.unwrap().length;
+                let new_opcode = match len {
+                    1 => 1,
+                    _ => (len / 2) + 1,
+                };
+                buffer.push(new_opcode as u8);
+                let mut copy = self.clone();
+                copy.opcode = new_opcode;
+            } else if (0x11..=0x15).contains(&self.opcode) {
+                let len = self.data.unwrap().length;
+                let new_opcode = match len {
+                    1 => 3,
+                    _ => 3 + (len / 2) + 1,
+                };
+                buffer.push(new_opcode as u8);
+                let mut copy = self.clone();
+                copy.opcode = new_opcode;
+            } else {
+                buffer.push(self.opcode as u8);
+            }
         } else {
             buffer.push((self.opcode &0x00FF) as u8);
             buffer.push((self.opcode << 8) as u8);
         }
+
+        if self.ctype == InstructionType::PathPop || self.ctype == InstructionType::Noop { 
+            // println!("BUFFER: {:?}", buffer);
+            return Ok(buffer);
+        }
+
         if self.ref_simple.is_some() {
             let ref_uw = self.ref_simple.unwrap();
             if ref_uw > u8::max_value().into() {
@@ -142,18 +169,33 @@ impl Chunk {
             buffer.extend(chunk_bytes.load(self.ref_data.unwrap()));
         }
         if self.data.is_some() {
-            if self.ctype != InstructionType::PathPush &&
-                !(0x00..0x05).contains(&self.opcode) &&
-                !(0x11..0x15).contains(&self.opcode) {
-                if self.opcode == 0x1b {
-                    buffer.push((self.data.unwrap().length - 4) as u8);
-                } else {
-                    buffer.push(self.data.unwrap().length as u8);
-                }
-            } 
+            if (0x01..=0x05).contains(&self.opcode) ||
+                (0x11..=0x15).contains(&self.opcode) {
+            } else if self.opcode == 0x1b {
+                buffer.push(4);
+            } else if self.opcode == 0x7 
+                || self.opcode == 0x0f
+                || self.opcode == 0x17
+                || self.opcode == 0x1f {
+                let len_buf = u16::to_be_bytes(self.data.unwrap().length);
+                buffer.append(&mut len_buf.to_vec());
+            } else if self.opcode == 0x20 {
+            } else if self.opcode == 0x0 {
+            } else if self.opcode == 0x28 {
+            } else {
+                buffer.push(self.data.unwrap().length as u8);
+            }
 
-            buffer.extend(chunk_bytes.load(self.data.unwrap()));
-        }
+            if self.opcode == 0x28 {
+                let mut idx = self.data.unwrap().lookup_from_buffer(&chunk_bytes.buffer).expect("Unable to lookup from buffer");
+                buffer.append(&mut idx);
+            } else {
+                buffer.extend(chunk_bytes.load(self.data.unwrap()));
+            }
+        } 
+
+
+        // println!("buffer: {:?}", buffer);
         Ok(buffer)
     }
 
@@ -172,8 +214,6 @@ impl Chunk {
             chunk_code &= 0x3F;
             delayed += 1;
         }
-
-        // println!("Chunk: {:x}", chunk_code);
 
         if chunk_code == 0x00 {
             ctype = InstructionType::DataSimple;
