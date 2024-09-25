@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, staging_buffer::DataStaging};
+use crate::{diff::DiffCollection, fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_encrypt, get_int, put_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -54,6 +54,32 @@ impl HBAMInterface {
                 }
             }
             block = self.inner.get_next_leaf().expect("Unable to get next leaf.");
+            start = 0;
+        }
+    }
+
+    fn get_kv_value(&mut self, key: u16) -> Result<Vec<u8>, String> {
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let wrapper = &block.chunks[offset];
+                let chunk = wrapper.chunk();
+                if chunk.ref_simple == Some(key) {
+                    if dir_path == chunk.path {
+                        let storage = match wrapper {
+                            ChunkType::Modification(..) => &self.staging_buffer.buffer,
+                            ChunkType::Unchanged(..) => &buffer,
+                        };
+                        return Ok(chunk.data.unwrap().lookup_from_buffer(&storage).expect("Unable to lookup data from buffer."));
+                    }
+                } else if chunk.path > dir_path {
+                    return Err(format!("Key {} not found in directory {:?}", key, dir_path));
+                }
+            }
+            self.inner.get_next_leaf().expect("Unable to get next leaf.");
+            (block, buffer) = self.inner.get_current_block_with_buffer();
             start = 0;
         }
     }
@@ -173,47 +199,55 @@ impl HBAMInterface {
             start = 0;
         }
     }
-//
-//     pub fn get_directory_bounds<'a>(&self, leaf: &'a Block, path: &HBAMPath) -> (usize, usize) {
-//         let mut full = leaf.chunks
-//             .iter()
-//             .map(|wrapper| wrapper.chunk())
-//             .enumerate()
-//             .skip_while(|c| c.1.path != *path)
-//             .filter(|c| c.1.path == *path)
-//             .skip(2);
-//         (full.nth(0).unwrap().0, full.last().unwrap().0)
-//     }
-//
-//     pub fn get_keyref<'a>(&self, directory: &'a [ChunkType], key: u16) -> Option<&'a ChunkType> {
-//         for wrapper in directory {
-//             let chunk = wrapper.chunk();
-//             if chunk.ref_simple == Some(key as u16) {
-//                 return Some(wrapper);
-//             }
-//         }
-//         None
-//     }
-//     
-//     pub fn get_keyref_mut<'a>(&self, directory: &'a mut [ChunkType], key: u16) -> Option<&'a mut ChunkType> {
-//         for wrapper in directory {
-//             let chunk = wrapper.chunk_mut();
-//             if chunk.ref_simple == Some(key as u16) {
-//                 return Some(wrapper);
-//             }
-//         }
-//         None
-//     }
-//
-//     pub fn get_keyref_by_path_mut<'a>(&self, leaf: &'a mut Block, directory: &HBAMPath, key: u16) -> Option<&'a mut ChunkType> {
-//         for wrapper in &mut leaf.chunks {
-//             let chunk = wrapper.chunk_mut();
-//             if chunk.path == *directory && chunk.ref_simple == Some(key) {
-//                 return Some(wrapper);
-//             }
-//         }
-//         None
-//     }
+
+    fn inc_kv(&mut self, key: u16) -> Result<(), String> {
+        let ref mut wrapper = self.get_kv(key).expect("Unable to retrieve kv.");
+        let buffer = self.inner.get_buffer_from_leaf(self.inner.cursor.block_index as u64);
+        let storage = match wrapper {
+            ChunkType::Modification(..) => &self.staging_buffer.buffer,
+            ChunkType::Unchanged(..) => &buffer,
+        };
+        let chunk = wrapper.chunk_mut();
+        let n = get_int(&chunk.data.unwrap().lookup_from_buffer(storage).expect("Unable to retrieve data from storage")) + 1;
+        let mut n_bytes = put_int(n);
+        n_bytes.insert(0, n_bytes.len() as u8);
+        
+        chunk.data = Some(self.staging_buffer.store(n_bytes));
+        *wrapper = ChunkType::Modification(chunk.clone());
+        Ok(())
+    }
+
+    pub fn commit_table_changes(&mut self, diffs: &DiffCollection) {
+        let mut changes = 0;
+        for object in &diffs.modified {
+            self.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
+            let mut id_data = put_int(object.id);
+            id_data.insert(0, id_data.len() as u8);
+            let mut de_name = encode_text(&object.name);
+            de_name.append(&mut vec![0; 3]);
+            self.set_long_kv_by_data(&encode_text(&object.name), &id_data).expect("Unable to set long kv using data.");
+
+            self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
+            self.inc_kv(252).expect("Unable to increment keyvalue.");
+            changes += 1;
+
+            self.goto_directory(&HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()])).expect("Unable to go to directory.");
+            self.set_kv(16, &fm_string_encrypt(&object.name)).expect("Unable to set keyvalue pair.");
+            self.inc_kv(252).expect("Unable to increment keyvalue.");
+            changes += 1;
+        }
+
+        self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
+        let mut change_data = self.get_kv_value(8).expect("Unable to get keyvalue");
+        change_data[42] += 1;
+        change_data[157] += 1;
+        self.set_kv(8, &change_data).expect("Unable to set keyvalue.");
+
+        let mut change_data = self.get_kv_value(9).expect("Unable to get keyvalue");
+        change_data[36] += 1;
+        self.set_kv(9, &change_data).expect("Unable to set keyvalue.");
+
+    }
 // pub fn commit_table_changes(&mut self, diffs: &DiffCollection) -> Vec<Block> {
 //         let mut output_blocks = vec![];
 //         let (table_leaf, _buffer) = self.get_leaf_with_buffer(&HBAMPath::new(vec!["3", "16"]));

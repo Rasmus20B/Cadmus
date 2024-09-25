@@ -108,6 +108,7 @@ impl HBAMFile {
         Ok(())
     }
 
+
     pub fn get_leaf_with_buffer(&mut self, hbam_path: &HBAMPath) -> (Block, Vec<u8>) {
         let mut buffer = [0u8; 4096];
         self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
