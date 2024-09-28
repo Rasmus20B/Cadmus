@@ -200,28 +200,10 @@ impl HBAMInterface {
         }
     }
 
-    fn inc_kv(&mut self, key: u16) -> Result<(), String> {
-        let ref mut wrapper = self.get_kv(key).expect("Unable to retrieve kv.");
-        let buffer = self.inner.get_buffer_from_leaf(self.inner.cursor.block_index as u64);
-        let storage = match wrapper {
-            ChunkType::Modification(..) => &self.staging_buffer.buffer,
-            ChunkType::Unchanged(..) => &buffer,
-        };
-        let chunk = wrapper.chunk_mut();
-        let n = get_int(&chunk.data.unwrap().lookup_from_buffer(storage).expect("Unable to retrieve data from storage")) + 1;
-        println!("Setting {} from {:?} to {:?}", key, n - 1,  n);
-        let mut n_bytes = put_int(n);
-        n_bytes.insert(0, n_bytes.len() as u8);
-        
-        chunk.data = Some(self.staging_buffer.store(n_bytes));
-        *wrapper = ChunkType::Modification(chunk.clone());
-        Ok(())
-    }
-
     fn update_consistency_counter(&mut self) -> Result<(), String> {
         let mut start = self.inner.cursor.chunk_index;
         let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
-        let (mut block, buffer) = self.inner.get_current_block_with_buffer_mut();
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
         loop {
             for offset in start as usize..block.chunks.len() {
                 let ref mut wrapper = &mut block.chunks[offset];
@@ -231,14 +213,13 @@ impl HBAMInterface {
                 };
                 let chunk = wrapper.chunk_mut();
                 if chunk.ref_simple == Some(252) {
-                    if dir_path == chunk.path {
+                    if dir_path.components == chunk.path.components {
                         let n_buffer = chunk.data.unwrap().lookup_from_buffer(storage).expect("Unable to retrieve data from storage.");
+
+                        // println!("buffer: {:x?}, n_buffer: {:x?}, CHUNK: {}", storage, n_buffer, chunk.chunk_to_string(storage));
                         let n = get_int(&n_buffer[1..=n_buffer[0] as usize]) + 1;
-                        println!("Setting {} from {:?} to {:?} with buffer: {:?}", 252, n - 1,  n, n_buffer);
                         let mut n_bytes = put_path_int(n as u32);
                         n_bytes.insert(0, n_bytes.len() as u8);
-                        
-                        println!("n_bytes: {:?}", n_bytes);
                         chunk.data = Some(self.staging_buffer.store(n_bytes));
                         **wrapper = ChunkType::Modification(chunk.clone());
                         return Ok(())
@@ -247,7 +228,8 @@ impl HBAMInterface {
                     return Err(format!("Key {} not found in directory {:?}", 252, dir_path));
                 }
             }
-            block = self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            (block, buffer) = self.inner.get_current_block_with_buffer_mut();
             start = 0;
         }
     }
@@ -260,7 +242,7 @@ impl HBAMInterface {
             id_data.insert(0, id_data.len() as u8);
             let mut de_name = encode_text(&object.name);
             de_name.append(&mut vec![0; 3]);
-            self.set_long_kv_by_data(&encode_text(&object.name), &id_data).expect("Unable to set long kv using data.");
+            self.set_long_kv_by_data(&de_name, &id_data).expect("Unable to set long kv using data.");
 
             self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
             self.update_consistency_counter().expect("Unable to increment keyvalue.");
@@ -270,6 +252,15 @@ impl HBAMInterface {
             self.set_kv(16, &fm_string_encrypt(&object.name)).expect("Unable to set keyvalue pair.");
             self.update_consistency_counter().expect("Unable to increment keyvalue.");
             changes += 1;
+            
+            self.goto_directory(&HBAMPath::new(vec!["3", "17", "1"])).expect("Unable to go to directory.");
+            self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+            self.goto_directory(&HBAMPath::new(vec!["4", "1"])).expect("Unable to go to directory.");
+            self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+            self.goto_directory(&HBAMPath::new(vec!["4", "5", "1"])).expect("Unable to go to directory.");
+            self.update_consistency_counter().expect("Unable to increment keyvalue.");
         }
 
         self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
@@ -391,12 +382,6 @@ mod tests {
         assert_eq!(kv.chunk().ref_data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0]);
     }
 }
-
-
-
-
-
-
 
 
 

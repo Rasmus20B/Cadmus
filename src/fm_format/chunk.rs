@@ -2,7 +2,7 @@ use core::fmt;
 use serde_json;
 use serde::{self, Deserialize, Serialize};
 use std::{fmt::Formatter, ops::RangeBounds};
-use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::path::HBAMPath, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int}};
+use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::{btree::HBAMFile, path::HBAMPath}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int, put_int}};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InstructionType {
@@ -120,47 +120,51 @@ impl Chunk {
     pub fn to_bytes(&self, chunk_bytes: &DataStaging) -> Result<Vec<u8>, BlockErr> {
         let mut buffer: Vec<u8> = vec![];
 
-        if (self.opcode & 0xFF00) == 0 {
-            if (0x01..=0x05).contains(&self.opcode) {
+        let mut new_opcode = self.opcode;
+
+        if (new_opcode & 0xFF00) == 0 {
+            if (0x01..=0x05).contains(&new_opcode) {
                 let len = self.data.unwrap().length;
-                let new_opcode = match len {
-                    1 => 1,
+                new_opcode = match len {
                     _ => (len / 2) + 1,
                 };
+
+                if new_opcode >= 0x06 {
+                    new_opcode = 0x06;
+                }
+
+                println!("FOUND ANEW OPCODE: {}", new_opcode);
+
                 buffer.push(new_opcode as u8);
-                let mut copy = self.clone();
-                copy.opcode = new_opcode;
-            } else if (0x11..=0x15).contains(&self.opcode) {
+            } else if (0x11..=0x15).contains(&new_opcode) {
                 let len = self.data.unwrap().length;
-                let new_opcode = match len {
+                new_opcode = match len {
                     1 => 3,
                     _ => 3 + (len / 2) + 1,
                 };
                 buffer.push(new_opcode as u8);
-                let mut copy = self.clone();
-                copy.opcode = new_opcode;
             } else {
-                buffer.push(self.opcode as u8);
+                buffer.push(new_opcode as u8);
             }
         } else {
-            buffer.push((self.opcode &0x00FF) as u8);
-            buffer.push((self.opcode << 8) as u8);
+            buffer.push((new_opcode &0x00FF) as u8);
+            buffer.push((new_opcode << 8) as u8);
         }
 
         if self.ctype == InstructionType::PathPop || self.ctype == InstructionType::Noop { 
-            // println!("BUFFER: {:?}", buffer);
             return Ok(buffer);
         }
 
         if self.ref_simple.is_some() {
             let ref_uw = self.ref_simple.unwrap();
-            if ref_uw > u8::max_value().into() {
-                let bytes = self.ref_simple.unwrap().to_be_bytes();
-                buffer.extend(bytes);
+            if new_opcode == 0xe {
+                let n_buf = u16::to_be_bytes(self.ref_simple.unwrap());
+                buffer.append(&mut n_buf.to_vec());
             } else {
                 buffer.push(self.ref_simple.unwrap() as u8);
             }
         }
+
         if self.segment_idx.is_some() {
             buffer.push(self.segment_idx.unwrap());
         }
@@ -169,24 +173,25 @@ impl Chunk {
             buffer.extend(chunk_bytes.load(self.ref_data.unwrap()));
         }
         if self.data.is_some() {
-            if (0x01..=0x05).contains(&self.opcode) ||
-                (0x11..=0x15).contains(&self.opcode) {
-            } else if self.opcode == 0x1b {
+            if (0x01..=0x05).contains(&new_opcode) ||
+                (0x11..=0x15).contains(&new_opcode) {
+            } else if new_opcode == 0x1b {
                 buffer.push(4);
-            } else if self.opcode == 0x7 
-                || self.opcode == 0x0f
-                || self.opcode == 0x17
-                || self.opcode == 0x1f {
+            } else if new_opcode == 0x7 
+                || new_opcode == 0x0f
+                || new_opcode == 0x17
+                || new_opcode == 0x1f {
                 let len_buf = u16::to_be_bytes(self.data.unwrap().length);
                 buffer.append(&mut len_buf.to_vec());
-            } else if self.opcode == 0x20 {
-            } else if self.opcode == 0x0 {
-            } else if self.opcode == 0x28 {
+            } else if new_opcode == 0x20 {
+            } else if new_opcode == 0x0 {
+            } else if new_opcode == 0x28 {
             } else {
+                println!("DATA LENGTH: {}", self.data.unwrap().length);
                 buffer.push(self.data.unwrap().length as u8);
             }
 
-            if self.opcode == 0x28 {
+            if new_opcode == 0x28 {
                 let mut idx = self.data.unwrap().lookup_from_buffer(&chunk_bytes.buffer).expect("Unable to lookup from buffer");
                 buffer.append(&mut idx);
             } else {
@@ -194,20 +199,24 @@ impl Chunk {
             }
         } 
 
+        if self.path == HBAMPath::new(vec!["3", "16", "5", "130"]) {
+            println!("len: {}, new opcode: {}",self.data.unwrap().length, new_opcode);
+            println!("Chunk: {}\nbuffer: {:x?}", self, buffer);
+        }
 
-        // println!("buffer: {:?}", buffer);
         Ok(buffer)
     }
 
     pub fn from_bytes(code: &[u8], offset: &mut usize, path: &mut Vec<String>) -> Result<Chunk, BlockErr> {
         let mut chunk_code = code[*offset];
-        let mut ctype = InstructionType::Noop;
+        let ctype;
         let mut data: Option<BlockStorage> = None;
         let mut ref_data: Option<BlockStorage> = None;
         let mut segidx: Option<u8> = None;
         let mut ref_simple: Option<u16> = None;
         let mut delayed = 0;
         let saved_offset = offset.clone();
+
         let mut saved_chunk_code = chunk_code as u16;
         
         if (chunk_code & 0xC0) == 0xC0 {
@@ -285,7 +294,7 @@ impl Chunk {
             if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
-            ref_simple = Some(u16::from_be_bytes(code[*offset..*offset+2].try_into().expect("CN")));
+            ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
             *offset += 2;
             let len = code[*offset] as usize;
             *offset += 1;

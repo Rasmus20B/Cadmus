@@ -100,11 +100,11 @@ impl HBAMFile {
     pub fn write_node(&mut self, block: &Block, data_store: &DataStaging) -> Result<(), &str> {
         let out_buffer = self.emit_binary_block(&block, &data_store).expect("Unable to emit binary representation of block.");
         // TODO: Block overflow must be tracked so indexes can be changed when required.
-        self.writer.seek(std::io::SeekFrom::Start(4096 * block.index as u64)).expect("Could not seek into file.");
+        self.writer.seek(std::io::SeekFrom::Start((Block::CAPACITY * block.index as usize) as u64)).expect("Could not seek into file.");
         if self.writer.write(&out_buffer).expect("Unable to write to file.") != 4096 {
             println!("DIDNT WRITE THE WHOLE BUFFER TBH");
         }
-        self.writer.flush().unwrap();
+        // self.writer.flush().unwrap();
         println!("Successfully wrote changes to file.");
         Ok(())
     }
@@ -241,6 +241,7 @@ impl HBAMFile {
             let leaf = Block::new(&buffer);
             for chunk in leaf.chunks {
                 let unwrapped = Chunk::from(chunk);
+                println!("{}", unwrapped);
                 let text = unwrapped.chunk_to_string(&buffer);
                 println!("{}", text);
             }
