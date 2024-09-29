@@ -2,7 +2,7 @@ use core::fmt;
 use serde_json;
 use serde::{self, Deserialize, Serialize};
 use std::{fmt::Formatter, ops::RangeBounds};
-use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::{btree::HBAMFile, path::HBAMPath}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int, put_int}};
+use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::{btree::HBAMFile, path::HBAMPath}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int, put_int, put_path_int}};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InstructionType {
@@ -157,7 +157,6 @@ impl Chunk {
         }
 
         if self.ref_simple.is_some() {
-            let ref_uw = self.ref_simple.unwrap();
             if new_opcode == 0xe {
                 let n_buf = u16::to_be_bytes(self.ref_simple.unwrap());
                 buffer.append(&mut n_buf.to_vec());
@@ -307,7 +306,7 @@ impl Chunk {
             if *offset + 3 > Block::CAPACITY {
                 return Err(BlockErr::DataExceedsSectorSize);
             }
-            ref_simple = Some(get_path_int(&code[*offset..*offset+2]) as u16);
+            ref_simple = Some(get_int(&code[*offset..*offset+2]) as u16);
             *offset += 2;
             let len = code[*offset] as usize;
             *offset += 1;
