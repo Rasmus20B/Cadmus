@@ -241,7 +241,7 @@ impl HBAMFile {
             let leaf = Block::new(&buffer);
             for chunk in leaf.chunks {
                 let unwrapped = Chunk::from(chunk);
-                println!("{}", unwrapped);
+                // println!("{}", unwrapped);
                 let text = unwrapped.chunk_to_string(&buffer);
                 println!("{}", text);
             }

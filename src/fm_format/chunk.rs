@@ -126,6 +126,7 @@ impl Chunk {
             if (0x01..=0x05).contains(&new_opcode) {
                 let len = self.data.unwrap().length;
                 new_opcode = match len {
+                    1 => 1,
                     _ => (len / 2) + 1,
                 };
 
@@ -133,7 +134,7 @@ impl Chunk {
                     new_opcode = 0x06;
                 }
 
-                println!("FOUND ANEW OPCODE: {}", new_opcode);
+                // println!("FOUND ANEW OPCODE: {}", new_opcode);
 
                 buffer.push(new_opcode as u8);
             } else if (0x11..=0x15).contains(&new_opcode) {
@@ -175,17 +176,26 @@ impl Chunk {
         if self.data.is_some() {
             if (0x01..=0x05).contains(&new_opcode) ||
                 (0x11..=0x15).contains(&new_opcode) {
-            } else if new_opcode == 0x1b {
-                buffer.push(4);
+            } else if new_opcode == 0x1b && self.data.unwrap().length == 4{
+                buffer.push(0);
             } else if new_opcode == 0x7 
                 || new_opcode == 0x0f
                 || new_opcode == 0x17
                 || new_opcode == 0x1f {
                 let len_buf = u16::to_be_bytes(self.data.unwrap().length);
                 buffer.append(&mut len_buf.to_vec());
+            } else if new_opcode >= 0x19 && new_opcode <= 0x1D {
+                // println!("path: {:?}, len: {}, calc: {}", self.path, self.data.unwrap().length, (((new_opcode == 0x19) as u8) + (2*new_opcode as u8 - 0x19)) as u8);
+                // let extra = self.data.unwrap().length as u8 + (((new_opcode == 0x19) as u8) + (2*new_opcode as u8 - 0x19)) as u8;
+                // let len = code[*offset] + (((chunk_code == 0x19) as usize) + (2*(chunk_code-0x19) as usize)) as u8;
+                // buffer.push(extra as u8);
+                buffer.push(self.data.unwrap().length as u8 - 4);
             } else if new_opcode == 0x20 {
             } else if new_opcode == 0x0 {
             } else if new_opcode == 0x28 {
+            } else if new_opcode == 0x30 {
+            } else if new_opcode == 0x38 {
+                buffer.push(self.data.unwrap().length as u8);
             } else {
                 println!("DATA LENGTH: {}", self.data.unwrap().length);
                 buffer.push(self.data.unwrap().length as u8);
@@ -199,9 +209,9 @@ impl Chunk {
             }
         } 
 
-        if self.path == HBAMPath::new(vec!["3", "16", "5", "130"]) {
-            println!("len: {}, new opcode: {}",self.data.unwrap().length, new_opcode);
-            println!("Chunk: {}\nbuffer: {:x?}", self, buffer);
+        if new_opcode == 0x30 {
+            // println!("len: {}, new opcode: {}",self.data.unwrap().length, new_opcode);
+            // println!("Chunk: {}\nbuffer: {:x?}", self, buffer);
         }
 
         Ok(buffer)
@@ -224,6 +234,9 @@ impl Chunk {
             delayed += 1;
         }
 
+        // if chunk_code == 0x1b {
+        //     println!("path: {:?}, BUf: {:x?}", path, &code[*offset..*offset+15]);
+        // }
         if chunk_code == 0x00 {
             ctype = InstructionType::DataSimple;
             *offset += 1;
