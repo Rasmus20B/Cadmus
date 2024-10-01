@@ -49,7 +49,7 @@ impl Block {
         let mut size_ = 0;
         while offset < Block::CAPACITY {
             let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
-            if instruction_res.is_ok() {println!("instructionres: {}", instruction_res.clone().unwrap().chunk_to_string(&buffer));}
+            // if instruction_res.is_ok() {println!("instructionres: {}", instruction_res.clone().unwrap().chunk_to_string(&buffer));}
             if instruction_res.is_err() {
                 let error = instruction_res.clone().unwrap_err();
                 match error {

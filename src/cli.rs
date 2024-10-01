@@ -15,5 +15,7 @@ pub struct CLI {
     pub sync: bool,
     #[clap(long = "print-all-blocks", action, requires("fmp"))]
     pub print_all_blocks: bool,
+    #[clap(long = "json-out", action, requires("fmp"))]
+    pub json_out: bool,
 }
 

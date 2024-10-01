@@ -1,32 +1,26 @@
-[
+tables: [
   {
     "id": 129,
-    "name": "blank",
-    "kind": "Table"
+    "name": "blanket",
   },
   {
     "id": 130,
-    "name": "second_table",
-    "kind": "Table"
+    "name": "blanketeetet",
   },
   {
     "id": 131,
     "name": "third_table",
-    "kind": "Table"
   },
   {
     "id": 132,
     "name": "appeenndding",
-    "kind": "Table"
   },
   {
     "id": 133,
     "name": "anotherone",
-    "kind": "Table"
   },
   {
     "id": 134,
     "name": "A_BCDEFGHIJKLMNOPQRSTUVWXYZ",
-    "kind": "Table"
   }
 ]

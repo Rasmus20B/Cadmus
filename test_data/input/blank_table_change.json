@@ -1,0 +1,16 @@
+{
+  "tables": [
+    {
+      "id": 129,
+      "name": "blank",
+      "created_by": "Admin",
+      "modified_by": "admin"
+    }
+  ],
+  "fields": [],
+  "table_occurrences": [],
+  "relations": [],
+  "value_lists": [],
+  "scripts": [],
+  "tests": []
+}

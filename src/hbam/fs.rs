@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::{diff::DiffCollection, fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::DiffCollection, fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Schema}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -234,50 +234,53 @@ impl HBAMInterface {
         }
     }
 
-    pub fn commit_table_changes(&mut self, diffs: &DiffCollection) {
+    pub fn commit_table_changes(&mut self, schema: &Schema, diffs: &DiffCollection) {
         let mut changes = 0;
-        for object in &diffs.modified {
-            self.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
-            let mut id_data = put_int(object.id);
-            id_data.insert(0, id_data.len() as u8);
-            let mut de_name = encode_text(&object.name);
-            de_name.append(&mut vec![0; 3]);
-            self.set_long_kv_by_data(&de_name, &id_data).expect("Unable to set long kv using data.");
+        for object in &schema.tables {
+            let status = diffs.get(&object.id).expect("diff does not include information for table.");
 
-            self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
-            self.update_consistency_counter().expect("Unable to increment keyvalue.");
-            changes += 1;
+            if *status == DBObjectStatus::Modified {
+                self.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
+                let mut id_data = put_int(object.id);
+                id_data.insert(0, id_data.len() as u8);
+                let mut de_name = encode_text(&object.name);
+                de_name.append(&mut vec![0; 3]);
+                self.set_long_kv_by_data(&de_name, &id_data).expect("Unable to set long kv using data.");
 
-            self.goto_directory(&HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()])).expect("Unable to go to directory.");
-            self.set_kv(16, &fm_string_encrypt(&object.name)).expect("Unable to set keyvalue pair.");
-            self.update_consistency_counter().expect("Unable to increment keyvalue.");
-            changes += 1;
-            
-            self.goto_directory(&HBAMPath::new(vec!["3", "17", "1"])).expect("Unable to go to directory.");
-            self.update_consistency_counter().expect("Unable to increment keyvalue.");
+                self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
+                self.update_consistency_counter().expect("Unable to increment keyvalue.");
+                changes += 1;
 
-            self.goto_directory(&HBAMPath::new(vec!["4", "1"])).expect("Unable to go to directory.");
-            self.update_consistency_counter().expect("Unable to increment keyvalue.");
+                self.goto_directory(&HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()])).expect("Unable to go to directory.");
+                self.set_kv(16, &fm_string_encrypt(&object.name)).expect("Unable to set keyvalue pair.");
+                self.update_consistency_counter().expect("Unable to increment keyvalue.");
+                changes += 1;
+                
+                self.goto_directory(&HBAMPath::new(vec!["3", "17", "1"])).expect("Unable to go to directory.");
+                self.update_consistency_counter().expect("Unable to increment keyvalue.");
 
-            self.goto_directory(&HBAMPath::new(vec!["4", "5", "1"])).expect("Unable to go to directory.");
-            self.update_consistency_counter().expect("Unable to increment keyvalue.");
+                self.goto_directory(&HBAMPath::new(vec!["4", "1"])).expect("Unable to go to directory.");
+                self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+                self.goto_directory(&HBAMPath::new(vec!["4", "5", "1"])).expect("Unable to go to directory.");
+                self.update_consistency_counter().expect("Unable to increment keyvalue.");
+            }
+
+            self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
+            let mut change_data = self.get_kv_value(8).expect("Unable to get keyvalue");
+            change_data[42] += 1;
+            change_data[157] += 1;
+            self.set_kv(8, &change_data).expect("Unable to set keyvalue.");
+
+            let mut change_data = self.get_kv_value(9).expect("Unable to get keyvalue");
+            change_data[36] += 1;
+            self.set_kv(9, &change_data).expect("Unable to set keyvalue.");
         }
-
-        self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
-        let mut change_data = self.get_kv_value(8).expect("Unable to get keyvalue");
-        change_data[42] += 1;
-        change_data[157] += 1;
-        self.set_kv(8, &change_data).expect("Unable to set keyvalue.");
-
-        let mut change_data = self.get_kv_value(9).expect("Unable to get keyvalue");
-        change_data[36] += 1;
-        self.set_kv(9, &change_data).expect("Unable to set keyvalue.");
-
         self.inner.write_nodes(&self.staging_buffer).expect("Unable to write nodes to output file.");
     }
 
-    pub fn commit_changes(&mut self, diffs: &DiffCollection) {
-        self.commit_table_changes(diffs);
+    pub fn commit_changes(&mut self, schema: &Schema, diffs: &DiffCollection) {
+        self.commit_table_changes(schema, diffs);
         self.inner.write_nodes(&self.staging_buffer).expect("Unable to write table block to file.");
     }
 }
