@@ -1,6 +1,6 @@
-use std::path::Path;
+use std::{collections::HashMap, io::Read, path::Path};
 
-use crate::{diff::DiffCollection, fm_format::chunk::ChunkType, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Schema}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, fm_format::chunk::{ChunkType, InstructionType}, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Relation, RelationComparison, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -21,6 +21,118 @@ impl HBAMInterface {
         }
     }
 
+    pub fn get_tables(&mut self) -> HashMap<usize, Table> {
+        let mut result = HashMap::new();
+        let table_storage_path = HBAMPath::new(vec!["3", "16", "5"]);
+        self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer();
+        loop {
+            let mut current_table = usize::max_value();
+            for offset in 0..block.chunks.len() {
+                let chunk = block.chunks[offset].chunk();
+                if chunk.path > table_storage_path {
+                    return result;
+                }
+                match chunk.path.components[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
+                    ["3", "16", "5", x] => {
+                        let index = x.parse::<usize>().unwrap();
+                        match chunk.ctype {
+                            InstructionType::PathPush => {
+                                result.insert(index, Table::new(index));
+                            },
+                            InstructionType::RefSimple => {
+                                match chunk.ref_simple {
+                                    Some(16) => {
+                                        let data = chunk.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to lookup data from fmp buffer.");
+                                        let decoded = fm_string_decrypt(&data);
+                                        result.get_mut(&index).unwrap().name = decoded;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            self.inner.get_next_leaf().expect("Unable to get next leaf.");
+            (block, buffer) = self.inner.get_current_block_with_buffer();
+        }
+    }
+
+    pub fn get_table_occurrences(&mut self) -> HashMap<usize, TableOccurrence> {
+        let mut result = HashMap::new();
+        let mut table_storage_path = HBAMPath::new(vec!["3", "17", "5"]);
+        self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
+        for x in 129..=255 {
+            table_storage_path.components.push(x.to_string());
+            if let Ok(()) = self.goto_directory(&table_storage_path) {
+                let name = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
+                let mut tmp = TableOccurrence::new(x);
+                tmp.name = name;
+                result.insert(x, tmp);
+            } 
+            table_storage_path.components.pop();
+        }
+        return result;
+    }
+
+    pub fn get_relations(&mut self) -> HashMap<usize, Relation> {
+        let mut result = HashMap::new();
+        let mut table_storage_path = HBAMPath::new(vec!["3", "17", "5"]);
+        // self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
+        for x in 129..=255 {
+            table_storage_path.components.push(x.to_string());
+            table_storage_path.components.push(251.to_string());
+            if let Ok(()) = self.goto_directory(&table_storage_path) {
+                let relation_definition = &self.get_simple_data().expect("Unable to get top-level relationship definition.")[0];
+                let mut tmp = Relation::new(result.len() + 1);
+                let relation_index = relation_definition[4];
+                if !result.contains_key(&(relation_index as usize)) {
+                tmp.table1 = x;
+                tmp.table2 = relation_definition[2] as u16 + 128;
+                tmp.id = relation_index as usize;
+                println!("path: {:?}, Pushing relationship {} :: {:?} :: bytes {:?}", table_storage_path.components, result.len() + 1, tmp, relation_definition);
+                result.insert(relation_index as usize, tmp);
+                }
+            }
+            table_storage_path.components.pop();
+            table_storage_path.components.pop();
+        }
+
+        let mut table_storage_path = HBAMPath::new(vec!["3", "251", "5"]);
+        for (idx, rel_handle) in result.iter_mut() {
+            table_storage_path.components.push(idx.to_string());
+            table_storage_path.components.push(3.to_string());
+            if let Ok(()) = self.goto_directory(&table_storage_path) {
+                let definition = &self.get_kv_value(1).expect("Unable to get keyvalue");
+                rel_handle.comparison = match definition[0] {
+                    0 => RelationComparison::Equal,
+                    1 => RelationComparison::NotEqual,
+                    2 => RelationComparison::Greater,
+                    3 => RelationComparison::GreaterEqual,
+                    4 => RelationComparison::Less,
+                    5 => RelationComparison::LessEqual,
+                    6 => RelationComparison::Cartesian,
+                    _ => unreachable!()
+                };
+                let start1 = 2 as usize;
+                let len1 = definition[1] as usize;
+                let start2 = 2 + len1 + 1 as usize;
+                let len2 = definition[2 + len1] as usize;
+                println!("bytes: {:?}, start1: {}, start2: {}, len1: {}, len2: {}", definition, start1, start2, len1, len2);
+                let n1 = get_path_int(&definition[start1..start1 + len1]) - 128;
+                let n2 = get_path_int(&definition[start2..start2 + len2]) - 128;
+                rel_handle.field1 = n1 as u16;
+                rel_handle.field2 = n2 as u16;
+            } 
+            table_storage_path.components.pop();
+            table_storage_path.components.pop();
+        }
+        return result;
+    }
+
     fn goto_directory(&mut self, path: &HBAMPath) -> Result<(), String> {
         let mut block = self.inner.get_leaf(path);
         loop {
@@ -34,6 +146,29 @@ impl HBAMInterface {
                 }
             }
             block = self.inner.get_next_leaf().expect("Unable to get next leaf.");
+        }
+    }
+
+    fn get_simple_data(&mut self) -> Result<Vec<Vec<u8>>, String> {
+        let mut res = vec![];
+        let mut start = self.inner.cursor.chunk_index;
+        let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
+        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
+        loop {
+            for offset in start as usize..block.chunks.len() {
+                let wrapper = &block.chunks[offset];
+                let chunk = wrapper.chunk();
+                if chunk.ctype == InstructionType::DataSimple {
+                    if dir_path == chunk.path {
+                        res.push(chunk.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to read simple data from buffer."));
+                    }
+                } else if chunk.path > dir_path {
+                    return Ok(res);
+                }
+            }
+            self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
+            (block, buffer) = self.inner.get_current_block_with_buffer_mut();
+            start = 0;
         }
     }
 
@@ -67,7 +202,6 @@ impl HBAMInterface {
                 let wrapper = &block.chunks[offset];
                 let chunk = wrapper.chunk();
                 if chunk.ref_simple == Some(key) {
-                    println!("Looking up @ {:?}, size: {}", chunk.data.unwrap(), chunk.size());
                     if dir_path == chunk.path {
                         let storage = match wrapper {
                             ChunkType::Modification(..) => &self.staging_buffer.buffer,
@@ -234,53 +368,80 @@ impl HBAMInterface {
         }
     }
 
+    pub fn modify_table(&mut self, table: &Table) {
+        self.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
+        let mut id_data = put_int(table.id);
+        id_data.insert(0, id_data.len() as u8);
+        let mut de_name = encode_text(&table.name);
+        de_name.append(&mut vec![0; 3]);
+        self.set_long_kv_by_data(&de_name, &id_data).expect("Unable to set long kv using data.");
+
+        self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
+        self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+        self.goto_directory(&HBAMPath::new(vec!["3", "16", "5", &table.id.to_string()])).expect("Unable to go to directory.");
+        self.set_kv(16, &fm_string_encrypt(&table.name)).expect("Unable to set keyvalue pair.");
+        self.update_consistency_counter().expect("Unable to increment keyvalue.");
+        
+        self.goto_directory(&HBAMPath::new(vec!["3", "17", "1"])).expect("Unable to go to directory.");
+        self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+        self.goto_directory(&HBAMPath::new(vec!["4", "1"])).expect("Unable to go to directory.");
+        self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+        self.goto_directory(&HBAMPath::new(vec!["4", "5", "1"])).expect("Unable to go to directory.");
+        self.update_consistency_counter().expect("Unable to increment keyvalue.");
+
+        self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
+        let mut change_data = self.get_kv_value(8).expect("Unable to get keyvalue");
+        change_data[42] += 1;
+        change_data[157] += 1;
+        self.set_kv(8, &change_data).expect("Unable to set keyvalue.");
+
+        let mut change_data = self.get_kv_value(9).expect("Unable to get keyvalue");
+        change_data[36] += 1;
+        self.set_kv(9, &change_data).expect("Unable to set keyvalue.");
+    }
+
+    pub fn modify_table_occurrence(&mut self, table_occurrence: &TableOccurrence) {
+        self.goto_directory(&HBAMPath::new(vec!["3", "17", "5", &table_occurrence.id.to_string()])).expect("Unable to go to table occurrence storage directory.");
+        self.set_kv(16, &fm_string_encrypt(&table_occurrence.name)).expect("Unable to set kv.");
+        self.update_consistency_counter().expect("Unable to update consistency counter");
+    }
+
     pub fn commit_table_changes(&mut self, schema: &Schema, diffs: &DiffCollection) {
-        let mut changes = 0;
-        for object in &schema.tables {
-            let status = diffs.get(&object.id).expect("diff does not include information for table.");
-
-            if *status == DBObjectStatus::Modified {
-                self.goto_directory(&HBAMPath::new(vec!["3", "16", "1", "1"])).expect("Unable to go to directory.");
-                let mut id_data = put_int(object.id);
-                id_data.insert(0, id_data.len() as u8);
-                let mut de_name = encode_text(&object.name);
-                de_name.append(&mut vec![0; 3]);
-                self.set_long_kv_by_data(&de_name, &id_data).expect("Unable to set long kv using data.");
-
-                self.goto_directory(&HBAMPath::new(vec!["3", "16", "1"])).expect("Unable to go to directory.");
-                self.update_consistency_counter().expect("Unable to increment keyvalue.");
-                changes += 1;
-
-                self.goto_directory(&HBAMPath::new(vec!["3", "16", "5", &object.id.to_string()])).expect("Unable to go to directory.");
-                self.set_kv(16, &fm_string_encrypt(&object.name)).expect("Unable to set keyvalue pair.");
-                self.update_consistency_counter().expect("Unable to increment keyvalue.");
-                changes += 1;
-                
-                self.goto_directory(&HBAMPath::new(vec!["3", "17", "1"])).expect("Unable to go to directory.");
-                self.update_consistency_counter().expect("Unable to increment keyvalue.");
-
-                self.goto_directory(&HBAMPath::new(vec!["4", "1"])).expect("Unable to go to directory.");
-                self.update_consistency_counter().expect("Unable to increment keyvalue.");
-
-                self.goto_directory(&HBAMPath::new(vec!["4", "5", "1"])).expect("Unable to go to directory.");
-                self.update_consistency_counter().expect("Unable to increment keyvalue.");
+        for table in &schema.tables {
+            let status = diffs.get(&table.1.id).expect("diff does not include information for table.");
+            match status {
+                DBObjectStatus::Unmodified => {},
+                DBObjectStatus::Modified => {
+                    self.modify_table(table.1);
+                }
+                DBObjectStatus::Created => {},
+                DBObjectStatus::Deleted => {},
             }
-
-            self.goto_directory(&HBAMPath::new(vec!["2"])).expect("Unable to get to directory.");
-            let mut change_data = self.get_kv_value(8).expect("Unable to get keyvalue");
-            change_data[42] += 1;
-            change_data[157] += 1;
-            self.set_kv(8, &change_data).expect("Unable to set keyvalue.");
-
-            let mut change_data = self.get_kv_value(9).expect("Unable to get keyvalue");
-            change_data[36] += 1;
-            self.set_kv(9, &change_data).expect("Unable to set keyvalue.");
         }
         self.inner.write_nodes(&self.staging_buffer).expect("Unable to write nodes to output file.");
     }
 
-    pub fn commit_changes(&mut self, schema: &Schema, diffs: &DiffCollection) {
-        self.commit_table_changes(schema, diffs);
+    pub fn commit_table_occurrence_changes(&mut self, schema: &Schema, diffs: &DiffCollection) {
+        for table_occurrence in &schema.table_occurrences {
+            let status = diffs.get(&table_occurrence.1.id).expect("diff does not include information for table.");
+            match status {
+                DBObjectStatus::Unmodified => {},
+                DBObjectStatus::Modified => {
+                    self.modify_table_occurrence(table_occurrence.1);
+                }
+                DBObjectStatus::Created => {},
+                DBObjectStatus::Deleted => {},
+            }
+        }
+        self.inner.write_nodes(&self.staging_buffer).expect("Unable to write nodes to output file.");
+    }
+
+    pub fn commit_changes(&mut self, schema: &Schema, diffs: &SchemaDiff) {
+        self.commit_table_changes(schema, &diffs.tables);
+        self.commit_table_occurrence_changes(schema, &diffs.table_occurrences);
         self.inner.write_nodes(&self.staging_buffer).expect("Unable to write table block to file.");
     }
 }

@@ -1,0 +1,84 @@
+{
+  "tables": {
+    "131": {
+      "id": 131,
+      "name": "related",
+      "created_by": "",
+      "modified_by": ""
+    },
+    "129": {
+      "id": 129,
+      "name": "blank",
+      "created_by": "",
+      "modified_by": ""
+    }
+  },
+  "fields": {},
+  "table_occurrences": {
+    "131": {
+      "id": 131,
+      "name": "related",
+      "created_by": "",
+      "modified_by": ""
+    },
+    "132": {
+      "id": 132,
+      "name": "double",
+      "created_by": "",
+      "modified_by": ""
+    },
+    "129": {
+      "id": 129,
+      "name": "blank",
+      "created_by": "",
+      "modified_by": ""
+    },
+    "133": {
+      "id": 133,
+      "name": "double 2",
+      "created_by": "",
+      "modified_by": ""
+    }
+  },
+  "relations": {
+    "3": {
+      "id": 3,
+      "table1": 132,
+      "table1_name": "",
+      "table1_data_source": 0,
+      "field1": 4,
+      "table2": 131,
+      "table2_name": "",
+      "table2_data_source": 0,
+      "field2": 2,
+      "comparison": "GreaterEqual"
+    },
+    "4": {
+      "id": 4,
+      "table1": 133,
+      "table1_name": "",
+      "table1_data_source": 0,
+      "field1": 5,
+      "table2": 131,
+      "table2_name": "",
+      "table2_data_source": 0,
+      "field2": 5,
+      "comparison": "Equal"
+    },
+    "2": {
+      "id": 2,
+      "table1": 129,
+      "table1_name": "",
+      "table1_data_source": 0,
+      "field1": 1,
+      "table2": 131,
+      "table2_name": "",
+      "table2_data_source": 0,
+      "field2": 1,
+      "comparison": "Equal"
+    }
+  },
+  "value_lists": {},
+  "scripts": {},
+  "tests": {}
+}

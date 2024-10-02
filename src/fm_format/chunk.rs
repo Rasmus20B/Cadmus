@@ -196,7 +196,7 @@ impl Chunk {
             } else if new_opcode == 0x38 {
                 buffer.push(self.data.unwrap().length as u8);
             } else {
-                println!("DATA LENGTH: {}", self.data.unwrap().length);
+                // println!("DATA LENGTH: {}", self.data.unwrap().length);
                 buffer.push(self.data.unwrap().length as u8);
             }
 

@@ -190,8 +190,7 @@
     - Byte 3: Data Source Index.
     - Byte 7: Table Actual Index.
 - (16) => Name of the table occurrence.
-- (216) => gimme some time
-- [3].[17].[5].[0].[251] => Simple Data. typically 5 Bytes.
+- (216) => gimme some te
 - (252) => ???
 
 # Calculation Engine
