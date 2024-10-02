@@ -23,42 +23,23 @@ impl HBAMInterface {
 
     pub fn get_tables(&mut self) -> HashMap<usize, Table> {
         let mut result = HashMap::new();
-        let table_storage_path = HBAMPath::new(vec!["3", "16", "5"]);
+        let mut table_storage_path = HBAMPath::new(vec!["3", "16", "5"]);
         self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
-        let (mut block, mut buffer) = self.inner.get_current_block_with_buffer();
-        loop {
-            let mut current_table = usize::max_value();
-            for offset in 0..block.chunks.len() {
-                let chunk = block.chunks[offset].chunk();
-                if chunk.path > table_storage_path {
-                    return result;
-                }
-                match chunk.path.components[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
-                    ["3", "16", "5", x] => {
-                        let index = x.parse::<usize>().unwrap();
-                        match chunk.ctype {
-                            InstructionType::PathPush => {
-                                result.insert(index, Table::new(index));
-                            },
-                            InstructionType::RefSimple => {
-                                match chunk.ref_simple {
-                                    Some(16) => {
-                                        let data = chunk.data.unwrap().lookup_from_buffer(&buffer).expect("Unable to lookup data from fmp buffer.");
-                                        let decoded = fm_string_decrypt(&data);
-                                        result.get_mut(&index).unwrap().name = decoded;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            self.inner.get_next_leaf().expect("Unable to get next leaf.");
-            (block, buffer) = self.inner.get_current_block_with_buffer();
+        for x in 129..=255 {
+            table_storage_path.components.push(x.to_string());
+            if let Ok(()) = self.goto_directory(&table_storage_path) {
+                let name = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
+                let created_by = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
+                let modified_by = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
+                let mut tmp = Table::new(x);
+                tmp.name = name;
+                tmp.created_by = created_by;
+                tmp.modified_by = modified_by;
+                result.insert(x, tmp);
+            } 
+            table_storage_path.components.pop();
         }
+        return result;
     }
 
     pub fn get_table_occurrences(&mut self) -> HashMap<usize, TableOccurrence> {
@@ -69,8 +50,12 @@ impl HBAMInterface {
             table_storage_path.components.push(x.to_string());
             if let Ok(()) = self.goto_directory(&table_storage_path) {
                 let name = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
+                let created_by = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
+                let modified_by = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
                 let mut tmp = TableOccurrence::new(x);
                 tmp.name = name;
+                tmp.created_by = created_by;
+                tmp.modified_by = modified_by;
                 result.insert(x, tmp);
             } 
             table_storage_path.components.pop();
