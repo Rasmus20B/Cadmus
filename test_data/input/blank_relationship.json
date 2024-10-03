@@ -21,6 +21,12 @@
       "created_by": "admin",
       "modified_by": "Admin"
     },
+    "132": {
+      "id": 132,
+      "name": "double",
+      "created_by": "admin",
+      "modified_by": "Admin"
+    },
     "131": {
       "id": 131,
       "name": "related",
@@ -32,27 +38,9 @@
       "name": "double 2",
       "created_by": "admin",
       "modified_by": "Admin"
-    },
-    "132": {
-      "id": 132,
-      "name": "double",
-      "created_by": "admin",
-      "modified_by": "Admin"
     }
   },
   "relations": {
-    "3": {
-      "id": 3,
-      "table1": 132,
-      "table1_name": "",
-      "table1_data_source": 0,
-      "field1": 4,
-      "table2": 131,
-      "table2_name": "",
-      "table2_data_source": 0,
-      "field2": 2,
-      "comparison": "GreaterEqual"
-    },
     "4": {
       "id": 4,
       "table1": 133,
@@ -64,6 +52,18 @@
       "table2_data_source": 0,
       "field2": 5,
       "comparison": "Equal"
+    },
+    "3": {
+      "id": 3,
+      "table1": 132,
+      "table1_name": "",
+      "table1_data_source": 0,
+      "field1": 4,
+      "table2": 131,
+      "table2_name": "",
+      "table2_data_source": 0,
+      "field2": 2,
+      "comparison": "GreaterEqual"
     },
     "2": {
       "id": 2,

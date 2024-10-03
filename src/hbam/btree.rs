@@ -292,11 +292,29 @@ impl HBAMFile {
         if !self.cached_blocks.contains_key(&index) {
             self.cached_blocks.insert(index, current_block);
         }
+
+        self.cursor.block_index = index;
         self.cached_blocks.get(&index).unwrap()
     }
 
     fn load_leaf_from_io(&mut self) -> Block {
         unimplemented!()
+    }
+
+    pub fn goto_next_leaf(&mut self) -> Result<&Block, String> {
+        debug_assert!(!self.cached_blocks.is_empty());
+        let next = self.cached_blocks[&self.cursor.block_index].next;
+
+        if self.cached_blocks.contains_key(&(next)) {
+            self.cursor.block_index = next;
+            self.cursor.chunk_index = 0;
+            return Ok(self.cached_blocks.get(&next).unwrap());
+        } else {
+            self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
+            self.cursor.block_index = next;
+            self.cursor.chunk_index = 0;
+            return Ok(self.cached_blocks.get(&next).unwrap());
+        }
     }
 
     pub fn get_next_leaf(&mut self) -> Result<&Block, String> {
@@ -320,14 +338,36 @@ impl HBAMFile {
         let next = self.cached_blocks[&self.cursor.block_index].next;
 
         if self.cached_blocks.contains_key(&(next)) {
-            self.cursor.block_index = next;
-            self.cursor.chunk_index = 0;
             return Ok(self.cached_blocks.get_mut(&next).unwrap());
         } else {
             self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
-            self.cursor.block_index = next;
-            self.cursor.chunk_index = 0;
             return Ok(self.cached_blocks.get_mut(&next).unwrap());
+        }
+    }
+
+    pub fn get_next_leaf_with_buffer(&mut self) -> Result<(&Block, Vec<u8>), String> {
+        debug_assert!(!self.cached_blocks.is_empty());
+        let next = self.cached_blocks[&self.cursor.block_index].next;
+        let buffer = self.get_buffer_from_leaf(next as u64);
+
+        if self.cached_blocks.contains_key(&(next)) {
+            return Ok((self.cached_blocks.get(&next).unwrap(), buffer));
+        } else {
+            self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
+            return Ok((self.cached_blocks.get(&next).unwrap(), buffer));
+        }
+    }
+
+    pub fn get_next_leaf_with_buffer_mut(&mut self) -> Result<(&mut Block, Vec<u8>), String> {
+        debug_assert!(!self.cached_blocks.is_empty());
+        let next = self.cached_blocks[&self.cursor.block_index].next;
+        let buffer = self.get_buffer_from_leaf(next as u64);
+
+        if self.cached_blocks.contains_key(&(next)) {
+            return Ok((self.cached_blocks.get_mut(&next).unwrap(), buffer));
+        } else {
+            self.load_leaf_n_from_disk(next).expect("Unable to load block from disk.");
+            return Ok((self.cached_blocks.get_mut(&next).unwrap(), buffer));
         }
     }
 }

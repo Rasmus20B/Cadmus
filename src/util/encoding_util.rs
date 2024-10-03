@@ -4,7 +4,8 @@ pub fn get_path_int(bytes : &[u8]) -> usize {
     match bytes.len() {
         1 => bytes[0] as usize,
         2 => 0x80 + ((bytes[0] as usize) & 0x7f << 8) + bytes[1] as usize,
-        _ => 0
+        3 => 0x80 + ((bytes[0] as usize) & 0x7f << 8) + ((bytes[1] as usize) & 0x7f),
+        _ => 0,
     }
 }
 

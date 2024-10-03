@@ -1,4 +1,4 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
+use std::{borrow::Borrow, fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
 use clap::Parser;
 use cli::CLI;
 use diff::get_diffs;

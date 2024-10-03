@@ -66,7 +66,6 @@ impl HBAMInterface {
     pub fn get_relations(&mut self) -> HashMap<usize, Relation> {
         let mut result = HashMap::new();
         let mut table_storage_path = HBAMPath::new(vec!["3", "17", "5"]);
-        // self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
         for x in 129..=255 {
             table_storage_path.components.push(x.to_string());
             table_storage_path.components.push(251.to_string());
@@ -78,7 +77,6 @@ impl HBAMInterface {
                 tmp.table1 = x;
                 tmp.table2 = relation_definition[2] as u16 + 128;
                 tmp.id = relation_index as usize;
-                println!("path: {:?}, Pushing relationship {} :: {:?} :: bytes {:?}", table_storage_path.components, result.len() + 1, tmp, relation_definition);
                 result.insert(relation_index as usize, tmp);
                 }
             }
@@ -86,6 +84,7 @@ impl HBAMInterface {
             table_storage_path.components.pop();
         }
 
+        // TODO: Multiple criteria for a given relationship between 2 fixed tables.
         let mut table_storage_path = HBAMPath::new(vec!["3", "251", "5"]);
         for (idx, rel_handle) in result.iter_mut() {
             table_storage_path.components.push(idx.to_string());
@@ -104,13 +103,12 @@ impl HBAMInterface {
                 };
                 let start1 = 2 as usize;
                 let len1 = definition[1] as usize;
-                let start2 = 2 + len1 + 1 as usize;
-                let len2 = definition[2 + len1] as usize;
-                println!("bytes: {:?}, start1: {}, start2: {}, len1: {}, len2: {}", definition, start1, start2, len1, len2);
-                let n1 = get_path_int(&definition[start1..start1 + len1]) - 128;
-                let n2 = get_path_int(&definition[start2..start2 + len2]) - 128;
-                rel_handle.field1 = n1 as u16;
-                rel_handle.field2 = n2 as u16;
+                let start2 = start1 + len1 + 1 as usize;
+                let len2 = definition[start1 + len1] as usize;
+                let n1 = get_path_int(&definition[start1..start1 + len1]);
+                let n2 = get_path_int(&definition[start2..start2 + len2]);
+                rel_handle.field1 = n1 as u16 - 128;
+                rel_handle.field2 = n2 as u16 - 128;
             } 
             table_storage_path.components.pop();
             table_storage_path.components.pop();
@@ -123,7 +121,7 @@ impl HBAMInterface {
         loop {
             for offset in 0..block.chunks.len() {
                 let chunk = block.chunks[offset].chunk();
-                if chunk.path == *path {
+                if chunk.path.components == *path.components {
                     self.inner.cursor = HBAMCursor { block_index: block.index, chunk_index: offset as u16 };
                     return Ok(())
                 } else if chunk.path > *path {
@@ -151,8 +149,7 @@ impl HBAMInterface {
                     return Ok(res);
                 }
             }
-            self.inner.get_next_leaf_mut().expect("Unable to get next leaf.");
-            (block, buffer) = self.inner.get_current_block_with_buffer_mut();
+            (block, buffer) = self.inner.get_next_leaf_with_buffer_mut().expect("Unable to get next leaf.");
             start = 0;
         }
     }
@@ -180,6 +177,7 @@ impl HBAMInterface {
 
     fn get_kv_value(&mut self, key: u16) -> Result<Vec<u8>, String> {
         let mut start = self.inner.cursor.chunk_index;
+        let block_start = self.inner.cursor.block_index;
         let dir_path = self.inner.get_current_block().chunks[self.inner.cursor.chunk_index as usize].chunk().path.clone();
         let (mut block, mut buffer) = self.inner.get_current_block_with_buffer();
         loop {
@@ -187,7 +185,7 @@ impl HBAMInterface {
                 let wrapper = &block.chunks[offset];
                 let chunk = wrapper.chunk();
                 if chunk.ref_simple == Some(key) {
-                    if dir_path == chunk.path {
+                    if dir_path.components == chunk.path.components {
                         let storage = match wrapper {
                             ChunkType::Modification(..) => &self.staging_buffer.buffer,
                             ChunkType::Unchanged(..) => &buffer,
@@ -198,8 +196,7 @@ impl HBAMInterface {
                     return Err(format!("Key {} not found in directory {:?}", key, dir_path));
                 }
             }
-            self.inner.get_next_leaf().expect("Unable to get next leaf.");
-            (block, buffer) = self.inner.get_current_block_with_buffer();
+            (block, buffer) = self.inner.get_next_leaf_with_buffer().expect("Unable to get next leaf.");
             start = 0;
         }
     }
@@ -214,7 +211,6 @@ impl HBAMInterface {
                 let chunk = wrapper.chunk_mut();
                 if chunk.ref_simple == Some(key) {
                     if dir_path == chunk.path {
-                        println!("Setting {} to {:?} @ path {:?}", key, data, dir_path);
                         chunk.data = Some(self.staging_buffer.store(data.to_vec()));
                         **wrapper = ChunkType::Modification(chunk.clone());
                         return Ok(())
