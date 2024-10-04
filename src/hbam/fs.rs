@@ -84,7 +84,6 @@ impl HBAMInterface {
             table_storage_path.components.pop();
         }
 
-        // TODO: Multiple criteria for a given relationship between 2 fixed tables.
         let mut table_storage_path = HBAMPath::new(vec!["3", "251", "5"]);
         for (idx, rel_handle) in result.iter_mut() {
             table_storage_path.components.push(idx.to_string());
