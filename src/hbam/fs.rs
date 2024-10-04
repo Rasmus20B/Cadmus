@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Read, path::Path};
 
-use crate::{diff::{DiffCollection, SchemaDiff}, fm_format::chunk::{ChunkType, InstructionType}, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Relation, RelationComparison, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, fm_format::chunk::{ChunkType, InstructionType}, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -90,25 +90,30 @@ impl HBAMInterface {
             table_storage_path.components.push(idx.to_string());
             table_storage_path.components.push(3.to_string());
             if let Ok(()) = self.goto_directory(&table_storage_path) {
-                let definition = &self.get_kv_value(1).expect("Unable to get keyvalue");
-                rel_handle.comparison = match definition[0] {
-                    0 => RelationComparison::Equal,
-                    1 => RelationComparison::NotEqual,
-                    2 => RelationComparison::Greater,
-                    3 => RelationComparison::GreaterEqual,
-                    4 => RelationComparison::Less,
-                    5 => RelationComparison::LessEqual,
-                    6 => RelationComparison::Cartesian,
-                    _ => unreachable!()
-                };
-                let start1 = 2 as usize;
-                let len1 = definition[1] as usize;
-                let start2 = start1 + len1 + 1 as usize;
-                let len2 = definition[start1 + len1] as usize;
-                let n1 = get_path_int(&definition[start1..start1 + len1]);
-                let n2 = get_path_int(&definition[start2..start2 + len2]);
-                rel_handle.field1 = n1 as u16 - 128;
-                rel_handle.field2 = n2 as u16 - 128;
+                for i in 0..255 {
+
+                if let Ok(definition) = &self.get_kv_value(i) {
+                    let comparison_ = match definition[0] {
+                        0 => RelationComparison::Equal,
+                        1 => RelationComparison::NotEqual,
+                        2 => RelationComparison::Greater,
+                        3 => RelationComparison::GreaterEqual,
+                        4 => RelationComparison::Less,
+                        5 => RelationComparison::LessEqual,
+                        6 => RelationComparison::Cartesian,
+                        _ => unreachable!()
+                    };
+                    let start1 = 2 as usize;
+                    let len1 = definition[1] as usize;
+                    let start2 = start1 + len1 + 1 as usize;
+                    let len2 = definition[start1 + len1] as usize;
+                    let n1 = get_path_int(&definition[start1..start1 + len1]);
+                    let n2 = get_path_int(&definition[start2..start2 + len2]);
+                    let field1_ = n1 as u16 - 128;
+                    let field2_ = n2 as u16 - 128;
+                    rel_handle.criterias.push(RelationCriteria { field1: field1_, field2: field2_, comparison: comparison_ });
+                    }
+                }
             } 
             table_storage_path.components.pop();
             table_storage_path.components.pop();

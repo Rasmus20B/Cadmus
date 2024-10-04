@@ -79,17 +79,22 @@ pub enum RelationComparison {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct RelationCriteria {
+    pub field1: u16,
+    pub field2: u16,
+    pub comparison: RelationComparison,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Relation {
     pub id: usize,
     pub table1: u16,
     pub table1_name: String,
     pub table1_data_source: u8,
-    pub field1: u16,
     pub table2: u16,
     pub table2_name: String,
     pub table2_data_source: u8,
-    pub field2: u16,
-    pub comparison: RelationComparison,
+    pub criterias: Vec<RelationCriteria>,
 }
 
 impl Relation {
@@ -99,12 +104,10 @@ impl Relation {
             table1: 0,
             table1_name: String::new(),
             table1_data_source: 0,
-            field1: 0,
             table2: 0,
             table2_name: String::new(),
             table2_data_source: 0,
-            field2: 0,
-            comparison: RelationComparison::Equal,
+            criterias: vec![],
         }
     }
 }
