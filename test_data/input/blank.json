@@ -1,0 +1,23 @@
+{
+  "tables": {
+    "129": {
+      "id": 129,
+      "name": "blank",
+      "created_by": "admin",
+      "modified_by": "Admin"
+    }
+  },
+  "fields": {},
+  "table_occurrences": {
+    "129": {
+      "id": 129,
+      "name": "blank",
+      "created_by": "admin",
+      "modified_by": "Admin"
+    }
+  },
+  "relations": {},
+  "value_lists": {},
+  "scripts": {},
+  "tests": {}
+}

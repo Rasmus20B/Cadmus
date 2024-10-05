@@ -72,10 +72,7 @@ fn main() -> Result<(), std::io::Error>{
         base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
         let additions = base_file.as_mut().unwrap().get_tables();
         ctx.fmp.tables.extend(additions);
-        let additions = base_file.as_mut().unwrap().get_table_occurrences();
-        ctx.fmp.table_occurrences.extend(additions);
-        let additions = base_file.as_mut().unwrap().get_relations();
-        ctx.fmp.relations.extend(additions);
+        base_file.as_mut().unwrap().get_table_occurrences(&mut ctx.fmp);
 
         if args.print_directory.is_some() {
             let dir = HBAMPath::from(args.print_directory.unwrap());

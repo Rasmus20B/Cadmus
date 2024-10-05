@@ -42,8 +42,7 @@ impl HBAMInterface {
         return result;
     }
 
-    pub fn get_table_occurrences(&mut self) -> HashMap<usize, TableOccurrence> {
-        let mut result = HashMap::new();
+    pub fn get_table_occurrences(&mut self, schema: &mut Schema) {
         let mut table_storage_path = HBAMPath::new(vec!["3", "17", "5"]);
         self.goto_directory(&table_storage_path).expect("Unable to go to directory.");
         for x in 129..=255 {
@@ -52,44 +51,37 @@ impl HBAMInterface {
                 let name = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
                 let created_by = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
                 let modified_by = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
-                let mut tmp = TableOccurrence::new(x);
-                tmp.name = name;
-                tmp.created_by = created_by;
-                tmp.modified_by = modified_by;
-                result.insert(x, tmp);
-            } 
-            table_storage_path.components.pop();
-        }
-        return result;
-    }
+                let mut tmp_occurrence = TableOccurrence::new(x);
+                tmp_occurrence.name = name;
+                tmp_occurrence.created_by = created_by;
+                tmp_occurrence.modified_by = modified_by;
+                schema.table_occurrences.insert(x, tmp_occurrence);
 
-    pub fn get_relations(&mut self) -> HashMap<usize, Relation> {
-        let mut result = HashMap::new();
-        let mut table_storage_path = HBAMPath::new(vec!["3", "17", "5"]);
-        for x in 129..=255 {
-            table_storage_path.components.push(x.to_string());
-            table_storage_path.components.push(251.to_string());
-            if let Ok(()) = self.goto_directory(&table_storage_path) {
-                let relation_definition = &self.get_simple_data().expect("Unable to get top-level relationship definition.")[0];
-                let mut tmp = Relation::new(result.len() + 1);
-                let relation_index = relation_definition[4];
-                if !result.contains_key(&(relation_index as usize)) {
-                tmp.table1 = x;
-                tmp.table2 = relation_definition[2] as u16 + 128;
-                tmp.id = relation_index as usize;
-                result.insert(relation_index as usize, tmp);
+                table_storage_path.components.push(251.to_string());
+                if let Ok(()) = self.goto_directory(&table_storage_path) {
+                    let relation_definitions = &self.get_simple_data().expect("Unable to get top-level relationship definition.");
+                    if relation_definitions.is_empty() { continue; }
+                    let relation_definition = relation_definitions[0].clone();
+                    let mut tmp = Relation::new(0);
+                    let relation_index = relation_definition[4];
+                    // if !result.contains_key(&(relation_index as usize)) {
+                        tmp.table1 = x as u16;
+                        tmp.table2 = relation_definition[2] as u16 + 128;
+                        tmp.id = relation_index as usize;
+                        schema.relations.insert(relation_index as usize, tmp);
+                    // }
                 }
-            }
-            table_storage_path.components.pop();
+                table_storage_path.components.pop();
+            } 
             table_storage_path.components.pop();
         }
 
         let mut table_storage_path = HBAMPath::new(vec!["3", "251", "5"]);
-        for (idx, rel_handle) in result.iter_mut() {
+        for (idx, rel_handle) in schema.relations.iter_mut() {
             table_storage_path.components.push(idx.to_string());
             table_storage_path.components.push(3.to_string());
             if let Ok(()) = self.goto_directory(&table_storage_path) {
-                for i in 0..255 {
+                for i in 0..20 {
 
                 if let Ok(definition) = &self.get_kv_value(i) {
                     let comparison_ = match definition[0] {
@@ -117,7 +109,6 @@ impl HBAMInterface {
             table_storage_path.components.pop();
             table_storage_path.components.pop();
         }
-        return result;
     }
 
     fn goto_directory(&mut self, path: &HBAMPath) -> Result<(), String> {
