@@ -2,43 +2,17 @@ use std::{borrow::Borrow, fs::{File, OpenOptions}, io::{BufReader, BufWriter}, p
 use clap::Parser;
 use cli::CLI;
 use diff::get_diffs;
-use fm_format::chunk::Chunk;
-use hbam::{btree::HBAMFile, fs::HBAMInterface, path::HBAMPath};
+use hbam::{btree::HBAMFile, chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
 use schema::{Schema, Table, TableOccurrence};
 use util::encoding_util::fm_string_decrypt;
 
 
-mod data_cache;
-mod fm_core;
-mod fm_io;
-mod fm_format;
 mod util;
 mod staging_buffer;
 mod hbam;
 mod schema;
 mod cli;
 mod diff;
-
-fn load_tables(file: &mut HBAMFile) -> Vec<Table> {
-    let (block, buffer) = file.get_leaf_with_buffer(&HBAMPath::new(vec!["3", "16"]));
-    let mut tables = vec![];
-    for chunk_wrapper in &block.chunks {
-        let chunk = Chunk::from(chunk_wrapper.clone());
-        match chunk.path.components[..].iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice() {
-            ["3", "16", "5", x] => {
-                if chunk.ref_simple == Some(16) {
-                    let data_uw = chunk.data.unwrap();
-                    let string = data_uw.lookup_from_buffer(&buffer.to_vec()).expect("Unable to lookup data from file.");
-                    let decoded = fm_string_decrypt(&string);
-                    tables.push(Table { id: x.parse().unwrap(), name: decoded, created_by: "Admin".to_string(), modified_by: "admin".to_string() });
-                }
-            },
-            _ => {}
-        };
-
-    }
-    tables
-}
 
 struct InputContext {
     cad: Schema,

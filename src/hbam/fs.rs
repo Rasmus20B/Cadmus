@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Read, path::Path};
 
-use crate::{diff::{DiffCollection, SchemaDiff}, fm_format::chunk::{ChunkType, InstructionType}, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, hbam::chunk::{ChunkType, InstructionType}, hbam::btree::HBAMCursor, schema::{DBObjectStatus, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -64,12 +64,10 @@ impl HBAMInterface {
                     let relation_definition = relation_definitions[0].clone();
                     let mut tmp = Relation::new(0);
                     let relation_index = relation_definition[4];
-                    // if !result.contains_key(&(relation_index as usize)) {
-                        tmp.table1 = x as u16;
-                        tmp.table2 = relation_definition[2] as u16 + 128;
-                        tmp.id = relation_index as usize;
-                        schema.relations.insert(relation_index as usize, tmp);
-                    // }
+                    tmp.table1 = x as u16;
+                    tmp.table2 = relation_definition[2] as u16 + 128;
+                    tmp.id = relation_index as usize;
+                    schema.relations.insert(relation_index as usize, tmp);
                 }
                 table_storage_path.components.pop();
             } 
@@ -435,7 +433,8 @@ mod tests {
 
         file.goto_directory(&HBAMPath::new(vec!["3", "16"])).expect("Unable to go to directory.");
         file.goto_directory(&HBAMPath::new(vec!["3", "17"])).expect("Unable to go to directory.");
-        assert!(file.inner.cached_blocks.len() == 1);
+        // 2 blocks in cache because of the root block.
+        assert_eq!(file.inner.cached_blocks.len(), 2);
         assert!(file.inner.cached_blocks.contains_key(&64));
 
         file.goto_directory(&HBAMPath::new(vec!["6"])).expect("Unable to go to directory.");
@@ -446,7 +445,7 @@ mod tests {
         assert!(file.inner.cached_blocks.contains_key(&64)
             && file.inner.cached_blocks.contains_key(&62)
             && file.inner.cached_blocks.contains_key(&61));
-        assert!(file.inner.cached_blocks.len() == 3);
+        assert!(file.inner.cached_blocks.len() == 4);
     }
 
     #[test]

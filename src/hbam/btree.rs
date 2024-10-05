@@ -1,6 +1,8 @@
 use std::{collections::HashMap, ffi::OsString, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, ops::DerefMut, path::Path, thread::current};
 
-use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, staging_buffer::{self, DataStaging}, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use super::chunk::{Chunk, ChunkType, InstructionType};
+use super::block::Block;
+use crate::{diff::DiffCollection, staging_buffer::{self, DataStaging}, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::path::HBAMPath;
 
@@ -393,7 +395,7 @@ impl HBAMFile {
 mod tests {
     use std::path::Path;
 
-    use crate::{diff::DiffCollection, fm_format::chunk::{Chunk, ChunkType, InstructionType}, fm_io::block::Block, hbam::path::HBAMPath, staging_buffer::DataStaging};
+    use super::{Chunk, ChunkType, InstructionType, Block, HBAMPath, staging_buffer::DataStaging};
 
     use super::HBAMFile;
 

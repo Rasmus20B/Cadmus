@@ -1,4 +1,4 @@
-use crate::fm_format::chunk::{Chunk, ChunkType, BlockErr};
+use super::chunk::{Chunk, ChunkType, BlockErr};
 use crate::util::encoding_util::{get_int, put_int};
 
 #[derive(Clone, Debug, Default)]

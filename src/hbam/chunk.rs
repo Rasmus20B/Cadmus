@@ -2,7 +2,10 @@ use core::fmt;
 use serde_json;
 use serde::{self, Deserialize, Serialize};
 use std::{fmt::Formatter, ops::RangeBounds};
-use crate::{fm_io::{block::Block, storage::BlockStorage}, hbam::{btree::HBAMFile, path::HBAMPath}, staging_buffer::DataStaging, util::encoding_util::{get_int, get_path_int, put_int, put_path_int}};
+use crate::staging_buffer::DataStaging;
+use crate::util::encoding_util::{get_int, get_path_int, put_int, put_path_int};
+
+use super::{block::Block, btree::HBAMFile, path::HBAMPath, block_location::BlockLocation, storage::BlockStorage};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InstructionType {

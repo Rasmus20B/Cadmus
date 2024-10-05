@@ -16,7 +16,7 @@ impl BlockLocation {
 
 #[cfg(test)]
 mod tests {
-    use crate::fm_io::block_location::BlockLocation;
+    use super::BlockLocation;
 
     pub fn comparison_test() {
         assert!(
