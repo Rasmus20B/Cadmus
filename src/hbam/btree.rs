@@ -65,8 +65,9 @@ impl HBAMFile {
     pub fn load_leaf_n_from_disk(&mut self, index: u32) -> Result<&Block, String> {
         let mut buffer = [0u8; 4096];
         self.reader.seek(std::io::SeekFrom::Start(index as u64 * 4096)).expect("Could not seek into file.");
-        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+        self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
         self.cached_blocks.insert(index, Block::new_with_index(&buffer, index));
+        self.cached_block_data.insert(index, buffer);
         Ok(self.cached_blocks.get(&index).unwrap())
     }
 
@@ -93,7 +94,6 @@ impl HBAMFile {
                     ChunkType::Unchanged(..) => &in_buffer,
                     ChunkType::Modification(..) => { data_store }
                 }).expect("Unable to emit binary chunk.");
-            // println!("{:?}", out_buffer);
             out_buffer.append(&mut bin_chunk);
         }
 
@@ -277,7 +277,8 @@ impl HBAMFile {
         let mut current_block = self.cached_blocks.get_mut(&1).unwrap();
         buffer = *self.cached_block_data.get(&1).unwrap();
         current_block.index = 1;
-        let mut next = 1;
+        let mut next = current_block.next as usize;
+        let mut found = false;
 
         loop {
             for chunk_wrapper in &current_block.chunks {
@@ -298,9 +299,24 @@ impl HBAMFile {
                         current_block = self.cached_blocks.get_mut(&(next as u32)).unwrap();
                         buffer = *self.cached_block_data.get(&(next as u32)).unwrap();
                         current_block.index = next as u32;
+                        found = true;
                         break;
                     }
                 }
+            }
+
+            if !found {
+                next = current_block.next as usize;
+                if !self.cached_blocks.contains_key(&(next as u32)) {
+                    self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                    self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+                    self.cached_blocks.insert(next as u32, Block::new(&buffer));
+                    self.cached_block_data.insert(next as u32, buffer);
+                } 
+                current_block = self.cached_blocks.get_mut(&(next as u32)).unwrap();
+                buffer = *self.cached_block_data.get(&(next as u32)).unwrap();
+                current_block.index = next as u32;
+
             }
 
             if current_block.block_type == 0 {

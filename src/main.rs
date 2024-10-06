@@ -9,8 +9,12 @@ use util::encoding_util::fm_string_decrypt;
 
 mod util;
 mod staging_buffer;
+mod compile;
+mod burn_script;
 mod hbam;
 mod schema;
+mod fm_script_engine;
+mod emulator;
 mod cli;
 mod diff;
 
@@ -44,13 +48,12 @@ fn main() -> Result<(), std::io::Error>{
 
     if args.fmp.is_some() {
         base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
-        let additions = base_file.as_mut().unwrap().get_tables();
-        ctx.fmp.tables.extend(additions);
-        base_file.as_mut().unwrap().get_table_occurrences(&mut ctx.fmp);
+        let mut base_file = base_file.unwrap();
+        ctx.fmp = Schema::from(&mut base_file);
 
         if args.print_directory.is_some() {
             let dir = HBAMPath::from(args.print_directory.unwrap());
-            let (leaf, buffer) = base_file.as_mut().unwrap().inner.get_leaf_with_buffer(&dir);
+            let (leaf, buffer) = base_file.inner.get_leaf_with_buffer(&dir);
             for wrapper in leaf.chunks {
                 let chunk = Chunk::from(wrapper);
                 println!("{}", chunk.chunk_to_string(&buffer))
@@ -58,7 +61,7 @@ fn main() -> Result<(), std::io::Error>{
         }
 
         if args.print_all_blocks {
-            base_file.as_mut().unwrap().inner.print_all_chunks();
+            base_file.inner.print_all_chunks();
         }
 
         if args.json_out {

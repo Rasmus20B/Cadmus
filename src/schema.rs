@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::{alloc::Layout, collections::HashMap};
 
 use serde::{Serialize, Deserialize};
+
+use crate::{fm_script_engine::fm_script_engine_instructions::{Instruction, ScriptStep}, hbam::fs::HBAMInterface};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum DBObjectKind {
@@ -25,6 +27,7 @@ pub enum DBObjectStatus {
 pub struct Table {
     pub id: usize,
     pub name: String,
+    pub fields: HashMap<usize, Field>,
     pub created_by: String,
     pub modified_by: String,
 }
@@ -34,6 +37,7 @@ impl Table {
         Self {
             id: id_,
             name: String::new(),
+            fields: HashMap::new(),
             created_by: String::new(),
             modified_by: String::new(),
         }
@@ -42,16 +46,18 @@ impl Table {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Field {
-    id: usize,
-    name: String,
-    created_by: String,
-    modified_by: String,
+    pub id: usize,
+    pub name: String,
+    pub created_by: String,
+    pub modified_by: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TableOccurrence {
     pub id: usize,
     pub name: String,
+    pub table_actual: u16,
+    pub table_actual_name: String,
     pub created_by: String,
     pub modified_by: String,
 }
@@ -61,6 +67,8 @@ impl TableOccurrence {
         Self {
             id: id_,
             name: String::new(),
+            table_actual: 0,
+            table_actual_name: String::new(),
             created_by: String::new(),
             modified_by: String::new(),
         }
@@ -113,34 +121,79 @@ impl Relation {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct ValueLists {
-    id: usize,
-    name: String,
-    created_by: String,
-    modified_by: String,
+pub struct ValueList {
+    pub id: usize,
+    pub name: String,
+    pub created_by: String,
+    pub modified_by: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+impl ValueList {
+    pub fn new(id_: usize) -> Self {
+        Self {
+            id: id_,
+            name: String::new(),
+            created_by: String::new(),
+            modified_by: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Script {
-    id: usize,
-    name: String,
-    created_by: String,
-    modified_by: String,
+    pub id: usize,
+    pub name: String,
+    pub instructions: Vec<ScriptStep>,
+    pub arguments: Vec<String>,
+    pub created_by: String,
+    pub modified_by: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+impl Script {
+    pub fn new() -> Self {
+        Self {
+            id: 0,
+            name: String::new(),
+            instructions: vec![],
+            arguments: vec![],
+            created_by: String::new(),
+            modified_by: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Test {
-    id: usize,
-    name: String,
+    pub id: usize,
+    pub name: String,
+    pub script: Script,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+impl Test {
+    pub fn new() -> Self {
+        Self {
+            id: 0,
+            name: String::new(),
+            script: Script::new(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LayoutFM {
+    pub id: usize,
+    pub name: String,
+    pub table_occurrence: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Schema {
     pub tables: HashMap<usize, Table>,
     pub fields: HashMap<usize, Field>,
     pub table_occurrences: HashMap<usize, TableOccurrence>,
     pub relations: HashMap<usize, Relation>,
-    pub value_lists: HashMap<usize, ValueLists>,
+    pub value_lists: HashMap<usize, ValueList>,
+    pub layouts: HashMap<usize, LayoutFM>,
     pub scripts: HashMap<usize, Script>,
     pub tests: HashMap<usize, Test>,
 }
@@ -153,8 +206,20 @@ impl Schema {
             table_occurrences: HashMap::new(),
             relations: HashMap::new(),
             value_lists: HashMap::new(),
+            layouts: HashMap::new(),
             scripts: HashMap::new(),
             tests: HashMap::new(),
         }
+    }
+}
+
+impl From<&mut HBAMInterface> for Schema {
+    fn from(hbam: &mut HBAMInterface) -> Schema {
+        let mut result = Schema::new();
+        result.tables.extend(hbam.get_tables());
+        hbam.get_table_occurrences(&mut result);
+        hbam.get_fields(&mut result).expect("Unable to get fields from hbam file.");
+        hbam.get_layouts(&mut result).expect("Unable to get fields from hbam file.");
+        result
     }
 }
