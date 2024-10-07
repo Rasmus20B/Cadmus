@@ -1,11 +1,9 @@
-set p to (do shell script "pwd") & "/input/relation.fmp12"
+set db_root to (do shell script "pwd") 
 tell application "FileMaker Pro"
   activate
-  open p
+  open db_root & "/input/relation.fmp12"
   tell table "blank"
-    count fields
-    count records
-    cell "PrimaryKey"
+    create field "addition"
   end tell
 end tell
 
