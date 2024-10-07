@@ -303,7 +303,5 @@ pub fn tokenize(code: &str) -> Vec<Token> {
             buffer.clear();
         }
     }
-
-    return list;
-
+    list
 }

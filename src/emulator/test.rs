@@ -559,19 +559,19 @@ impl<'a> TestEnvironment<'a> {
             }
             Node::Call { name, args } => {
                 match name.as_str() {
-                    "Abs" => { return Ok(self.evaluate(args[0].clone())?
+                    "Abs" => { Ok(self.evaluate(args[0].clone())?
                         .parse::<f32>().expect("unable to perform Abs() on non-numeric")
                         .abs().to_string())
                     }
-                    "Acos" => { return Ok(self.evaluate(args[0].clone())?.parse::<f64>().unwrap().acos().to_string()) }
-                    "Asin" => { return Ok(std::cmp::min(self.evaluate(args[0].clone())?, self.evaluate(args[1].clone())?))}
+                    "Acos" => { Ok(self.evaluate(args[0].clone())?.parse::<f64>().unwrap().acos().to_string()) }
+                    "Asin" => { Ok(std::cmp::min(self.evaluate(args[0].clone())?, self.evaluate(args[1].clone())?))}
                     "Char" => { 
                         let mut res = String::new();
                         res.push('\"');
                         let c = char::from_u32(self.evaluate(args[0].clone()).expect("Unable to evalue argument.").parse::<u32>().unwrap()).unwrap();
                         res.push(c);
                         res.push('\"');
-                        return Ok(res);
+                        Ok(res)
                     }
                     "Min" => { 
                         Ok(args
@@ -690,7 +690,7 @@ mod tests {
     use std::path::Path;
     use crate::emulator::test::TestState;
     use crate::hbam::fs::HBAMInterface;
-    use crate::{compile::{self, compiler::compile_burn}, schema::Schema};
+    use crate::{compile::compiler::compile_burn, schema::Schema};
     use super::TestEnvironment;
 
     #[test]
@@ -723,7 +723,7 @@ mod tests {
         end test;
         ";
 
-        let mut test = compile_burn(code);
+        let test = compile_burn(code);
         file.tests.extend(&mut test.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();

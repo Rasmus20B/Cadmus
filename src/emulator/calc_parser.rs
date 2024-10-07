@@ -198,12 +198,12 @@ impl Parser {
                 let op = operator.unwrap().ttype;
                 let expr2 = (self.parse_expr().expect("unable to parse expression."));
 
-                return Ok(Box::new(
+                Ok(Box::new(
                         Node::Binary { 
                             left: func_call,
                             operation: op, 
                             right: expr2 }
-                ));
+                ))
                 // return Ok(self.parse_func_call(tok.value).expect("Unable to parse function call"));
             }
             TokenType::CloseParen => {
@@ -254,13 +254,13 @@ impl Parser {
                 let op = operator.unwrap().ttype;
                 let expr2 = (self.parse_expr().expect("unable to parse expression."));
 
-                return Ok(Box::new(
+                Ok(Box::new(
                         Node::Binary { 
                             left: func_call,
                             operation: op, 
                             right: expr2 
                 }
-                ));
+                ))
                 // return Ok(self.parse_func_call(tok.value).expect("Unable to parse function call"));
             }
             TokenType::CloseParen => {
@@ -406,7 +406,7 @@ impl Parser {
             TokenType::OpenParen => {
                 self.tokens.next();
                 let expr = self.parse_comparison().expect("unable to parse expression.");
-                return Ok(expr);
+                Ok(expr)
             }
             _ => { 
                 Ok(self.parse_primary().expect("unable to parse rhs."))
@@ -419,11 +419,11 @@ impl Parser {
         match cur.ttype {
             TokenType::Identifier => {
                 if cur.value.split("::").collect::<Vec<_>>().len() == 2 {
-                    return Ok(Box::new(Node::Field(cur.value.clone())));
+                    Ok(Box::new(Node::Field(cur.value.clone())))
                 } else if self.tokens.peek().unwrap_or(&Token::new(TokenType::NumericLiteral)).ttype == TokenType::OpenParen {
-                    return Ok(Box::new(Node::Call { name: cur.value.clone(), args: self.parse_args() }))
+                    Ok(Box::new(Node::Call { name: cur.value.clone(), args: self.parse_args() }))
                 } else {
-                    return Ok(Box::new(Node::Variable(cur.value.clone())));
+                    Ok(Box::new(Node::Variable(cur.value.clone())))
                 }
             },
             TokenType::NumericLiteral => {
@@ -451,7 +451,7 @@ impl Parser {
                 }))
             }
            _ => {
-               return Err(ParserError::UnexpectedToken { 
+               Err(ParserError::UnexpectedToken { 
                    token: cur.clone(),
                    expected: vec![
                        TokenType::Identifier,

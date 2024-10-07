@@ -14,16 +14,13 @@ impl RelationMgr {
     pub fn add_node(&mut self, occ1: usize, occ2: usize) {
         let exists = self.graph.get(&occ1).unwrap_or(&vec![])
             .iter()
-            .filter(|x| **x == occ2)
-            .collect::<Vec<_>>().len() > 0;
+            .any(|x| *x == occ2);
 
-        let graph_node = self.graph.get_mut(&(occ1 as usize));
+        let graph_node = self.graph.get_mut(&occ1);
         if graph_node.is_none() {
             self.graph.insert(occ1, vec![occ2]);
-        } else {
-            if !exists {
-                graph_node.unwrap().push(occ2);
-            }         
+        } else if !exists {
+            graph_node.unwrap().push(occ2);
         }
     }
     pub fn add_relation(&mut self, occ1: usize, occ2: usize) {
@@ -61,7 +58,7 @@ impl RelationMgr {
                 }
             }
         }
-        return None;
+        None
     }
 }
 

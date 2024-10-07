@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
 use clap::Parser;
-use cli::CLI;
+use cli::CommandLine;
 use diff::get_diffs;
 use hbam::{btree::HBAMFile, chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
 use schema::{Schema, Table, TableOccurrence};
@@ -37,7 +37,7 @@ fn main() -> Result<(), std::io::Error>{
     let mut base_file: Option<HBAMInterface>;
     let mut ctx = InputContext::new();
 
-    let args = CLI::parse();
+    let args = CommandLine::parse();
     if args.input.is_some() {
         let in_file = File::open(Path::new(&args.input.clone().unwrap()))?;
         let reader = BufReader::new(in_file);
@@ -72,6 +72,7 @@ fn main() -> Result<(), std::io::Error>{
                 OpenOptions::new()
                     .write(true)
                     .create(true)
+                    .truncate(true)
                     .open(json_path)
                     .expect("Unable to open file."));
             serde_json::to_writer_pretty(writer, &ctx.fmp).expect("Unable to write JSON output.");

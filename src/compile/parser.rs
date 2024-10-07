@@ -227,7 +227,7 @@ impl Parser {
                 }
             }
         }
-        return Ok(ret);
+        Ok(ret)
     }
 }
 

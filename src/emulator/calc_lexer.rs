@@ -53,14 +53,14 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
 
         match c {
             ' ' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
             },
             '(' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -68,7 +68,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::OpenParen));
             },
             ')' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -76,7 +76,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::CloseParen));
             },
             '+' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -84,7 +84,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Plus));
             }
             ',' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -92,7 +92,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Comma));
             },
             '-' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -100,7 +100,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Minus));
             },
             '*' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -108,7 +108,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Multiply));
             },
             '/' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -116,7 +116,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Divide));
             },
             '&' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -124,7 +124,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 tokens.push(Token::new(calc_tokens::TokenType::Ampersand));
             },
             '!' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -135,7 +135,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 }
             },
             '=' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -145,7 +145,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 }
             },
             '<' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -157,7 +157,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
                 }
             },
             '>' => {
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -170,7 +170,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
             }
             '"' => {
                 // TODO: String handling directly from fmp12 file. Extra quotes.
-                if buffer.len() > 0 {
+                if !buffer.is_empty() {
                     let b = flush_buffer(buffer.as_str());
                     buffer.clear();
                     tokens.push(b.unwrap());
@@ -220,7 +220,7 @@ pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerErr
             }
         }
     }
-    if buffer.len() > 0 {
+    if !buffer.is_empty() {
         let b = flush_buffer(buffer.as_str());
         buffer.clear();
         tokens.push(b.unwrap());

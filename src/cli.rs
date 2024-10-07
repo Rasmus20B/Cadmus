@@ -2,7 +2,7 @@ use clap::Parser;
 
 #[derive(Parser)]
 #[command(arg_required_else_help(true))]
-pub struct CLI {
+pub struct CommandLine {
     #[clap(short = 'i')]
     pub input: Option<String>,
     #[clap(long = "fmp")]

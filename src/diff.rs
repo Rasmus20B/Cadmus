@@ -44,11 +44,11 @@ pub fn get_table_diffs(original: &Schema, updated: &Schema) -> DiffCollection {
     }
 
     for o_object in &original.tables {
-        if updated.tables.iter().find(|obj| obj.1.id == o_object.1.id).is_none() {
+        if !updated.tables.iter().any(|obj| obj.1.id == o_object.1.id) {
             result.insert(o_object.1.id, DBObjectStatus::Deleted);
         }
     }
-    return result;
+    result
 }
 
 pub fn get_table_occurrence_diffs(original: &Schema, updated: &Schema) -> DiffCollection {
@@ -66,11 +66,11 @@ pub fn get_table_occurrence_diffs(original: &Schema, updated: &Schema) -> DiffCo
     }
 
     for o_object in &original.table_occurrences {
-        if updated.table_occurrences.iter().find(|obj| obj.1.id == o_object.1.id).is_none() {
+        if !updated.table_occurrences.iter().any(|obj| obj.1.id == o_object.1.id) {
             result.insert(o_object.1.id, DBObjectStatus::Deleted);
         }
     }
-    return result;
+    result
 }
 
 pub fn get_relations_diffs(original: &Schema, updated: &Schema) -> DiffCollection {
@@ -88,18 +88,18 @@ pub fn get_relations_diffs(original: &Schema, updated: &Schema) -> DiffCollectio
     }
 
     for o_object in &original.table_occurrences {
-        if updated.table_occurrences.iter().find(|obj| obj.1.id == o_object.1.id).is_none() {
+        if !updated.table_occurrences.iter().any(|obj| obj.1.id == o_object.1.id) {
             result.insert(o_object.1.id, DBObjectStatus::Deleted);
         }
     }
-    return result;
+    result
 }
 
 pub fn get_diffs(original: &Schema, updated: &Schema) -> SchemaDiff {
     let mut result = SchemaDiff::new();
     result.tables.extend(get_table_diffs(original, updated));
     result.table_occurrences.extend(get_table_occurrence_diffs(original, updated));
-    return result;
+    result
 }
 
 // #[cfg(test)]

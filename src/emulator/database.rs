@@ -121,7 +121,7 @@ impl Database {
     pub fn generate_from_fmp12(&mut self, file: &Schema) {
 
         /* Generate Base Tables */
-        let tables_size = file.tables.keys().into_iter().max().unwrap_or(&0);
+        let tables_size = file.tables.keys().max().unwrap_or(&0);
         self.tables.resize(*tables_size + 1, TableObject::new("".to_string()));
         for (i, table) in &file.tables {
             let tmp = TableObject {
@@ -130,10 +130,10 @@ impl Database {
             };
             self.tables[*i] = tmp;
 
-            let fields_size = table.fields.keys().into_iter().max().unwrap_or(&0);
-            self.tables[*i].fields.resize(*fields_size as usize + 1, Field::new());
+            let fields_size = table.fields.keys().max().unwrap_or(&0);
+            self.tables[*i].fields.resize(*fields_size + 1, Field::new());
             for (j, field) in &table.fields {
-                self.tables[*i as usize].fields[*j as usize] = Field {
+                self.tables[*i].fields[*j] = Field {
                     name: field.name.to_string(),
                     records: vec![]
                 }
@@ -141,8 +141,8 @@ impl Database {
         }
 
         /* Generate Table Occurrences */
-        let occurrence_size = file.table_occurrences.keys().into_iter().max().unwrap_or(&0);
-        self.occurrence_handle = *file.table_occurrences.keys().into_iter().min().unwrap_or(&0) as u16;
+        let occurrence_size = file.table_occurrences.keys().max().unwrap_or(&0);
+        self.occurrence_handle = *file.table_occurrences.keys().min().unwrap_or(&0) as u16;
         self.table_occurrences.resize(*occurrence_size + 1, TableOccurrence::new());
         for (i, occurrence) in &file.table_occurrences {
             self.occurrence_indices.insert(
@@ -159,7 +159,7 @@ impl Database {
         }
 
         /* Generate Relationships */ 
-        for (_, rel) in &file.relations {
+        for rel in file.relations.values() {
             self.table_occurrences[rel.table1 as usize].related_records.push(
                 RelatedRecordSet {
                     occurrence: rel.table2 as usize,
@@ -218,7 +218,7 @@ impl Database {
                 return &f.records[cur_idx];
             }
         }
-        return "";
+        ""
     }
 
     pub fn get_occurrence(&self, occurrence_handle: usize) -> &TableOccurrence {
@@ -259,25 +259,11 @@ impl Database {
     }
 
     pub fn get_table(&self, name: &str) -> Option<&TableObject> {
-        for t in &self.tables {
-            if t.name == name {
-                return Some(&t);
-            }
-        }
-
-        return None;
-        // &self.tables[self.get_current_occurrence().table_ptr as usize]
+        self.tables.iter().find(|table| table.name == name)
     }
 
     pub fn get_table_mut(&mut self, name: &str) -> Option<&mut TableObject> {
-        for t in &mut self.tables {
-            if t.name == name {
-                return Some(t);
-            }
-        }
-
-        return None;
-        // &self.tables[self.get_current_occurrence().table_ptr as usize]
+        self.tables.iter_mut().find(|table| table.name == name)
     }
 
     pub fn get_records_for_current_table(&self) -> &Vec<Field> {
@@ -408,7 +394,7 @@ impl Database {
                 .filter(|x| x.occurrence == next)
                 .collect::<Vec<_>>();
 
-            if relation.len() == 0 {
+            if relation.is_empty() {
                 return Err("Cannot access unrelated record.");
             }
 
@@ -507,9 +493,9 @@ impl Database {
 
         let records = &self.tables[table_idx as usize].fields[field].records;
         if n >= records.len() {
-            return &records[records.len()];
+            &records[records.len()]
         } else {
-            return &records[n];
+            &records[n]
         }
     }
 
@@ -535,14 +521,14 @@ impl Database {
         let records = &mut self.tables[table_idx as usize].fields[field].records;
         let length = records.len();
         if n >= records.len() {
-            return &mut records[length];
+            &mut records[length]
         } else {
-            return &mut records[n];
+            &mut records[n]
         }
     }
 
     /* called after a "perform_find" type script step */
-    pub fn update_found_set(&mut self, records: &Vec<usize>) {
+    pub fn update_found_set(&mut self, records: &[usize]) {
         if records.is_empty() {
             self.reset_found_set();
             return;
@@ -565,7 +551,7 @@ impl Database {
 
     pub fn goto_record(&mut self, record_id: usize) {
         let mut set = self.get_current_occurrence_mut();
-        if record_id as usize >= set.found_set.len() {
+        if record_id >= set.found_set.len() {
             set.record_ptr = set.found_set.len() - 1;
         } else {
             set.record_ptr = record_id;

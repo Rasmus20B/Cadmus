@@ -65,7 +65,7 @@ impl HBAMFile {
     pub fn load_leaf_n_from_disk(&mut self, index: u32) -> Result<&Block, String> {
         let mut buffer = [0u8; 4096];
         self.reader.seek(std::io::SeekFrom::Start(index as u64 * 4096)).expect("Could not seek into file.");
-        self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
+        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
         self.cached_blocks.insert(index, Block::new_with_index(&buffer, index));
         self.cached_block_data.insert(index, buffer);
         Ok(self.cached_blocks.get(&index).unwrap())
@@ -84,7 +84,7 @@ impl HBAMFile {
     pub fn emit_binary_block(&mut self, block: &Block, data_store: &DataStaging) -> Result<Vec<u8>, &str> {
         let mut in_buffer = DataStaging::new();
         self.reader.seek(std::io::SeekFrom::Start((Block::CAPACITY * block.index as usize) as u64)).expect("Unable to seek in fmp file.");
-        self.reader.read(&mut in_buffer.buffer).expect("Unable to read block from file.");
+        self.reader.read_exact(&mut in_buffer.buffer).expect("Unable to read block from file.");
         let mut out_buffer: Vec<u8> = vec![];
         out_buffer.append(&mut self.emit_binary_block_header(&block).expect("Unable to emit block header to buffer"));
         for chunk_wrapper in &block.chunks {
@@ -244,7 +244,7 @@ impl HBAMFile {
             println!("======================");
             println!("Block: {}", index);
             self.reader.seek(std::io::SeekFrom::Start(index * Block::CAPACITY as u64)).expect("Could not seek into file.");
-            self.reader.read(&mut buffer).expect("Could not read from HBAM file.");
+            self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
             let leaf = Block::new(&buffer);
             for chunk in leaf.chunks {
                 let unwrapped = Chunk::from(chunk);

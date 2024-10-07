@@ -70,7 +70,7 @@ impl Block {
 
         self.chunks = instructions_;
         
-        return Ok(());
+        Ok(())
     }
 
     pub fn from_bytes(offset_: usize, index_: Option<u32>, buffer: &[u8]) -> Self {

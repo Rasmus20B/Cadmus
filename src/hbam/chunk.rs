@@ -492,7 +492,7 @@ impl Chunk {
         if delayed > 0 {
             path.pop();
         }
-        return Ok(chunk)
+        Ok(chunk)
     }
 
     pub fn chunk_to_string(&self, buffer: &[u8]) -> String {

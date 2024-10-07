@@ -45,7 +45,7 @@ impl Lexer {
                 x if x.is_whitespace() =>  
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -56,7 +56,7 @@ impl Lexer {
                 {
                     let mut ret: Vec<Token> = vec![];
 
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -109,7 +109,7 @@ impl Lexer {
                 '{' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -121,7 +121,7 @@ impl Lexer {
                 '}' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -135,7 +135,7 @@ impl Lexer {
 
                     let mut ret: Vec<Token> = vec![];
 
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -146,7 +146,7 @@ impl Lexer {
                 ';' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -157,7 +157,7 @@ impl Lexer {
                 '!' =>  
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -173,7 +173,7 @@ impl Lexer {
                 '=' =>  
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -189,7 +189,7 @@ impl Lexer {
                 '>' =>  
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -206,7 +206,7 @@ impl Lexer {
                 '<' =>  
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -223,7 +223,7 @@ impl Lexer {
                 '+' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -234,7 +234,7 @@ impl Lexer {
                 '-' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -245,7 +245,7 @@ impl Lexer {
                 '*' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -256,7 +256,7 @@ impl Lexer {
                 '/' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -267,7 +267,7 @@ impl Lexer {
                 '&' =>
                 {
                     let mut ret: Vec<Token> = vec![];
-                    if buffer.len() > 0 {
+                    if !buffer.is_empty() {
                         let b = flush_buffer(buffer.as_str());
                         buffer.clear();
                         ret.push(b);
@@ -288,8 +288,7 @@ impl Lexer {
                 buffer.clear();
             }
         }
-
-        return result;
+        result
     }
 }
 

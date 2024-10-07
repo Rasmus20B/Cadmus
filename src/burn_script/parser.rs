@@ -206,7 +206,7 @@ impl Parser {
                 }
             }
         }
-        return Ok(scripts);
+        Ok(scripts)
     }
 }
 

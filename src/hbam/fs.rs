@@ -39,7 +39,7 @@ impl HBAMInterface {
             } 
             table_storage_path.components.pop();
         }
-        return result;
+        result
     }
 
     pub fn get_table_occurrences(&mut self, schema: &mut Schema) {
@@ -307,7 +307,7 @@ impl HBAMInterface {
                 };
                 let chunk = wrapper.chunk_mut();
                 if let Ok(chunk_data) = chunk.data.unwrap().lookup_from_buffer(storage) {
-                    if dir_path == chunk.path && data == data {
+                    if dir_path == chunk.path {
                         let key_location = self.staging_buffer.store(key.to_vec());
                         chunk.ref_data = Some(key_location);
                         let data_location = self.staging_buffer.store(chunk_data);
