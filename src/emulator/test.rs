@@ -5,15 +5,17 @@ use std::fmt::write;
 use std::ops::Deref;
 
 use chrono::Local;
+use clap::Parser;
 use color_print::cprintln;
 use crate::schema::Script;
 use crate::schema::Test;
 use crate::schema;
 use crate::fm_script_engine::fm_script_engine_instructions::Instruction;
 use crate::fm_script_engine::fm_script_engine_instructions::ScriptStep;
-use super::{calc_eval, database::*};
+use super::calc_lexer;
+use super::{calc_parser, database::*};
 
-use super::calc_eval::Node;
+use super::calc_parser::Node;
 use super::calc_tokens;
 use super::calc_tokens::TokenType;
 use super::database::Database;
@@ -463,229 +465,25 @@ impl<'a> TestEnvironment<'a> {
     }
 
     pub fn eval_calculation(&self, calculation: &str) -> String {
-        let flush_buffer = |b: &str| -> Result<calc_tokens::Token, String> {
-            match b {
-                _ => {
-                    let n = b.parse::<f64>();
-                    if n.is_ok() {
-                        Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::NumericLiteral, n.unwrap().to_string()))
-                    } else if !b.as_bytes()[0].is_ascii_digit() {
-                        Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, b.to_string()))
-                    } else {
-                        Err("Invalid Identifier".to_string())
-                    }
-                }
-            }
-        };
-
-        let mut tokens : Vec<calc_tokens::Token> = vec![];
-        let mut lex_iter = calculation.chars().into_iter().peekable();
-        let mut buffer = String::new();
-        while let Some(c) = &lex_iter.next() {
-
-            if c.is_whitespace() && buffer.is_empty() {
-                continue;
-            }
-
-            match c {
-                ' ' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                },
-                '(' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::OpenParen)).unwrap());
-                },
-                ')' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::CloseParen)).unwrap());
-                },
-                '+' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Plus)).unwrap());
-                }
-                ',' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Comma)).unwrap());
-                },
-                '-' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Minus)).unwrap());
-                },
-                '*' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Multiply)).unwrap());
-                },
-                '/' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Divide)).unwrap());
-                },
-                '&' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Ampersand)).unwrap());
-                },
-                '!' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    if *lex_iter.peek().unwrap() == '=' {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Neq)).unwrap());
-                        lex_iter.next();
-                    }
-                },
-                '=' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    if *lex_iter.peek().unwrap() == '=' {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Eq)).unwrap());
-                    }
-                },
-                '<' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    if *lex_iter.peek().unwrap() == '=' {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Ltq)).unwrap());
-                    } else {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Lt)).unwrap());
-                    }
-                },
-                '>' => {
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    if *lex_iter.peek().unwrap() == '=' {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Gtq)).unwrap());
-                    } else {
-                        tokens.push(Ok::<calc_tokens::Token, String>(
-                                calc_tokens::Token::new(calc_tokens::TokenType::Gt)).unwrap());
-                    }
-                }
-                '"' => {
-                    // TODO: String handling directly from fmp12 file. Extra quotes.
-                    if buffer.len() > 0 {
-                        let b = flush_buffer(buffer.as_str());
-                        buffer.clear();
-                        tokens.push(b.unwrap());
-                    }
-                    buffer.push(*c);
-                    while let Some(c) = &lex_iter.next() {
-                        if *c == '\"' {
-                            buffer.push(*c);
-                            break;
-                        }
-                        buffer.push(*c);
-                    }
-
-                    let size = buffer.chars()
-                        .filter(|c| c.is_alphanumeric())
-                        .collect::<Vec<_>>().len();
-                    if size > 0 {
-                        tokens.push(calc_tokens::Token::with_value(calc_tokens::TokenType::String, buffer.clone()));
-                    }
-                    buffer.clear();
-                },
-                ':' => {
-                    buffer.push(*c);
-                    if buffer.is_empty() || *lex_iter.peek().unwrap_or(&'?') != ':' { 
-                        eprintln!("invalid ':' found.");
-                        buffer.push(*c);
-                    }
-                    lex_iter.next();
-                    buffer.push(*c);
-                    while let Some(c) = &lex_iter.next() {
-                        buffer.push(*c);
-                        let peeked = lex_iter.peek();
-                        if peeked.is_none() || !peeked.unwrap().is_alphanumeric() {
-                            break;
-                        }
-                    }
-                    tokens.push(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, buffer.clone()));
-                    buffer.clear();
-                },
-                _ => {
-                    buffer.push(*c);
-                }
-            }
-        }
-
-        if buffer.len() > 0 {
-            let b = flush_buffer(buffer.as_str());
-            buffer.clear();
-            tokens.push(b.unwrap());
-        }
-
-        // for t in &tokens {
-        //     println!("{:?}", t);
-        // }
-        /* Once we have our tokens, parse them into a binary expression. */
-        let ast = calc_eval::Parser::new(tokens).parse().expect("unable to parse tokens.");
+        let tokens = calc_lexer::lex(calculation);
+        let ast = calc_parser::Parser::new(tokens).parse().expect("unable to parse tokens.");
         self.evaluate(ast)
     }
 
-    fn get_operand_val(&'a self, val: &'a str) -> Operand {
+    fn get_operand_val(&'a self, val: &'a str) -> Result<Operand<'a>, String> {
         let r = val.parse::<f64>();
         if r.is_ok() {
-            return Operand {
+            return Ok(Operand {
                 otype: OperandType::Number,
                 value: val
-            }
+            })
         }
 
         if val.starts_with("\"") && val.ends_with("\"") {
-            return Operand {
+            return Ok(Operand {
                 otype: OperandType::Text,
                 value: val
-            }
+            })
         }
 
         let fieldname = val.split("::").collect::<Vec<&str>>();
@@ -698,27 +496,18 @@ impl<'a> TestEnvironment<'a> {
                 .get(val);
 
             if var_val.is_none() {
-                eprintln!("Unknown variable: {}", val); 
-                return Operand {
-                    otype: OperandType::Text,
-                    value: ""
-                }
+                return Err("Unable to evaluate script step argument.".to_string());
             }
             return self.get_operand_val(&var_val.unwrap().value);
         }
 
-        return Operand {
-            otype: OperandType::Text,
-            value: ""
-        }
-
     }
 
-    pub fn evaluate(&self, ast: Box<calc_eval::Node>) -> String {
+    pub fn evaluate(&self, ast: Box<Node>) -> String {
 
         match *ast {
-            calc_eval::Node::Unary { value, child } => {
-                let val = self.get_operand_val(value.as_str())
+            Node::Unary { value, child } => {
+                let val = self.get_operand_val(value.as_str()).unwrap()
                     .value.to_string();
 
                 if child.is_none() {
@@ -727,15 +516,15 @@ impl<'a> TestEnvironment<'a> {
                 }
                 val.to_string()
             },
-            calc_eval::Node::Grouping { ref left, operation, right } => {
+            Node::Grouping { ref left, operation, right } => {
                 let lhs_wrap = &self.evaluate(left.clone());
                 let rhs_wrap = &self.evaluate(right);
 
                 let mut lhs = match *left.clone() {
                     Node::Number(val) => Operand { value: &val.to_string(), otype: OperandType::Number },
-                    _ => self.get_operand_val(lhs_wrap)
+                    _ => self.get_operand_val(lhs_wrap).unwrap()
                 };
-                let mut rhs = self.get_operand_val(rhs_wrap);
+                let mut rhs = self.get_operand_val(rhs_wrap).unwrap();
 
                 match operation {
                     TokenType::Multiply => {
@@ -760,11 +549,12 @@ impl<'a> TestEnvironment<'a> {
                     _ => format!("Invalid operation {:?}.", operation).to_string()
                 }
             }
-            calc_eval::Node::Call { name, args } => {
+            Node::Call { name, args } => {
                 match name.as_str() {
-                    "Abs" => { return (self.evaluate(args[0].clone())
+                    "Abs" => { return self.evaluate(args[0].clone())
                         .parse::<f32>().expect("unable to perform Abs() on non-numeric")
-                        .abs().to_string())}
+                        .abs().to_string()
+                    }
                     "Acos" => { return (self.evaluate(args[0].clone()).parse::<f64>().unwrap().acos().to_string()) }
                     "Asin" => { return std::cmp::min(self.evaluate(args[0].clone()), self.evaluate(args[1].clone()))}
                     "Char" => { 
@@ -782,8 +572,8 @@ impl<'a> TestEnvironment<'a> {
                                 self.evaluate(x.clone())
                             })
                             .min_by(|x, y| {
-                                let lhs = self.get_operand_val(&x);
-                                let rhs = self.get_operand_val(&y);
+                                let lhs = self.get_operand_val(&x).unwrap();
+                                let rhs = self.get_operand_val(&y).unwrap();
 
                                 if lhs.otype == OperandType::Number && rhs.otype == OperandType::Number {
                                         lhs.value.parse::<f64>().expect("lhs is not a valid number")
@@ -799,7 +589,7 @@ impl<'a> TestEnvironment<'a> {
                     },
                     "Get" => {
                         match *args[0] {
-                            calc_eval::Node::Unary { ref value, ref child } => {
+                            Node::Unary { ref value, ref child } => {
                                 match value.as_str() {
                                     "AccountName" => "\"Admin\"".to_string(),
                                     "CurrentTime" => Local::now().timestamp().to_string(),
@@ -813,11 +603,11 @@ impl<'a> TestEnvironment<'a> {
 
                 }
             },
-            calc_eval::Node::Binary { left, operation, right } => {
+            Node::Binary { left, operation, right } => {
                 let lhs_wrap = &self.evaluate(left);
                 let rhs_wrap = &self.evaluate(right);
-                let lhs = self.get_operand_val(lhs_wrap);
-                let rhs = self.get_operand_val(rhs_wrap);
+                let lhs = self.get_operand_val(lhs_wrap).unwrap();
+                let rhs = self.get_operand_val(rhs_wrap).unwrap();
 
                 match operation {
                     calc_tokens::TokenType::Plus => { 
@@ -886,8 +676,8 @@ impl<'a> TestEnvironment<'a> {
                 format!("\"{lhs}{rhs}\"")
             }
             Node::Number(val) => val.to_string(),
-            Node::Variable(val) => self.get_operand_val(&val).value.to_string(),
-            Node::Field(val) => self.get_operand_val(&val).value.to_string(),
+            Node::Variable(val) => self.get_operand_val(&val).unwrap().value.to_string(),
+            Node::Field(val) => self.get_operand_val(&val).unwrap().value.to_string(),
             Node::StringLiteral(val) => val.to_string(),
         }
     }
