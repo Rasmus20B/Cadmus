@@ -1,4 +1,4 @@
-use std::collections::{vec_deque, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 pub struct RelationMgr {
     graph: HashMap<usize, Vec<usize>>,
@@ -12,15 +12,12 @@ impl RelationMgr {
     }
 
     pub fn add_node(&mut self, occ1: usize, occ2: usize) {
-        let exists = self.graph.get(&occ1).unwrap_or(&vec![])
-            .iter()
-            .any(|x| *x == occ2);
-
-        let graph_node = self.graph.get_mut(&occ1);
-        if graph_node.is_none() {
+        if let Some(graph_node) = self.graph.get_mut(&occ1) {
+            if !graph_node.iter().any(|x| *x == occ2) {
+                graph_node.push(occ2);
+            } 
+        } else {
             self.graph.insert(occ1, vec![occ2]);
-        } else if !exists {
-            graph_node.unwrap().push(occ2);
         }
     }
     pub fn add_relation(&mut self, occ1: usize, occ2: usize) {

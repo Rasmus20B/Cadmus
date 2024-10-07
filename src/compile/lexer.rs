@@ -8,7 +8,7 @@ pub fn tokenize(code: &str) -> Vec<Token> {
     let mut in_calc = false;
     let mut in_script = false;
     let mut in_assertion = false;
-    let mut lex_iter = code.chars().into_iter().enumerate().peekable();
+    let mut lex_iter = code.chars().enumerate().peekable();
 
     let flush_buffer = |b: &str| -> Result<Token, String> {
         match b {
@@ -37,7 +37,7 @@ pub fn tokenize(code: &str) -> Vec<Token> {
             continue;
         }
 
-        while in_string == true {
+        while in_string {
             if c == '"' {
                 list.push(Token { ttype: TokenType::String, text: buffer.to_string()});
                 in_string = false;
@@ -47,7 +47,7 @@ pub fn tokenize(code: &str) -> Vec<Token> {
             c = lex_iter.next().unwrap().1;
         }
 
-        while in_script == true {
+        while in_script {
             if c == ']' {
                 list.push(Token { ttype: TokenType::Script, text: buffer.to_string()});
                 in_script = false;
@@ -58,7 +58,7 @@ pub fn tokenize(code: &str) -> Vec<Token> {
             c = lex_iter.next().unwrap().1;
         }
 
-        while in_calc == true {
+        while in_calc {
             if c == '}' {
                 list.push(Token { ttype: TokenType::Calculation, text: buffer.to_string()});
                 in_calc = false;
@@ -69,7 +69,7 @@ pub fn tokenize(code: &str) -> Vec<Token> {
         }
 
         let mut scope = 1;
-        while in_assertion == true {
+        while in_assertion {
             if scope == 0 {
                 list.push(Token { ttype: TokenType::Assertion, text: buffer.to_string()});
                 buffer.clear();

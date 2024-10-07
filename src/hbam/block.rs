@@ -30,15 +30,15 @@ impl Block {
     }
 
     pub fn new(buffer: &[u8]) -> Self {
-        let mut res = Self::header_from_bytes(&buffer);
-        res.read_chunks(&buffer).expect("Unable to read chunks.");
+        let mut res = Self::header_from_bytes(buffer);
+        res.read_chunks(buffer).expect("Unable to read chunks.");
         res
     }
 
     pub fn new_with_index(buffer: &[u8], index: u32) -> Self {
-        let mut res = Self::header_from_bytes(&buffer);
+        let mut res = Self::header_from_bytes(buffer);
         res.index = index;
-        res.read_chunks(&buffer).expect("Unable to read chunks.");
+        res.read_chunks(buffer).expect("Unable to read chunks.");
         res
     }
 
@@ -48,7 +48,7 @@ impl Block {
         let mut instructions_ = vec![];
         let mut size_ = 0;
         while offset < Block::CAPACITY {
-            let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
+            let instruction_res = Chunk::from_bytes(buffer, &mut offset, &mut path);
             // if instruction_res.is_ok() {println!("instructionres: {}", instruction_res.clone().unwrap().chunk_to_string(&buffer));}
             if instruction_res.is_err() {
                 let error = instruction_res.clone().unwrap_err();
@@ -79,7 +79,7 @@ impl Block {
         let mut instructions_ = vec![];
         let mut size_ = 0;
         while offset < Block::CAPACITY {
-            let instruction_res = Chunk::from_bytes(&buffer, &mut offset, &mut path);
+            let instruction_res = Chunk::from_bytes(buffer, &mut offset, &mut path);
             if instruction_res.is_err() {
                 let error = instruction_res.unwrap_err();
                 match error {

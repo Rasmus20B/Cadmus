@@ -2,7 +2,7 @@
 use core::fmt;
 use std::cell::Cell;
 
-use super::calc_tokens::{self, Token, TokenType};
+use super::calc_tokens::{Token, TokenType};
 
 enum Precedence {
     Lowest,
@@ -196,7 +196,7 @@ impl Parser {
                 }
 
                 let op = operator.unwrap().ttype;
-                let expr2 = (self.parse_expr().expect("unable to parse expression."));
+                let expr2 = self.parse_expr().expect("unable to parse expression.");
 
                 Ok(Box::new(
                         Node::Binary { 
@@ -252,7 +252,7 @@ impl Parser {
                 }
 
                 let op = operator.unwrap().ttype;
-                let expr2 = (self.parse_expr().expect("unable to parse expression."));
+                let expr2 = self.parse_expr().expect("unable to parse expression.");
 
                 Ok(Box::new(
                         Node::Binary { 
@@ -284,19 +284,19 @@ impl Parser {
     fn parse_string(&mut self, tok: Token) -> Result<Box<Node>, &str> {
         let n = self.tokens.next();
         if n.is_none() {
-            return Ok(Box::new(Node::Unary { value: format!("{}", tok.value), child: None }));
+            return Ok(Box::new(Node::Unary { value: tok.value.to_string(), child: None }));
         }
         match n.unwrap().ttype {
             TokenType::Ampersand => {
                 Ok(Box::new(Node::Binary { 
-                    left: Box::new(Node::Unary { value: format!("{}", tok.value), child: None } ), 
+                    left: Box::new(Node::Unary { value: tok.value.to_string(), child: None } ), 
                     operation: n.unwrap().ttype, 
                     right: self.parse().expect("unable to parse") 
                 }))
             },
             TokenType::Eq => {
                 Ok(Box::new(Node::Binary { 
-                    left: Box::new(Node::Unary { value: format!("{}", tok.value), child: None } ), 
+                    left: Box::new(Node::Unary { value: tok.value.to_string(), child: None } ), 
                     operation: n.unwrap().ttype,
                     right: self.parse().expect("Uable to parse")
                 }))
@@ -433,7 +433,7 @@ impl Parser {
                 Ok(Box::new(Node::StringLiteral(cur.value.clone())))
             },
             TokenType::OpenParen => {
-                let expr1 = (self.parse_expr().expect("unable to parse grouped expression."));
+                let expr1 = self.parse_expr().expect("unable to parse grouped expression.");
 
                 let operator = self.tokens.next();
 
@@ -442,7 +442,7 @@ impl Parser {
                 }
 
                 let op = operator.unwrap().ttype;
-                let expr2 = (self.parse_expr().expect("unable to parse grouped expression."));
+                let expr2 = self.parse_expr().expect("unable to parse grouped expression.");
 
                 Ok(Box::new( Node::Grouping { 
                     left: expr1, 

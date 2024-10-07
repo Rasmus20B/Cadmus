@@ -1,11 +1,10 @@
 use core::fmt;
-use serde_json;
 use serde::{self, Deserialize, Serialize};
 use std::{fmt::Formatter, ops::RangeBounds};
 use crate::staging_buffer::DataStaging;
-use crate::util::encoding_util::{get_int, get_path_int, put_int, put_path_int};
+use crate::util::encoding_util::{get_int, get_path_int};
 
-use super::{block::Block, btree::HBAMFile, path::HBAMPath, block_location::BlockLocation, storage::BlockStorage};
+use super::{block::Block, path::HBAMPath, storage::BlockStorage};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum InstructionType {
@@ -186,7 +185,7 @@ impl Chunk {
                 || new_opcode == 0x1f {
                 let len_buf = u16::to_be_bytes(self.data.unwrap().length);
                 buffer.append(&mut len_buf.to_vec());
-            } else if new_opcode >= 0x19 && new_opcode <= 0x1D {
+            } else if (0x19..=0x1D).contains(&new_opcode) {
                 // println!("path: {:?}, len: {}, calc: {}", self.path, self.data.unwrap().length, (((new_opcode == 0x19) as u8) + (2*new_opcode as u8 - 0x19)) as u8);
                 // let extra = self.data.unwrap().length as u8 + (((new_opcode == 0x19) as u8) + (2*new_opcode as u8 - 0x19)) as u8;
                 // let len = code[*offset] + (((chunk_code == 0x19) as usize) + (2*(chunk_code-0x19) as usize)) as u8;
@@ -227,7 +226,7 @@ impl Chunk {
         let mut segidx: Option<u8> = None;
         let mut ref_simple: Option<u16> = None;
         let mut delayed = 0;
-        let saved_offset = offset.clone();
+        let saved_offset = *offset;
 
         let mut saved_chunk_code = chunk_code as u16;
         
@@ -335,7 +334,7 @@ impl Chunk {
                 *offset += 1;
                 data = Some(BlockStorage{ offset: *offset as u16, length: 3 });
                 *offset += 3;
-        } else if chunk_code >= 0x11 && chunk_code <= 0x15 {
+        } else if (0x11..=0x15).contains(&chunk_code) {
             ctype = InstructionType::DataSimple;
             *offset += 1;
             let len = 3 + ((chunk_code == 0x11) as usize) + (2 * (chunk_code as usize - 0x11));
@@ -373,7 +372,7 @@ impl Chunk {
             *offset += 1;
             data = Some(BlockStorage{ offset: *offset as u16, length: 4 });
             *offset += 4;
-        } else if chunk_code >= 0x19 && chunk_code <= 0x1D {
+        } else if (0x19..=0x1D).contains(&chunk_code) {
             ctype = InstructionType::DataSimple;
             *offset += 1;
             if *offset > Block::CAPACITY {
@@ -483,7 +482,7 @@ impl Chunk {
         let chunk = Chunk::new(
                         saved_offset as u16,
                         ctype,
-                        saved_chunk_code.into(),
+                        saved_chunk_code,
                         data,
                         ref_data,
                         HBAMPath::new(path.to_vec()),

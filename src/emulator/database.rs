@@ -550,7 +550,7 @@ impl Database {
     }
 
     pub fn goto_record(&mut self, record_id: usize) {
-        let mut set = self.get_current_occurrence_mut();
+        let set = self.get_current_occurrence_mut();
         if record_id >= set.found_set.len() {
             set.record_ptr = set.found_set.len() - 1;
         } else {
@@ -559,26 +559,26 @@ impl Database {
     }
 
     pub fn goto_previous_record(&mut self) {
-        let mut set = self.get_current_occurrence_mut();
+        let set = self.get_current_occurrence_mut();
         if set.record_ptr > 0 {
             set.record_ptr -= 1;
         }
     }
 
     pub fn goto_next_record(&mut self) {
-        let mut set = self.get_current_occurrence_mut();
+        let set = self.get_current_occurrence_mut();
         if set.record_ptr < set.found_set.len() - 1 {
             set.record_ptr += 1;
         }
     }
 
     pub fn goto_first_record(&mut self) {
-        let mut set = self.get_current_occurrence_mut();
+        let set = self.get_current_occurrence_mut();
         set.record_ptr = 0;
     }
 
     pub fn goto_last_record(&mut self) {
-        let mut set = self.get_current_occurrence_mut();
+        let set = self.get_current_occurrence_mut();
         set.record_ptr = set.found_set.len() - 1;
     }
 }

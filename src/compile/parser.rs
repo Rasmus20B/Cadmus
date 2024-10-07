@@ -62,9 +62,7 @@ impl Parser {
                                     parser_iter.next();
                                     let n = parser_iter.next().unwrap();
                                     relationship.table2_name = n.text.clone();
-                                } else {
-
-                                }
+                                } 
                             }
                             TokenType::End => 
                             {

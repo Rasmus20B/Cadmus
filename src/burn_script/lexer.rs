@@ -14,7 +14,7 @@ impl Lexer {
     pub fn get_tokens(&self) -> Vec<Token> {
         let mut result = vec![];
         let mut buffer = String::new();
-        let mut lex_iter = self.code.chars().into_iter().peekable();
+        let mut lex_iter = self.code.chars().peekable();
         let mut scope = 0;
 
         let flush_buffer = |b: &str| {

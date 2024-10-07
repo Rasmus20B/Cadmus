@@ -34,7 +34,7 @@ impl Parser {
                     }
 
                     /* Parse arguments to script */
-                    while let Some(t) = parser_iter.next() {
+                    for t in parser_iter.by_ref() {
                         match t.ttype {
                             TokenType::Argument => {
                                 tmp.arguments.push(t.value.clone());
@@ -66,7 +66,7 @@ impl Parser {
                                         switches: vec![],
                                     };
 
-                                    while let Some(t) = parser_iter.next() {
+                                    for t in parser_iter.by_ref() {
                                         match t.ttype {
                                             TokenType::Argument => {
                                                 step.switches.push(t.value.clone());
@@ -144,7 +144,7 @@ impl Parser {
                                     switches: vec![]
                                 };
 
-                                while let Some(t) = parser_iter.next() {
+                                for t in parser_iter.by_ref() {
                                     match t.ttype {
                                         TokenType::Argument => {
                                             step.switches.push(t.value.clone());
@@ -165,7 +165,7 @@ impl Parser {
                                     index: 0,
                                     switches: vec![]
                                 };
-                                while let Some(t) = parser_iter.next() {
+                                for t in parser_iter.by_ref() {
                                     match t.ttype {
                                         TokenType::Argument => {
                                             step.switches.push(t.value.clone());

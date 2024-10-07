@@ -1,8 +1,8 @@
-use std::{collections::HashMap, ffi::OsString, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, ops::DerefMut, path::Path, thread::current};
+use std::{collections::HashMap, fs::{write, File, OpenOptions}, io::{BufReader, BufWriter, Read, Seek, Write}, path::Path};
 
 use super::chunk::{Chunk, ChunkType, InstructionType};
 use super::block::Block;
-use crate::{diff::DiffCollection, staging_buffer::{self, DataStaging}, util::{dbcharconv::{self, encode_text}, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{staging_buffer::DataStaging, util::encoding_util::get_int};
 
 use super::path::HBAMPath;
 
@@ -39,9 +39,9 @@ impl HBAMFile {
             writer: BufWriter::new(
                 OpenOptions::new()
                 .write(true)
-                .open(&path)
+                .open(path)
                 .expect("Unable to open file.")),
-            reader: BufReader::new(File::open(&path).expect("Unable to open file.")),
+            reader: BufReader::new(File::open(path).expect("Unable to open file.")),
             cursor: HBAMCursor::new(),
             cached_blocks: HashMap::new(),
             block_buffer: DataStaging::new(),
@@ -86,7 +86,7 @@ impl HBAMFile {
         self.reader.seek(std::io::SeekFrom::Start((Block::CAPACITY * block.index as usize) as u64)).expect("Unable to seek in fmp file.");
         self.reader.read_exact(&mut in_buffer.buffer).expect("Unable to read block from file.");
         let mut out_buffer: Vec<u8> = vec![];
-        out_buffer.append(&mut self.emit_binary_block_header(&block).expect("Unable to emit block header to buffer"));
+        out_buffer.append(&mut self.emit_binary_block_header(block).expect("Unable to emit block header to buffer"));
         for chunk_wrapper in &block.chunks {
             let mut bin_chunk = self.emit_binary_chunk(
                 chunk_wrapper.chunk(), 
@@ -105,7 +105,7 @@ impl HBAMFile {
     }
 
     pub fn write_node(&mut self, block: &Block, data_store: &DataStaging) -> Result<(), &str> {
-        let out_buffer = self.emit_binary_block(&block, &data_store).expect("Unable to emit binary representation of block.");
+        let out_buffer = self.emit_binary_block(block, data_store).expect("Unable to emit binary representation of block.");
         // TODO: Block overflow must be tracked so indexes can be changed when required.
         self.writer.seek(std::io::SeekFrom::Start((Block::CAPACITY * block.index as usize) as u64)).expect("Could not seek into file.");
         if self.writer.write(&out_buffer).expect("Unable to write to file.") != 4096 {
@@ -119,7 +119,7 @@ impl HBAMFile {
     pub fn write_nodes(&mut self, data_store: &DataStaging) -> Result<(), &str> {
         let blocks = std::mem::take(&mut self.cached_blocks);
         for block in blocks {
-            self.write_node(&block.1, &data_store).expect("Unable to write block to file.");
+            self.write_node(&block.1, data_store).expect("Unable to write block to file.");
         }
         Ok(())
     }
@@ -142,7 +142,7 @@ impl HBAMFile {
                     if chunk.ctype == InstructionType::RefSimple {
                         next = n;
                     } else if *hbam_path <= chunk.path {
-                        self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                        self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                         self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
                         current_block = Block::new(&buffer);
                         current_block.index = next as u32;
@@ -176,7 +176,7 @@ impl HBAMFile {
                     if chunk.ctype == InstructionType::RefSimple {
                         next = n;
                     } else if *hbam_path <= chunk.path {
-                        self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                        self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                         self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
                         current_block = Block::new(&buffer);
                         current_block.index = next as u32;
@@ -191,9 +191,7 @@ impl HBAMFile {
             }
         }
         let index = current_block.index;
-        if !self.cached_blocks.contains_key(&current_block.index) {
-            self.cached_blocks.insert(current_block.index, current_block);
-        }
+        self.cached_blocks.entry(current_block.index).or_insert(current_block);
         self.cached_blocks.get(&index).unwrap()
     }
 
@@ -266,11 +264,11 @@ impl HBAMFile {
 
     pub fn get_leaf(&mut self, hbam_path: &HBAMPath) -> &Block {
         let mut buffer = [0u8; 4096];
-        if !self.cached_blocks.contains_key(&1) {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry(1) {
             self.reader.seek(std::io::SeekFrom::Start(4096)).expect("Could not seek into file.");
             self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
 
-            self.cached_blocks.insert(1, Block::new(&buffer));
+            e.insert(Block::new(&buffer));
             self.cached_block_data.insert(1, buffer);
         }
 
@@ -290,10 +288,10 @@ impl HBAMFile {
                     if chunk.ctype == InstructionType::RefSimple {
                         next = n;
                     } else if *hbam_path <= chunk.path {
-                        if !self.cached_blocks.contains_key(&(next as u32)) {
-                            self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                        if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry((next as u32)) {
+                            self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                             self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
-                            self.cached_blocks.insert(next as u32, Block::new(&buffer));
+                            e.insert(Block::new(&buffer));
                             self.cached_block_data.insert(next as u32, buffer);
                         } 
                         current_block = self.cached_blocks.get_mut(&(next as u32)).unwrap();
@@ -307,10 +305,10 @@ impl HBAMFile {
 
             if !found {
                 next = current_block.next as usize;
-                if !self.cached_blocks.contains_key(&(next as u32)) {
-                    self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096 as u64)).expect("Could not seek into file.");
+                if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry((next as u32)) {
+                    self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                     self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
-                    self.cached_blocks.insert(next as u32, Block::new(&buffer));
+                    e.insert(Block::new(&buffer));
                     self.cached_block_data.insert(next as u32, buffer);
                 } 
                 current_block = self.cached_blocks.get_mut(&(next as u32)).unwrap();
@@ -411,7 +409,7 @@ impl HBAMFile {
 mod tests {
     use std::path::Path;
 
-    use super::{Chunk, ChunkType, InstructionType, Block, HBAMPath, staging_buffer::DataStaging};
+    use super::{Chunk, ChunkType, InstructionType, Block, HBAMPath, DataStaging};
 
     use super::HBAMFile;
 

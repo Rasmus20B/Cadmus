@@ -1,10 +1,9 @@
-use std::{borrow::Borrow, fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
+use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
 use clap::Parser;
 use cli::CommandLine;
 use diff::get_diffs;
-use hbam::{btree::HBAMFile, chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
-use schema::{Schema, Table, TableOccurrence};
-use util::encoding_util::fm_string_decrypt;
+use hbam::{chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
+use schema::Schema;
 
 
 mod util;
@@ -34,7 +33,7 @@ impl InputContext {
 
 
 fn main() -> Result<(), std::io::Error>{
-    let mut base_file: Option<HBAMInterface>;
+    let base_file: Option<HBAMInterface>;
     let mut ctx = InputContext::new();
 
     let args = CommandLine::parse();

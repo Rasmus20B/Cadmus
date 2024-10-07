@@ -22,7 +22,7 @@ pub fn put_path_int(n: u32) -> Vec<u8> {
 }
 
 pub fn get_int(bytes: &[u8]) -> usize {
-    return match bytes.len() {
+    match bytes.len() {
         1 => bytes[0] as usize,
         2 => ((bytes[0] as usize) << 8) + (bytes[1] as usize),
         4 => (get_int(&bytes[0..2]) << 16) + get_int(&bytes[2..4]),
@@ -39,20 +39,19 @@ pub fn put_int(mut n: usize) -> Vec<u8> {
         res[idx] = cur as u8;
         idx -= 1;
     }
-    return res;
+    res
 }
 
 pub fn fm_string_encrypt(text: &String) -> Vec<u8> {
     text
         .bytes()
-        .into_iter()
         .map(|c| c ^ 0x5A)
         .collect()
 }
 
 pub fn fm_string_decrypt(bytes: &[u8]) -> String {
     match String::from_utf8(bytes
-                                 .into_iter()
+                                 .iter()
                                  .map(|c| c ^ 0x5A)
                                  .collect::<Vec<u8>>()) {
         Ok(v) => v.to_string(),

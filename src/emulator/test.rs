@@ -1,19 +1,14 @@
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fmt::write;
-use std::ops::Deref;
 
 use chrono::Local;
 use clap::Parser;
 use color_print::cprintln;
-use crate::schema::Script;
 use crate::schema::Test;
 use crate::schema;
 use crate::fm_script_engine::fm_script_engine_instructions::Instruction;
-use crate::fm_script_engine::fm_script_engine_instructions::ScriptStep;
 use super::calc_lexer;
-use super::{calc_parser, database::*};
+use super::calc_parser;
 
 use super::calc_parser::Node;
 use super::calc_tokens;
@@ -122,11 +117,11 @@ impl<'a> TestEnvironment<'a> {
     }
 
     pub fn generate_database(&mut self) {
-        self.database.generate_from_fmp12(&self.file_handle);
+        self.database.generate_from_fmp12(self.file_handle);
     }
 
     pub fn generate_layout_mgr(&mut self) {
-        for (_, layout) in &self.file_handle.layouts {
+        for layout in self.file_handle.layouts.values() {
             self.layout_mgr.add_mapping(layout.name.clone(), layout.table_occurrence);
         }
     }
@@ -138,7 +133,7 @@ impl<'a> TestEnvironment<'a> {
 
     #[allow(unused)]
     pub fn run_tests(&mut self) {
-        for (_, test) in &self.file_handle.tests {
+        for test in self.file_handle.tests.values() {
             /* 1. Run the script 
              * 2. Check Assertions defined in test component
              * 3. Clean the test environment for next test */
@@ -155,7 +150,7 @@ impl<'a> TestEnvironment<'a> {
         }
     }
     pub fn run_tests_with_cleanup(&mut self) {
-        for (_, test) in &self.file_handle.tests {
+        for test in self.file_handle.tests.values() {
             /* 1. Run the script 
              * 2. Check Assertions defined in test component
              * 3. Clean the test environment for next test */
@@ -240,7 +235,7 @@ impl<'a> TestEnvironment<'a> {
                 let mut exit = false;
                 if cur_instruction.switches.len() > 1 {
                     let res = &self.eval_calculation(&cur_instruction.switches[1]);
-                    if res != "false" || res != "" || res != "0" {
+                    if res != "false" || !res.is_empty() || res != "0" {
                         exit = true;
                     }
                 }
@@ -286,12 +281,12 @@ impl<'a> TestEnvironment<'a> {
                 for criteria in &self.find_criteria {
                     let values = self.database
                         .get_field_vals_for_current_table(
-                            &criteria.0
+                            criteria.0
                                 .split("::")
                                 .collect::<Vec<&str>>()[1]
                             );
 
-                    let ids = values.into_iter()
+                    let ids = values.iter()
                         .enumerate()
                         .filter(|x| *x.1 == criteria.1)
                         .map(|x| x.0)
@@ -368,7 +363,7 @@ impl<'a> TestEnvironment<'a> {
                 }
             },
             Instruction::ElseIf => {
-                if self.branch_taken == true {
+                if self.branch_taken {
                     while self.instruction_ptr[n_stack].1 < script_handle.instructions.len() {
                         cur_instruction = &script_handle.instructions[self.instruction_ptr[n_stack].1];
                         match cur_instruction.opcode {
@@ -404,7 +399,7 @@ impl<'a> TestEnvironment<'a> {
                 }
             }
             Instruction::Else => {
-                if self.branch_taken == true {
+                if self.branch_taken {
                     while self.instruction_ptr[n_stack].1 < script_handle.instructions.len() {
                         cur_instruction = &script_handle.instructions[self.instruction_ptr[n_stack].1];
                         match cur_instruction.opcode {
@@ -580,8 +575,8 @@ impl<'a> TestEnvironment<'a> {
                                 self.evaluate(x.clone()).expect("Unable to evaluate argument.")
                             })
                             .min_by(|x, y| {
-                                let lhs = self.get_operand_val(&x).unwrap();
-                                let rhs = self.get_operand_val(&y).unwrap();
+                                let lhs = self.get_operand_val(x).unwrap();
+                                let rhs = self.get_operand_val(y).unwrap();
 
                                 if lhs.otype == OperandType::Number && rhs.otype == OperandType::Number {
                                         lhs.value.parse::<f64>().expect("lhs is not a valid number")

@@ -1,4 +1,4 @@
-use std::{alloc::Layout, collections::HashMap, io::Read, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
@@ -94,9 +94,9 @@ impl HBAMInterface {
                         6 => RelationComparison::Cartesian,
                         _ => unreachable!()
                     };
-                    let start1 = 2 as usize;
+                    let start1 = 2_usize;
                     let len1 = definition[1] as usize;
-                    let start2 = start1 + len1 + 1 as usize;
+                    let start2 = start1 + len1 + 1_usize;
                     let len2 = definition[start1 + len1] as usize;
                     let n1 = get_path_int(&definition[start1..start1 + len1]);
                     let n2 = get_path_int(&definition[start2..start2 + len2]);
@@ -157,7 +157,7 @@ impl HBAMInterface {
                 if chunk.path.components == *path.components {
                     self.inner.cursor = HBAMCursor { block_index: block.index, chunk_index: offset as u16 };
                     return Ok(())
-                } else if chunk.path > *path || block.index.clone() == 0 {
+                } else if chunk.path > *path || block.index == 0 {
                     return Err(format!("Directory {:?} not found.", path));
                 }
             }
@@ -227,7 +227,7 @@ impl HBAMInterface {
                             ChunkType::Modification(..) => &self.staging_buffer.buffer,
                             ChunkType::Unchanged(..) => &buffer,
                         };
-                        return Ok(chunk.data.unwrap().lookup_from_buffer(&storage).expect("Unable to lookup data from buffer."));
+                        return Ok(chunk.data.unwrap().lookup_from_buffer(storage).expect("Unable to lookup data from buffer."));
                     }
                 } else if chunk.path > dir_path {
                     return Err(format!("Key {} not found in directory {:?}", key, dir_path));
@@ -244,7 +244,7 @@ impl HBAMInterface {
         let mut block = self.inner.get_current_block_mut();
         loop {
             for offset in start as usize..block.chunks.len() {
-                let ref mut wrapper = &mut block.chunks[offset];
+                let wrapper = &mut (&mut block.chunks[offset]);
                 let chunk = wrapper.chunk_mut();
                 if chunk.ref_simple == Some(key) {
                     if dir_path == chunk.path {
@@ -267,14 +267,14 @@ impl HBAMInterface {
         let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
         loop {
             for offset in start as usize..block.chunks.len() {
-                let ref mut wrapper = &mut block.chunks[offset];
+                let wrapper = &mut (&mut block.chunks[offset]);
                 if wrapper.chunk().ref_data.is_none() { continue; }
                 let storage = match wrapper {
                     ChunkType::Modification(..) => &self.staging_buffer.buffer,
                     ChunkType::Unchanged(..) => &buffer,
                 };
                 let chunk = &mut wrapper.chunk_mut();
-                if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(&storage) {
+                if let Ok(key) = chunk.ref_data.unwrap().lookup_from_buffer(storage) {
                     if dir_path == chunk.path {
                         let key_location = self.staging_buffer.store(key.to_vec());
                         chunk.ref_data = Some(key_location);
@@ -358,7 +358,7 @@ impl HBAMInterface {
         let (mut block, mut buffer) = self.inner.get_current_block_with_buffer_mut();
         loop {
             for offset in start as usize..block.chunks.len() {
-                let ref mut wrapper = &mut block.chunks[offset];
+                let wrapper = &mut (&mut block.chunks[offset]);
                 let storage = match wrapper {
                     ChunkType::Modification(..) => &self.staging_buffer.buffer,
                     ChunkType::Unchanged(..) => &buffer,

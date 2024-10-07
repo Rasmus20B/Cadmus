@@ -28,22 +28,20 @@ impl fmt::Display for LexerError {
 
 pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerError> {
     let flush_buffer = |b: &str| -> Result<calc_tokens::Token, LexerError> {
-        match b {
-            _ => {
-                let n = b.parse::<f64>();
-                if n.is_ok() {
-                    Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::NumericLiteral, n.unwrap().to_string()))
-                } else if !b.as_bytes()[0].is_ascii_digit() {
-                    Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, b.to_string()))
-                } else {
-                    Err(LexerError::InvalidCharacter { character: b.as_bytes()[0] as char, position: 0 })
-                }
+        {
+            let n = b.parse::<f64>();
+            if let Ok(parsed) = n {
+                Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::NumericLiteral, parsed.to_string()))
+            } else if !b.as_bytes()[0].is_ascii_digit() {
+                Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, b.to_string()))
+            } else {
+                Err(LexerError::InvalidCharacter { character: b.as_bytes()[0] as char, position: 0 })
             }
         }
     };
 
     let mut tokens : Vec<calc_tokens::Token> = vec![];
-    let mut lex_iter = calculation_string.chars().into_iter().peekable();
+    let mut lex_iter = calculation_string.chars().peekable();
     let mut buffer = String::new();
     while let Some(c) = &lex_iter.next() {
 
