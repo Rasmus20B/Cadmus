@@ -38,6 +38,14 @@ impl Variable {
     } 
 }
 
+#[derive(Debug)]
+enum EvaluateError {
+    DivideByZero { operand_left: String, operand_right: String },
+    InvalidOperation { operand_left: String, operator: String, operand_right: String },
+    InvalidArgument { function: String, argument: String },
+    UnimplementedFunction { function: String },
+}
+
 pub struct VMTable {
     pub name: String,
     pub records: HashMap<String, Vec<String>>,
@@ -465,9 +473,9 @@ impl<'a> TestEnvironment<'a> {
     }
 
     pub fn eval_calculation(&self, calculation: &str) -> String {
-        let tokens = calc_lexer::lex(calculation);
+        let tokens = calc_lexer::lex(calculation).expect("Unable to lex calculation.");
         let ast = calc_parser::Parser::new(tokens).parse().expect("unable to parse tokens.");
-        self.evaluate(ast)
+        self.evaluate(ast).expect("Unable to evaluate expression.")
     }
 
     fn get_operand_val(&'a self, val: &'a str) -> Result<Operand<'a>, String> {
@@ -503,7 +511,8 @@ impl<'a> TestEnvironment<'a> {
 
     }
 
-    pub fn evaluate(&self, ast: Box<Node>) -> String {
+
+    pub fn evaluate(&self, ast: Box<Node>) -> Result<String, EvaluateError> {
 
         match *ast {
             Node::Unary { value, child } => {
@@ -511,14 +520,13 @@ impl<'a> TestEnvironment<'a> {
                     .value.to_string();
 
                 if child.is_none() {
-                    return val;
-                } else {
-                }
-                val.to_string()
+                    return Ok(val);
+                } 
+                Ok(val.to_string())
             },
             Node::Grouping { ref left, operation, right } => {
-                let lhs_wrap = &self.evaluate(left.clone());
-                let rhs_wrap = &self.evaluate(right);
+                let lhs_wrap = &self.evaluate(left.clone())?;
+                let rhs_wrap = &self.evaluate(right)?;
 
                 let mut lhs = match *left.clone() {
                     Node::Number(val) => Operand { value: &val.to_string(), otype: OperandType::Number },
@@ -528,10 +536,10 @@ impl<'a> TestEnvironment<'a> {
 
                 match operation {
                     TokenType::Multiply => {
-                        (lhs.value.parse::<f32>().unwrap() * rhs.value.parse::<f32>().unwrap()).to_string()
+                        Ok((lhs.value.parse::<f32>().unwrap() * rhs.value.parse::<f32>().unwrap()).to_string())
                     }
                     TokenType::Plus => {
-                        (lhs.value.parse::<f32>().unwrap() + rhs.value.parse::<f32>().unwrap()).to_string()
+                        Ok((lhs.value.parse::<f32>().unwrap() + rhs.value.parse::<f32>().unwrap()).to_string())
                     }
                     TokenType::Ampersand => {
                         if lhs.otype == OperandType::Text {
@@ -544,32 +552,32 @@ impl<'a> TestEnvironment<'a> {
                             .strip_prefix('"').unwrap()
                             .strip_suffix('"').unwrap();
                         }
-                        ("\"".to_owned() + lhs.value + rhs.value + "\"").to_string()
+                        Ok(("\"".to_owned() + lhs.value + rhs.value + "\"").to_string())
                     }
-                    _ => format!("Invalid operation {:?}.", operation).to_string()
+                    _ => Ok(format!("Invalid operation {:?}.", operation).to_string())
                 }
             }
             Node::Call { name, args } => {
                 match name.as_str() {
-                    "Abs" => { return self.evaluate(args[0].clone())
+                    "Abs" => { return Ok(self.evaluate(args[0].clone())?
                         .parse::<f32>().expect("unable to perform Abs() on non-numeric")
-                        .abs().to_string()
+                        .abs().to_string())
                     }
-                    "Acos" => { return (self.evaluate(args[0].clone()).parse::<f64>().unwrap().acos().to_string()) }
-                    "Asin" => { return std::cmp::min(self.evaluate(args[0].clone()), self.evaluate(args[1].clone()))}
+                    "Acos" => { return Ok(self.evaluate(args[0].clone())?.parse::<f64>().unwrap().acos().to_string()) }
+                    "Asin" => { return Ok(std::cmp::min(self.evaluate(args[0].clone())?, self.evaluate(args[1].clone())?))}
                     "Char" => { 
                         let mut res = String::new();
                         res.push('\"');
-                        let c = char::from_u32(self.evaluate(args[0].clone()).parse::<u32>().unwrap()).unwrap();
+                        let c = char::from_u32(self.evaluate(args[0].clone()).expect("Unable to evalue argument.").parse::<u32>().unwrap()).unwrap();
                         res.push(c);
                         res.push('\"');
-                        return res;
+                        return Ok(res);
                     }
                     "Min" => { 
-                        args
+                        Ok(args
                             .into_iter()
                             .map(|x| {
-                                self.evaluate(x.clone())
+                                self.evaluate(x.clone()).expect("Unable to evaluate argument.")
                             })
                             .min_by(|x, y| {
                                 let lhs = self.get_operand_val(&x).unwrap();
@@ -583,102 +591,96 @@ impl<'a> TestEnvironment<'a> {
                                 } else {
                                     lhs.value.to_string().cmp(&rhs.value.to_string())
                                 }
-                            }).unwrap()
-
-
+                            }).unwrap())
                     },
                     "Get" => {
                         match *args[0] {
-                            Node::Unary { ref value, ref child } => {
+                            Node::Unary { ref value, child: _ } => {
                                 match value.as_str() {
-                                    "AccountName" => "\"Admin\"".to_string(),
-                                    "CurrentTime" => Local::now().timestamp().to_string(),
-                                    _ => { format!("Unknown argument for Get(): {:?}", args[0]) }
+                                    "AccountName" => Ok("\"Admin\"".to_string()),
+                                    "CurrentTime" => Ok(Local::now().timestamp().to_string()),
+                                    _ => { Err(EvaluateError::InvalidArgument { function: name, argument: value.to_string() }) }
                                 }
                             }
-                            _ => { format!("Unknown argument for Get(): {:?}", args[0]) }
+                            // TODO: Evaluate expression into string and then do the match.
+                            _ => unimplemented!()
                         }
                     }
-                    _ => { format!("Unimplemented function: {}", name) }
-
+                    _ => { Err(EvaluateError::UnimplementedFunction { function: name }) }
                 }
             },
             Node::Binary { left, operation, right } => {
-                let lhs_wrap = &self.evaluate(left);
-                let rhs_wrap = &self.evaluate(right);
-                let lhs = self.get_operand_val(lhs_wrap).unwrap();
-                let rhs = self.get_operand_val(rhs_wrap).unwrap();
+                let lhs_wrap = &self.evaluate(left).unwrap();
+                let rhs_wrap = &self.evaluate(right).unwrap();
+                let mut lhs = self.get_operand_val(lhs_wrap).unwrap();
+                let mut rhs = self.get_operand_val(rhs_wrap).unwrap();
 
                 match operation {
                     calc_tokens::TokenType::Plus => { 
-                        if lhs.otype != OperandType::Number
-                            || rhs.otype != OperandType::Number {
-                                eprintln!("Unable to add non-number types.");
-                                return "undefined".to_string();
-                        }
-                        (lhs.value.parse::<f64>().unwrap()
+                        if lhs.otype == OperandType::Text { lhs.value = "0" }
+                        if rhs.otype == OperandType::Text { rhs.value = "0" }
+                        Ok((lhs.value.parse::<f64>().unwrap()
                          + 
                          rhs.value.parse::<f64>().unwrap()
-                         ).to_string() 
+                         ).to_string())
                     },
                     calc_tokens::TokenType::Minus => { 
-                        if lhs.otype != OperandType::Number
-                            || rhs.otype != OperandType::Number {
-                                eprintln!("Unable to add non-number types.");
-                                return "undefined".to_string();
-                        }
-                        (lhs.value.parse::<f64>().unwrap()
+                        if lhs.otype == OperandType::Text { lhs.value = "0" }
+                        if rhs.otype == OperandType::Text { rhs.value = "0" }
+                        Ok((lhs.value.parse::<f64>().unwrap()
                          - 
                          rhs.value.parse::<f64>().unwrap()
-                         ).to_string() 
+                         ).to_string())
                     },
                     calc_tokens::TokenType::Multiply => { 
-                        if lhs.otype != OperandType::Number
-                            || rhs.otype != OperandType::Number {
-                                eprintln!("Unable to add non-number types.");
-                                return "undefined".to_string();
-                        }
-                        (lhs.value.parse::<f64>().unwrap()
+                        if lhs.otype == OperandType::Text { lhs.value = "0" }
+                        if rhs.otype == OperandType::Text { rhs.value = "0" }
+                        Ok((lhs.value.parse::<f64>().unwrap()
                          * 
                          rhs.value.parse::<f64>().unwrap()
-                         ).to_string() 
+                         ).to_string())
                     },
                     calc_tokens::TokenType::Divide => { 
-                        if lhs.otype != OperandType::Number
-                            || rhs.otype != OperandType::Number {
-                                eprintln!("Unable to add non-number types.");
-                                return "undefined".to_string();
+                        if lhs.otype == OperandType::Text { lhs.value = "0" }
+                        if rhs.otype == OperandType::Text { rhs.value = "0" }
+
+                        let checked_rhs = rhs.value.parse::<f64>().unwrap();
+                        if checked_rhs == 0.0 { 
+                            return Err(EvaluateError::DivideByZero { 
+                                operand_left: lhs.value.to_string(), 
+                                operand_right: checked_rhs.to_string() 
+                            }) 
                         }
-                        (lhs.value.parse::<f64>().unwrap()
+                        Ok((lhs.value.parse::<f64>().unwrap()
                          / 
                          rhs.value.parse::<f64>().unwrap()
-                         ).to_string() 
+                         ).to_string())
                     },
                     _ => { unreachable!()}
                 }
             },
             Node::Comparison { ref left, operation, ref right } => {
-                match operation {
-                    TokenType::Eq => { (self.evaluate(left.clone()) == self.evaluate(right.clone())).to_string() },
-                    TokenType::Neq => { (self.evaluate(left.clone()) != self.evaluate(right.clone())).to_string() },
-                    TokenType::Gt => { (self.evaluate(left.clone()) > self.evaluate(right.clone())).to_string() },
-                    TokenType::Gtq => { (self.evaluate(left.clone()) >= self.evaluate(right.clone())).to_string() },
-                    TokenType::Lt => { (self.evaluate(left.clone()) < self.evaluate(right.clone())).to_string() },
-                    TokenType::Ltq => { (self.evaluate(left.clone()) <= self.evaluate(right.clone())).to_string() },
+                Ok(match operation {
+                    TokenType::Eq => { (self.evaluate(left.clone())? == self.evaluate(right.clone())?).to_string() },
+                    TokenType::Neq => { (self.evaluate(left.clone())? != self.evaluate(right.clone())?).to_string() },
+                    TokenType::Gt => { (self.evaluate(left.clone())? > self.evaluate(right.clone())?).to_string() },
+                    TokenType::Gtq => { (self.evaluate(left.clone())? >= self.evaluate(right.clone())?).to_string() },
+                    TokenType::Lt => { (self.evaluate(left.clone())? < self.evaluate(right.clone())?).to_string() },
+                    TokenType::Ltq => { (self.evaluate(left.clone())? <= self.evaluate(right.clone())?).to_string() },
                     _ => unreachable!()
-                }
+                })
             }
             Node::Concatenation { left, right } => { 
-                let lhs = self.evaluate(left.clone());
-                let rhs = self.evaluate(right.clone());
+                let lhs = self.evaluate(left.clone())?;
+                let rhs = self.evaluate(right.clone())?;
                 let lhs = lhs.replace('"', "");
                 let rhs = rhs.replace('"', "");
-                format!("\"{lhs}{rhs}\"")
+                Ok(format!("\"{lhs}{rhs}\""))
             }
-            Node::Number(val) => val.to_string(),
-            Node::Variable(val) => self.get_operand_val(&val).unwrap().value.to_string(),
-            Node::Field(val) => self.get_operand_val(&val).unwrap().value.to_string(),
-            Node::StringLiteral(val) => val.to_string(),
+            Node::Number(val) => Ok(val.to_string()),
+            Node::Variable(val) => Ok(self.get_operand_val(&val).unwrap().value.to_string()),
+            Node::Field(val) => Ok(self.get_operand_val(&val).unwrap().value.to_string()),
+            Node::StringLiteral(val) => Ok(val.to_string()),
         }
     }
 }

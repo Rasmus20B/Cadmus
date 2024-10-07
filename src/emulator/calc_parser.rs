@@ -1,4 +1,5 @@
 
+use core::fmt;
 use std::cell::Cell;
 
 use super::calc_tokens::{self, Token, TokenType};
@@ -40,6 +41,7 @@ impl Precedence {
     }
 
 }
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
@@ -116,7 +118,26 @@ impl TokenList {
 
 }
 
+#[derive(Debug)]
+pub enum ParserError {
+    UnexpectedToken { token: Token, expected: Vec<TokenType> },
+    MissingToken { expected: TokenType, position: usize },
+}
 
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedToken { token, expected } => {
+                write!(f, "Unexpected token: '{:?}'. Expected one of {:?}", token.ttype, expected)
+            },
+            Self::MissingToken { expected, position: _ } => {
+                write!(f, "Missing token: Expected one of {:?}", expected)
+            },
+        }
+        
+    }
+}
 pub struct Parser {
     tokens: TokenList,
 }
@@ -388,13 +409,12 @@ impl Parser {
                 return Ok(expr);
             }
             _ => { 
-                let expr = (self.parse_primary().expect("unable to parse rhs."));
-                Ok(expr)
+                Ok(self.parse_primary().expect("unable to parse rhs."))
             }
         }
     }
 
-    pub fn parse_primary(&mut self) -> Result<Box<Node>, &str> {
+    pub fn parse_primary(&mut self) -> Result<Box<Node>, ParserError> {
         let cur = self.tokens.current();
         match cur.ttype {
             TokenType::Identifier => {
@@ -431,7 +451,15 @@ impl Parser {
                 }))
             }
            _ => {
-                Err("Unable to parse calculation: ")
+               return Err(ParserError::UnexpectedToken { 
+                   token: cur.clone(),
+                   expected: vec![
+                       TokenType::Identifier,
+                       TokenType::OpenParen,
+                       TokenType::NumericLiteral,
+                       TokenType::String 
+                   ] 
+               })
             }
         }
     }

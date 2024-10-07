@@ -1,8 +1,33 @@
 
-use super::calc_tokens;
+use core::fmt;
 
-pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
-    let flush_buffer = |b: &str| -> Result<calc_tokens::Token, String> {
+use super::calc_tokens::{self, Token, TokenType};
+
+#[derive(Debug)]
+pub enum LexerError {
+    InvalidCharacter { character: char, position: usize },
+    UnterminatedString { position: usize },
+    UnexpectedEOF,
+}
+
+impl fmt::Display for LexerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LexerError::InvalidCharacter { character, position } => {
+                write!(f, "Invalid character '{}' @ position {}", character, position)
+            },
+            LexerError::UnterminatedString { position } => {
+                write!(f, "Unterminated string starting @ position {}", position)
+            },
+            LexerError::UnexpectedEOF => {
+                write!(f, "Unexpected end of file.")
+            }
+        }
+    }
+}
+
+pub fn lex(calculation_string: &str) -> Result<Vec<calc_tokens::Token>, LexerError> {
+    let flush_buffer = |b: &str| -> Result<calc_tokens::Token, LexerError> {
         match b {
             _ => {
                 let n = b.parse::<f64>();
@@ -11,7 +36,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                 } else if !b.as_bytes()[0].is_ascii_digit() {
                     Ok(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, b.to_string()))
                 } else {
-                    Err("Invalid Identifier".to_string())
+                    Err(LexerError::InvalidCharacter { character: b.as_bytes()[0] as char, position: 0 })
                 }
             }
         }
@@ -40,7 +65,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::OpenParen)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::OpenParen));
             },
             ')' => {
                 if buffer.len() > 0 {
@@ -48,7 +73,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::CloseParen)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::CloseParen));
             },
             '+' => {
                 if buffer.len() > 0 {
@@ -56,7 +81,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Plus)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Plus));
             }
             ',' => {
                 if buffer.len() > 0 {
@@ -64,7 +89,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Comma)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Comma));
             },
             '-' => {
                 if buffer.len() > 0 {
@@ -72,7 +97,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Minus)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Minus));
             },
             '*' => {
                 if buffer.len() > 0 {
@@ -80,7 +105,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Multiply)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Multiply));
             },
             '/' => {
                 if buffer.len() > 0 {
@@ -88,7 +113,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Divide)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Divide));
             },
             '&' => {
                 if buffer.len() > 0 {
@@ -96,7 +121,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     buffer.clear();
                     tokens.push(b.unwrap());
                 }
-                tokens.push(Ok::<calc_tokens::Token, String>(calc_tokens::Token::new(calc_tokens::TokenType::Ampersand)).unwrap());
+                tokens.push(Token::new(calc_tokens::TokenType::Ampersand));
             },
             '!' => {
                 if buffer.len() > 0 {
@@ -105,8 +130,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     tokens.push(b.unwrap());
                 }
                 if *lex_iter.peek().unwrap() == '=' {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Neq)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Neq));
                     lex_iter.next();
                 }
             },
@@ -117,8 +141,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     tokens.push(b.unwrap());
                 }
                 if *lex_iter.peek().unwrap() == '=' {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Eq)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Eq));
                 }
             },
             '<' => {
@@ -128,11 +151,9 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     tokens.push(b.unwrap());
                 }
                 if *lex_iter.peek().unwrap() == '=' {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Ltq)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Ltq));
                 } else {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Lt)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Lt));
                 }
             },
             '>' => {
@@ -142,11 +163,9 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     tokens.push(b.unwrap());
                 }
                 if *lex_iter.peek().unwrap() == '=' {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Gtq)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Gtq));
                 } else {
-                    tokens.push(Ok::<calc_tokens::Token, String>(
-                            calc_tokens::Token::new(calc_tokens::TokenType::Gt)).unwrap());
+                    tokens.push(Token::new(calc_tokens::TokenType::Gt));
                 }
             }
             '"' => {
@@ -157,27 +176,32 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                     tokens.push(b.unwrap());
                 }
                 buffer.push(*c);
+                let mut terminated = false;
                 while let Some(c) = &lex_iter.next() {
                     if *c == '\"' {
+                        terminated = true;
                         buffer.push(*c);
                         break;
                     }
                     buffer.push(*c);
                 }
 
+                if !terminated {
+                    return Err(LexerError::UnterminatedString { position: 20 })
+                }
+
                 let size = buffer.chars()
                     .filter(|c| c.is_alphanumeric())
                     .collect::<Vec<_>>().len();
                 if size > 0 {
-                    tokens.push(calc_tokens::Token::with_value(calc_tokens::TokenType::String, buffer.clone()));
+                    tokens.push(Token::with_value(TokenType::String, buffer.clone()));
                 }
                 buffer.clear();
             },
             ':' => {
                 buffer.push(*c);
                 if buffer.is_empty() || *lex_iter.peek().unwrap_or(&'?') != ':' { 
-                    eprintln!("invalid ':' found.");
-                    buffer.push(*c);
+                    return Err(LexerError::InvalidCharacter { character: ':', position: 20 })
                 }
                 lex_iter.next();
                 buffer.push(*c);
@@ -188,7 +212,7 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
                         break;
                     }
                 }
-                tokens.push(calc_tokens::Token::with_value(calc_tokens::TokenType::Identifier, buffer.clone()));
+                tokens.push(Token::with_value(TokenType::Identifier, buffer.clone()));
                 buffer.clear();
             },
             _ => {
@@ -196,12 +220,10 @@ pub fn lex(calculation_string: &str) -> Vec<calc_tokens::Token> {
             }
         }
     }
-
     if buffer.len() > 0 {
         let b = flush_buffer(buffer.as_str());
         buffer.clear();
         tokens.push(b.unwrap());
     }
-
-    tokens
+    Ok(tokens)
 }
