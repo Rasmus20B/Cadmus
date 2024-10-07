@@ -191,11 +191,7 @@ impl Chunk {
                 // let len = code[*offset] + (((chunk_code == 0x19) as usize) + (2*(chunk_code-0x19) as usize)) as u8;
                 // buffer.push(extra as u8);
                 buffer.push(self.data.unwrap().length as u8 - 4);
-            } else if new_opcode == 0x20 {
-            } else if new_opcode == 0x0 {
-            } else if new_opcode == 0x28 {
-            } else if new_opcode == 0x30 {
-            } else if new_opcode == 0x38 {
+            } else if [0x20, 0x0, 0x28, 0x30, 0x38].contains(&new_opcode) {
                 buffer.push(self.data.unwrap().length as u8);
             } else {
                 // println!("DATA LENGTH: {}", self.data.unwrap().length);

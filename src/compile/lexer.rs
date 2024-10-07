@@ -21,8 +21,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
             "end" => Ok(Token::new(TokenType::End)),
             _ => {
                 let n = b.parse::<f64>();
-                if n.is_ok() {
-                    Ok(Token::with_value(TokenType::NumericLiteral, n.unwrap().to_string()))
+                if let Ok(parsed) = n {
+                    Ok(Token::with_value(TokenType::NumericLiteral, parsed.to_string()))
                 } else if !b.as_bytes()[0].is_ascii_digit() {
                     Ok(Token::with_value(TokenType::Identifier, b.to_string()))
                 } else {
@@ -107,8 +107,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     buffer.clear();
                     }
                 }
@@ -120,8 +120,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -141,8 +141,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -157,8 +157,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -175,8 +175,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                     let mut ret: Vec<Token> = vec![];
                     if !buffer.is_empty() {
                         let out = flush_buffer(b);
-                        if out.is_ok() {
-                            ret.push(out.unwrap());
+                        if let Ok(flushed) = out {
+                            ret.push(flushed);
                         }
                         buffer.clear();
                     }
@@ -190,8 +190,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -204,8 +204,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -217,8 +217,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -230,8 +230,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -243,8 +243,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -256,8 +256,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -269,8 +269,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }
@@ -282,8 +282,8 @@ pub fn tokenize(code: &str) -> Vec<Token> {
                 let mut ret: Vec<Token> = vec![];
                 if !buffer.is_empty() {
                     let out = flush_buffer(b);
-                    if out.is_ok() {
-                        ret.push(out.unwrap());
+                    if let Ok(flushed) = out {
+                        ret.push(flushed);
                     }
                     buffer.clear();
                 }

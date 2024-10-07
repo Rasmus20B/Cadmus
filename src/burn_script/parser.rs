@@ -91,8 +91,8 @@ impl Parser {
                                     break;
                                 }
                                 let n = parser_iter.peek();
-                                if n.is_some() {
-                                    match n.unwrap().ttype {
+                                if let Some(next) = n {
+                                    match next.ttype {
                                         TokenType::Else => {
                                             continue;
                                         }
@@ -102,18 +102,17 @@ impl Parser {
                                         _ => {}
                                     }
                                 }
-                                let op: Instruction;
-                                match top.unwrap() {
+                                let op: Instruction = match top.unwrap() {
                                     Instruction::If => {
-                                        op = Instruction::EndIf;
+                                        Instruction::EndIf
                                     },
                                     Instruction::Loop => {
-                                        op = Instruction::EndLoop;
+                                        Instruction::EndLoop
                                     },
                                     _ => {
                                         return Err("Invalid scope signifier.");
                                     }
-                                }
+                                };
                                 punc_stack.pop();
                                 let step = ScriptStep {
                                     opcode: op,

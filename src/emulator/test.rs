@@ -225,8 +225,8 @@ impl<'a> TestEnvironment<'a> {
                     .strip_suffix('"').unwrap();
 
                 let occurrence = self.layout_mgr.lookup(name.to_string());
-                if occurrence.is_some() {
-                    self.database.set_current_occurrence(occurrence.unwrap() as u16);
+                if let Some(occurrence_uw) = occurrence {
+                    self.database.set_current_occurrence(occurrence_uw as u16);
                 }
                 self.instruction_ptr[n_stack].1 += 1;
             },
@@ -470,7 +470,7 @@ impl<'a> TestEnvironment<'a> {
     pub fn eval_calculation(&self, calculation: &str) -> String {
         let tokens = calc_lexer::lex(calculation).expect("Unable to lex calculation.");
         let ast = calc_parser::Parser::new(tokens).parse().expect("unable to parse tokens.");
-        self.evaluate(ast).expect("Unable to evaluate expression.")
+        self.evaluate(*ast).expect("Unable to evaluate expression.")
     }
 
     fn get_operand_val(&'a self, val: &'a str) -> Result<Operand<'a>, String> {
@@ -507,9 +507,9 @@ impl<'a> TestEnvironment<'a> {
     }
 
 
-    pub fn evaluate(&self, ast: Box<Node>) -> Result<String, EvaluateError> {
+    pub fn evaluate(&self, ast: Node) -> Result<String, EvaluateError> {
 
-        match *ast {
+        match ast {
             Node::Unary { value, child } => {
                 let val = self.get_operand_val(value.as_str()).unwrap()
                     .value.to_string();
@@ -519,11 +519,11 @@ impl<'a> TestEnvironment<'a> {
                 } 
                 Ok(val.to_string())
             },
-            Node::Grouping { ref left, operation, right } => {
-                let lhs_wrap = &self.evaluate(left.clone())?;
-                let rhs_wrap = &self.evaluate(right)?;
+            Node::Grouping { left, operation, right } => {
+                let lhs_wrap = &self.evaluate(*left.clone())?;
+                let rhs_wrap = &self.evaluate(*right)?;
 
-                let mut lhs = match *left.clone() {
+                let mut lhs = match *left {
                     Node::Number(val) => Operand { value: &val.to_string(), otype: OperandType::Number },
                     _ => self.get_operand_val(lhs_wrap).unwrap()
                 };
@@ -589,7 +589,7 @@ impl<'a> TestEnvironment<'a> {
                             }).unwrap())
                     },
                     "Get" => {
-                        match *args[0] {
+                        match args[0] {
                             Node::Unary { ref value, child: _ } => {
                                 match value.as_str() {
                                     "AccountName" => Ok("\"Admin\"".to_string()),
@@ -605,8 +605,8 @@ impl<'a> TestEnvironment<'a> {
                 }
             },
             Node::Binary { left, operation, right } => {
-                let lhs_wrap = &self.evaluate(left).unwrap();
-                let rhs_wrap = &self.evaluate(right).unwrap();
+                let lhs_wrap = &self.evaluate(*left).unwrap();
+                let rhs_wrap = &self.evaluate(*right).unwrap();
                 let mut lhs = self.get_operand_val(lhs_wrap).unwrap();
                 let mut rhs = self.get_operand_val(rhs_wrap).unwrap();
 
@@ -654,20 +654,20 @@ impl<'a> TestEnvironment<'a> {
                     _ => { unreachable!()}
                 }
             },
-            Node::Comparison { ref left, operation, ref right } => {
+            Node::Comparison { left, operation, right } => {
                 Ok(match operation {
-                    TokenType::Eq => { (self.evaluate(left.clone())? == self.evaluate(right.clone())?).to_string() },
-                    TokenType::Neq => { (self.evaluate(left.clone())? != self.evaluate(right.clone())?).to_string() },
-                    TokenType::Gt => { (self.evaluate(left.clone())? > self.evaluate(right.clone())?).to_string() },
-                    TokenType::Gtq => { (self.evaluate(left.clone())? >= self.evaluate(right.clone())?).to_string() },
-                    TokenType::Lt => { (self.evaluate(left.clone())? < self.evaluate(right.clone())?).to_string() },
-                    TokenType::Ltq => { (self.evaluate(left.clone())? <= self.evaluate(right.clone())?).to_string() },
+                    TokenType::Eq => { (self.evaluate(*left)? == self.evaluate(*right)?).to_string() },
+                    TokenType::Neq => { (self.evaluate(*left)? != self.evaluate(*right)?).to_string() },
+                    TokenType::Gt => { (self.evaluate(*left)? > self.evaluate(*right)?).to_string() },
+                    TokenType::Gtq => { (self.evaluate(*left)? >= self.evaluate(*right)?).to_string() },
+                    TokenType::Lt => { (self.evaluate(*left)? < self.evaluate(*right)?).to_string() },
+                    TokenType::Ltq => { (self.evaluate(*left)? <= self.evaluate(*right)?).to_string() },
                     _ => unreachable!()
                 })
             }
             Node::Concatenation { left, right } => { 
-                let lhs = self.evaluate(left.clone())?;
-                let rhs = self.evaluate(right.clone())?;
+                let lhs = self.evaluate(*left)?;
+                let rhs = self.evaluate(*right)?;
                 let lhs = lhs.replace('"', "");
                 let rhs = rhs.replace('"', "");
                 Ok(format!("\"{lhs}{rhs}\""))

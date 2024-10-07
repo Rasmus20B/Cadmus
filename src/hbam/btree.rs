@@ -288,7 +288,7 @@ impl HBAMFile {
                     if chunk.ctype == InstructionType::RefSimple {
                         next = n;
                     } else if *hbam_path <= chunk.path {
-                        if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry((next as u32)) {
+                        if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry(next as u32) {
                             self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                             self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
                             e.insert(Block::new(&buffer));
@@ -305,7 +305,7 @@ impl HBAMFile {
 
             if !found {
                 next = current_block.next as usize;
-                if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry((next as u32)) {
+                if let std::collections::hash_map::Entry::Vacant(e) = self.cached_blocks.entry(next as u32) {
                     self.reader.seek(std::io::SeekFrom::Start((next as u64) * 4096_u64)).expect("Could not seek into file.");
                     self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
                     e.insert(Block::new(&buffer));
@@ -408,9 +408,7 @@ impl HBAMFile {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-
     use super::{Chunk, ChunkType, InstructionType, Block, HBAMPath, DataStaging};
-
     use super::HBAMFile;
 
     #[test]

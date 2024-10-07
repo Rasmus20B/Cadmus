@@ -50,7 +50,7 @@ pub enum Node {
     Concatenation { left: Box<Node>, right: Box<Node> },
     Comparison { left: Box<Node>, operation: TokenType, right: Box<Node> },
     Grouping { left: Box<Node>, operation: TokenType, right: Box<Node> },
-    Call { name: String, args: Vec<Box::<Node>> },
+    Call { name: String, args: Vec<Node> },
     Number(f64),
     Variable(String),
     Field(String),
@@ -149,14 +149,14 @@ impl Parser {
         }
     }
 
-    fn parse_args(&mut self) -> Vec<Box<Node>> {
+    fn parse_args(&mut self) -> Vec<Node> {
         let mut _args = vec![];
 
         loop {
             self.tokens.next();
             let arg = self.parse_expr().expect("unable to parse argument.");
 
-            _args.push(arg);
+            _args.push(*arg);
 
             if !(self.tokens.current().ttype == TokenType::Comma) {
                 return _args;

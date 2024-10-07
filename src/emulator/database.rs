@@ -423,7 +423,6 @@ impl Database {
                         RelationComparison::Greater => *lhs.1 >= *rhs.1.to_string(),
                         RelationComparison::GreaterEqual => *lhs.1 >= *rhs.1.to_string(),
                         RelationComparison::Cartesian => true,
-                        _ => false
                     };
 
                     // println!("relation: {}: {} :: {:?} :: {}: {}", current, lhs.1,
