@@ -13,6 +13,10 @@ pub struct CommandLine {
     pub print_root_block: bool,
     #[clap(short = 's', requires("fmp"), requires("input"))]
     pub sync: bool,
+    #[clap(short = 't', long = "test")]
+    pub test: bool,
+    #[clap(long = "test-file")]
+    pub test_file: Option<String>,
     #[clap(long = "print-all-blocks", action, requires("fmp"))]
     pub print_all_blocks: bool,
     #[clap(long = "json-out", action, requires("fmp"))]

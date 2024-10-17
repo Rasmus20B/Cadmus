@@ -1,0 +1,105 @@
+table %1 Person = {
+  field %1 id = {
+    datatype = Number,
+    auto_increment = true,
+    auto_entry = [get(uuid)],
+    unique = true,
+    required = true,
+  },
+  field %2 first_name = {
+    datatype = Text,
+  },
+  field %3 surname = {
+    datatype = Text,
+  },
+  field %4 job_id = {
+    datatype = Text,
+  }
+}
+
+table %2 Job = {
+  field %1 id = {
+    datatype = Number,
+    auto_increment = true,
+    unique = true,
+    required = true,
+    validation_message = "Invalid ID chosen.",
+    auto_entry = [get(uuid)],
+  },
+  field %2 title = {
+    datatype = Text,
+  }
+  field %3 salary = {
+    datatype = Number,
+    validation_calc = [this >= 0],
+  }
+}
+
+table %3 SalaryLevel = {
+  field %1 id = {
+    datatype = Number,
+    auto_increment = true,
+    unique = true,
+    required = true,
+    validation_message = "Invalid ID chosen.",
+    auto_entry = [get(uuid)],
+  }
+  field %2 title = {
+    dataType = Text,
+  },
+  field %3 start = {
+    dataType = Number,
+    unique = true,
+  },
+  field %4 end = {
+    dataType = Number,
+    unique = true,
+  },
+}
+
+table_occurrence %1 Person_occ : Person
+table_occurrence %2 Job_occ : Job
+table_occurrence %3 Salary_occ : Salary
+
+relationship %1 = Person_occ::job_id == Job_occ::id;
+relationship %2 = {
+  Job_occ::salary >= Salary_occ::start,
+  Job_occ::salary <= Salary_occ::end,
+}
+
+layout %1 Person = {
+  table_occurrence = Person_occ,
+}
+
+layout %2 Job = {
+  table_occurrence = Job_occ,
+}
+
+layout %3 Salary = {
+  table_occurrence = Salary_occ,
+}
+
+script %1 make_10_people {
+  set_variable(x, 0);
+  go_to_layout("Person");
+  loop {
+    exit_loop_if(x == 10);
+    new_record_request();
+    if(x == 7) {
+        set_field(Person::first_name, "Kevin");
+    } elif(x == 1) {
+        set_field(Person::first_name, "alvin" & " Presley");
+    } else {
+        set_field(Person::first_name, "Jeff");
+        set_field(Person::surname, "Keighly");
+    }
+    set_variable(x, x + 1);
+  }
+}
+
+
+
+
+
+
+

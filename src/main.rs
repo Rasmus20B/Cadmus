@@ -31,7 +31,6 @@ impl InputContext {
     }
 }
 
-
 fn main() -> Result<(), std::io::Error>{
     let base_file: Option<HBAMInterface>;
     let mut ctx = InputContext::new();
@@ -88,6 +87,16 @@ fn main() -> Result<(), std::io::Error>{
         ctx.fmp.tables.extend(additions);
         let table_diffs = get_diffs(&ctx.fmp, &ctx.cad);
         patch_file.commit_changes(&ctx.cad, &table_diffs);
+
+        if args.test {
+            if let Some(test_file) = args.test_file {
+                let in_file = File::open(Path::new(&test_file))?;
+                let reader = BufReader::new(in_file);
+                let objects: Schema = serde_json::from_reader(reader).expect("Unable to read text input file");
+                ctx.cad.tests.extend(objects.tests);
+            } else {
+            }
+        }
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */
     }
