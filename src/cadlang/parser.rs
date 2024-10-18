@@ -1,5 +1,5 @@
 use core::fmt;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::write};
 
 use crate::schema::{AutoEntry, AutoEntryType, Field, Schema, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType};
 
@@ -13,13 +13,47 @@ pub enum ParseErr {
     UnknownTableOccurrence { token: Token },
     UnknownField { token: Token },
     InvalidAssert { token: Token }, // Asserts can only be used in tests
-    MissingSpecifier { construct: String, specifier: String },
+    MissingAttribute { base_object: String, construct: String, specifier: String },
     UnexpectedEOF,
 }
 
 impl<'a> fmt::Display for ParseErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::UnexpectedToken { token, expected } => {
+                if expected.len() > 1 {
+                    write!(f, "Unexpected Token: {:?}.\nExpected one of: {:?}", token, expected)
+                } else {
+                    write!(f, "Unexpected Token: {:?}.\nExpected {:?}", token, expected)
+                }
+            }
+            Self::RelationCriteria { token } => {
+                write!(f, "Found non-matching table \"{}\" reference in relation criteria. @ {}, {}", 
+                    token.value,
+                    token.location.line,
+                    token.location.column)
+            }
+            Self::UnknownTable { token } => {
+                write!(f, "Invalid reference to table: {} @ {}, {}", 
+                    token.value,
+                    token.location.line,
+                    token.location.column)
+            }
+            Self::UnknownTableOccurrence { token } => {
+                write!(f, "Invalid reference to table occurrence: {} @ {}, {}", 
+                    token.value,
+                    token.location.line,
+                    token.location.column)
+            }
+            Self::UnknownField { token } => {
+                write!(f, "Invalid reference to field: {} @ {}, {}", 
+                    token.value,
+                    token.location.line,
+                    token.location.column)
+            }
+            Self::MissingAttribute { base_object, construct, specifier } => {
+                write!(f, "Missing attribute {} for {} in {}", specifier, construct, base_object)
+            }
             _ => write!(f, "nah not compiling.")
         }
     }
@@ -163,19 +197,22 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                 }
 
                 if generate_.is_none() {
-                    return Err(ParseErr::MissingSpecifier { 
+                    return Err(ParseErr::MissingAttribute { 
+                        base_object: tmp.name,
                         construct: String::from("Serial"), 
                         specifier: String::from("generate") 
                     })
                 }
                 if next_.is_none() {
-                    return Err(ParseErr::MissingSpecifier { 
+                    return Err(ParseErr::MissingAttribute { 
+                        base_object: tmp.name,
                         construct: String::from("Serial"), 
                         specifier: String::from("next") 
                     })
                 }
                 if increment_.is_none() {
-                    return Err(ParseErr::MissingSpecifier { 
+                    return Err(ParseErr::MissingAttribute { 
+                        base_object: tmp.name,
                         construct: String::from("Serial"), 
                         specifier: String::from("increment") 
                     })
