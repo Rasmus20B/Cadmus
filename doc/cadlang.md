@@ -45,8 +45,7 @@ last_visited = true
 data = <String>
 ```
 ```
-calculated_val = [Calculation]
-do_not_replace = [true, false]
+calculated_val = /!/[Calculation]
 ```
 ```
 no_modify = [true, false]

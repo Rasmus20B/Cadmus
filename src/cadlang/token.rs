@@ -19,6 +19,7 @@ pub enum TokenType {
     ObjectNumber,
     Assignment,
     Calculation,
+    IntegerLiteral,
     String,
 
     // Auto Entry Tab
@@ -32,7 +33,7 @@ pub enum TokenType {
     Increment,
     LastVisited,
     Data,
-    Calculated,
+    CalculatedVal,
     DoNotReplace,
     Lookup,
 
@@ -76,6 +77,7 @@ pub enum TokenType {
     CloseSquare,
     Comma,
     Colon,
+    Exclamation,
     EOF,
 }
 

@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use crate::schema::{AutoEntry, AutoEntryType, Field, Schema, Table, TableOccurrence, Validation, ValidationTrigger};
+use crate::schema::{AutoEntry, AutoEntryType, Field, Schema, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType};
 
 use super::token::{Token, TokenType};
 
@@ -13,6 +13,7 @@ pub enum ParseErr {
     UnknownTableOccurrence { token: Token },
     UnknownField { token: Token },
     InvalidAssert { token: Token }, // Asserts can only be used in tests
+    MissingSpecifier { construct: String, specifier: String },
     UnexpectedEOF,
 }
 
@@ -46,28 +47,29 @@ fn expect<'a>(tokens: &'a Vec<Token>, expected: &Vec<TokenType>, info: &mut Pars
 }
 
 pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
-    println!("DOES GET HERE");
-    let tmp = Field {
+    let mut tmp = Field {
         id: 0,
         name: String::from("field"),
-        created_by: String::new(),
-        modified_by: String::new(),
+        created_by: String::from("admin"),
+        modified_by: String::from("admin"),
         autoentry: AutoEntry {
             definition: AutoEntryType::NA,
             nomodify: false,
         },
         validation: Validation {
             trigger: ValidationTrigger::OnEntry,
-            user_override: false,
+            user_override: true,
             checks: vec![],
-            message: String::from("Error with validation."),
+            message: String::from("Error with field validation."),
         },
         global: false,
         repetitions: 1,
     };
 
-    expect(tokens, &vec![TokenType::ObjectNumber], &mut info)?;
-    expect(tokens, &vec![TokenType::Identifier], &mut info)?;
+    tmp.id = expect(tokens, &vec![TokenType::ObjectNumber], &mut info)?
+        .value.parse().expect("Unable to parse object id.");
+    tmp.name = expect(tokens, &vec![TokenType::Identifier], &mut info)?
+        .value.clone();
     expect(tokens, &vec![TokenType::Assignment], &mut info)?;
     expect(tokens, &vec![TokenType::OpenBrace], &mut info)?;
     info.cursor += 1;
@@ -86,6 +88,137 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                 depth += 1;
                 info.cursor += 1;
             }
+
+            // Auto Entry Switches
+            TokenType::CalculatedVal => {
+                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                let calc = expect(tokens, &vec![TokenType::Exclamation, TokenType::Calculation], &mut info)?;
+                match calc.ttype {
+                    TokenType::Exclamation => {
+                        tmp.autoentry.definition = AutoEntryType::Calculation { 
+                            code: expect(tokens, &vec![TokenType::Calculation], &mut info)?
+                                .value.clone(),
+                            noreplace: true 
+                        }
+
+                    },
+                    TokenType::Calculation => {
+                        tmp.autoentry.definition = AutoEntryType::Calculation { 
+                            code: calc.value.clone(),
+                            noreplace: false 
+                        }
+                    },
+                    _ => unreachable!()
+
+                }
+            }
+
+            TokenType::Serial => {
+                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                expect(tokens, &vec![TokenType::OpenBrace], &mut info)?;
+                info.cursor += 1;
+
+                let mut generate_: Option::<SerialTrigger> = None;
+                let mut next_: Option<usize> = None;
+                let mut increment_: Option<usize> = None;
+                while let Some(token) = tokens.get(info.cursor) {
+                    match token.ttype {
+                        TokenType::Generate => {
+                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                            generate_ = match expect(tokens, 
+                                &vec![TokenType::OnCreation, TokenType::OnCommit], 
+                                &mut info)?.ttype {
+                                TokenType::OnCreation => {
+                                    Some(SerialTrigger::OnCreation)
+                                }
+                                TokenType::OnCommit => {
+                                    Some(SerialTrigger::OnCommit)
+                                }
+                                _ => unreachable!()
+                            };
+                        }
+                        TokenType::Next => {
+                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                            next_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], &mut info)?
+                                .value.parse::<usize>().expect("unable to parse next."));
+                        }
+                        TokenType::Increment => {
+                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                            increment_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], &mut info)?
+                                .value.parse::<usize>().expect("unable to parse increment."));
+                        }
+                        TokenType::Comma => {}
+                        TokenType::CloseBrace => {
+                            info.cursor += 1;
+                            break;
+                        }
+                        _ => {
+                            return Err(ParseErr::UnexpectedToken { 
+                                token: token.clone(), 
+                                expected: vec![TokenType::Generate, TokenType::Next, TokenType::Increment] 
+                            });
+                        }
+                    }
+                    info.cursor += 1;
+                }
+
+                if generate_.is_none() {
+                    return Err(ParseErr::MissingSpecifier { 
+                        construct: String::from("Serial"), 
+                        specifier: String::from("generate") 
+                    })
+                }
+                if next_.is_none() {
+                    return Err(ParseErr::MissingSpecifier { 
+                        construct: String::from("Serial"), 
+                        specifier: String::from("next") 
+                    })
+                }
+                if increment_.is_none() {
+                    return Err(ParseErr::MissingSpecifier { 
+                        construct: String::from("Serial"), 
+                        specifier: String::from("increment") 
+                    })
+                }
+                tmp.autoentry.definition = AutoEntryType::Serial { 
+                    next: next_.unwrap(), 
+                    increment: increment_.unwrap(), 
+                    trigger: generate_.unwrap() 
+                }
+
+            }
+
+            // Validation Switches
+            TokenType::NotEmpty => {
+                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                    TokenType::True => {
+                        tmp.validation.checks.push(ValidationType::NotEmpty)
+                    },
+                    TokenType::False => {},
+                    _ => unreachable!()
+                };
+            }
+            TokenType::Required => {
+                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                    TokenType::True => {
+                        tmp.validation.checks.push(ValidationType::Required)
+                    },
+                    TokenType::False => {},
+                    _ => unreachable!()
+                };
+            }
+            TokenType::Unique => {
+                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                    TokenType::True => {
+                        tmp.validation.checks.push(ValidationType::Unique)
+                    },
+                    TokenType::False => {},
+                    _ => unreachable!()
+                };
+            }
             _ => {
                 info.cursor += 1;
             }
@@ -96,7 +229,7 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
         return Err(ParseErr::UnexpectedEOF);
     }
     println!("Scanned a field.");
-    Ok((0, tmp))
+    Ok((tmp.id, tmp))
 }
 
 pub fn parse_table<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
@@ -191,9 +324,12 @@ pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
             TokenType::EOF => {
                 break;
             }
-            token_ => { return Err(ParseErr::UnexpectedToken { token: tokens[info.cursor].clone(), expected: [
-                TokenType::Table, TokenType::TableOccurrence, TokenType::Relation,
-                TokenType::ValueList, TokenType::Script, TokenType::Test].to_vec(),
+            _ => { return Err(ParseErr::UnexpectedToken { 
+                token: tokens[info.cursor].clone(), 
+                expected: [
+                    TokenType::Table, TokenType::TableOccurrence, TokenType::Relation,
+                    TokenType::ValueList, TokenType::Script, TokenType::Test
+                ].to_vec(),
             }) }
         }
         info.cursor += 1;
@@ -204,7 +340,9 @@ pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cadlang::lexer::lex, schema::{Table, TableOccurrence}};
+    use std::collections::HashMap;
+
+    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType}};
 
     use super::parse;
 
@@ -214,33 +352,86 @@ mod tests {
             table %1 Person = {
                 field %1 id = {
                     datatype = Number,
-                    auto_increment=true,
                     required =true,
                     unique= true,
-                    auto_entry = [get(uuid)],
+                    calculated_val = [get(uuid)],
                     validation_message = \"Invalid ID chosen.\",
+                },
+                field %2 counter = {
+                    datatype = Number,
+                    serial = {
+                        generate = on_creation,
+                        next = 1,
+                        increment = 1,
+                    }
                 }
             }
             ";
 
         let tokens = lex(code).expect("Tokenisation failed.");
-        let schema = parse(&tokens);
-        let expected = Table::new(1);
-
+        let schema = parse(&tokens).expect("Parsing failed.");
+        let mut expected_fields = HashMap::new();
+        expected_fields.insert(1, Field {
+                    id: 1,
+                    name: String::from("id"),
+                    created_by: String::from("admin"),
+                    modified_by: String::from("admin"),
+                    repetitions: 1,
+                    global: false,
+                    autoentry: AutoEntry {
+                        nomodify: false,
+                        definition: AutoEntryType::Calculation { 
+                            code: String::from("get(uuid)"), 
+                            noreplace: false, 
+                        }
+                    },
+                    validation: Validation {
+                        checks: vec![
+                            ValidationType::Required,
+                            ValidationType::Unique
+                        ],
+                        message: String::from("Error with field validation."),
+                        trigger: ValidationTrigger::OnEntry,
+                        user_override: true,
+                    }
+                });
+        expected_fields.insert(2, Field {
+                    id: 2,
+                    name: String::from("counter"),
+                    created_by: String::from("admin"),
+                    modified_by: String::from("admin"),
+                    repetitions: 1,
+                    global: false,
+                    autoentry: AutoEntry {
+                        nomodify: false,
+                        definition: AutoEntryType::Serial { 
+                            next: 1, 
+                            increment: 1, 
+                            trigger: SerialTrigger::OnCreation 
+                        }
+                    },
+                    validation: Validation {
+                        checks: vec![
+                        ],
+                        message: String::from("Error with field validation."),
+                        trigger: ValidationTrigger::OnEntry,
+                        user_override: true,
+                    }
+                });
+        let expected = Table {
+            id: 1,
+            name: String::from("Person"),
+            fields: expected_fields,
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+        };
+        assert_eq!(schema.tables[&1], expected);
     }
 
     #[test]
     fn basic_table_occurrence_parse_test() {
         let code = "
             table %1 Person = {
-                field %1 id = {
-                    datatype = Number,
-                    auto_increment=true,
-                    required =true,
-                    unique= true,
-                    auto_entry = [get(uuid)],
-                    validation_message = \"Invalid ID chosen.\",
-                }
             }
             table_occurrence %1 Person_occ : Person
             ";
