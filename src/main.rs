@@ -6,6 +6,7 @@ use hbam::{chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
 use schema::Schema;
 
 
+mod cadlang;
 mod util;
 mod staging_buffer;
 mod compile;

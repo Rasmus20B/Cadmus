@@ -61,8 +61,8 @@ table_occurrence %1 Person_occ : Person
 table_occurrence %2 Job_occ : Job
 table_occurrence %3 Salary_occ : Salary
 
-relationship %1 = Person_occ::job_id == Job_occ::id;
-relationship %2 = {
+relation %1 = Person_occ::job_id == Job_occ::id;
+relation %2 = {
   Job_occ::salary >= Salary_occ::start,
   Job_occ::salary <= Salary_occ::end,
 }
