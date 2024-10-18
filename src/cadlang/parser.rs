@@ -83,7 +83,7 @@ fn expect<'a>(tokens: &'a Vec<Token>, expected: &Vec<TokenType>, info: &mut Pars
 pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
     let mut tmp = Field {
         id: 0,
-        name: String::from("field"),
+        name: String::new(),
         created_by: String::from("admin"),
         modified_by: String::from("admin"),
         autoentry: AutoEntry {
@@ -265,7 +265,6 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
     if tokens.get(info.cursor).is_none() {
         return Err(ParseErr::UnexpectedEOF);
     }
-    println!("Scanned a field.");
     Ok((tmp.id, tmp))
 }
 
@@ -279,18 +278,15 @@ pub fn parse_table<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
     info.cursor += 1;
     let mut fields_ = HashMap::new();
     while let Some(token) = tokens.get(info.cursor) {
-        println!("CURSOR: {}, Token: {:?}", info.cursor, token.ttype);
         match token.ttype {
             TokenType::Field => {
                 let tmp = parse_field(tokens, &mut info)?;
                 fields_.insert(tmp.0, tmp.1);
-                println!("Token after field: {:?} \n{:?}", tokens[info.cursor - 1], tokens[info.cursor]);
             },
             TokenType::CloseBrace => {
                 break;
             }
             TokenType::Comma => {
-                println!("FOUND A COMMA.");
             }
             _ => return Err(ParseErr::UnexpectedToken { 
                 token: token.clone(), 
@@ -302,8 +298,6 @@ pub fn parse_table<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
     if tokens.get(info.cursor).is_none() {
         return Err(ParseErr::UnexpectedEOF);
     }
-
-    println!("FINIHED TABLE DEFINITION.");
     Ok((id_, Table {
         id: id_,
         name: name_,
@@ -318,7 +312,6 @@ pub fn parse_table_occurrence<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseIn
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], &mut info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
 
-    println!("ID: {}", id_);
     let name_ = expect(tokens, &vec![TokenType::Identifier], &mut info)?.value.clone();
     expect(tokens, &vec![TokenType::Colon], &mut info)?;
     let base_table_ = expect(tokens, &vec![TokenType::Identifier], &mut info)?.value.clone();
@@ -347,7 +340,6 @@ pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
             TokenType::TableOccurrence => {
                 let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info)
                     .expect("unable to parse table occurrence.");
-                println!("id: {:?}", table_occurrence);
                 result.table_occurrences.insert(id, table_occurrence);
             }
             TokenType::Relation => {
