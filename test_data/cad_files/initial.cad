@@ -1,8 +1,11 @@
 table %1 Person = {
   field %1 id = {
     datatype = Number,
-    auto_increment = true,
-    auto_entry = [get(uuid)],
+    serial = {
+      generate = OnCreation,
+      next = 1,
+      increment = 1,
+    }
     unique = true,
     required = true,
   },
@@ -20,11 +23,10 @@ table %1 Person = {
 table %2 Job = {
   field %1 id = {
     datatype = Number,
-    auto_increment = true,
+    auto_entry = [get(uuid)],
     unique = true,
     required = true,
     validation_message = "Invalid ID chosen.",
-    auto_entry = [get(uuid)],
   },
   field %2 title = {
     datatype = Text,
@@ -79,7 +81,7 @@ layout %3 Salary : Salary_occ {
   // Layout object definitions can go here
 }
 
-script %1 make_10_people {
+script %1 make_10_people = {
   set_variable(x, 0);
   go_to_layout("Person");
   loop {

@@ -14,16 +14,52 @@ pub enum TokenType {
     AutoIncrement,
     AutoEntry,
     Datatype,
-    Required,
-    Unique,
-    ValidationCalc,
-    ValidationMessage,
 
     Identifier,
     ObjectNumber,
     Assignment,
     Calculation,
     String,
+
+    // Auto Entry Tab
+    Creation,
+    Modification,
+    Serial,
+    Generate,
+    OnCreation,
+    OnCommit,
+    Next,
+    Increment,
+    LastVisited,
+    Data,
+    Calculated,
+    DoNotReplace,
+    Lookup,
+
+    // Lookup 
+    StartTable,
+    RelatedTable,
+
+    // Validation Tab
+    Validate,
+    Always,
+    OnEntry,
+    AllowOverride,
+
+    // Validate Require tab
+    StrictDataType,
+    NotEmpty,
+    Required,
+    Unique,
+    MemberOf,
+    Range,
+    ValidationCalc,
+    MaxChars,
+    ValidationMessage,
+
+    // Storage Tab
+    Global,
+    Repetitions,
 
     Number,
     Text,

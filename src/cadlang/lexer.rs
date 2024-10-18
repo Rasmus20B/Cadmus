@@ -166,7 +166,6 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
             }
             _ => {
                 if buffer.is_empty() {
-                    println!("assigning start: {:?}", cursor);
                     token_start = cursor;
                 }
                 buffer.push(c)
@@ -247,7 +246,7 @@ table %1 Person {
         let lexed = lex(&code).expect("Unable to lex code.");
 
         for pair in expected.iter().zip(lexed) {
-            println!("{:?} == {:?}", pair.0, pair.1);
+            // println!("{:?} == {:?}", pair.0, pair.1);
             assert_eq!(*pair.0, pair.1);
         }
     }

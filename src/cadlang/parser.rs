@@ -27,7 +27,7 @@ struct ParseInfo {
     cursor: usize,
 }
 
-pub fn parse_table<'a>(tokens: &'a Vec<Token>, info: ParseInfo) -> Result<Table, ParseErr> {
+pub fn parse_table<'a>(tokens: &'a Vec<Token>, info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
     unimplemented!()
 }
 
@@ -36,27 +36,23 @@ pub fn parse_table_occurrence<'a>(tokens: &'a Vec<Token>, info: ParseInfo) -> Re
 }
 
 pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
-    let result = Schema::new();
+    let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
     
     match &tokens[info.cursor].ttype {
         TokenType::Table => {
-
+            let (id, table) = parse_table(tokens, &mut info).expect("Unable to parse table.");
+            result.tables.insert(id, table);
         },
         TokenType::TableOccurrence => {
-
         }
         TokenType::Relation => {
-
         },
         TokenType::ValueList => {
-
         },
         TokenType::Script => {
-
         },
         TokenType::Test => {
-
         },
         token_ => { return Err(ParseErr::UnexpectedToken { token: tokens[info.cursor].clone(), expected: [
             TokenType::Table, TokenType::TableOccurrence, TokenType::Relation,
@@ -65,4 +61,32 @@ pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
     };
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{cadlang::lexer::lex, schema::Table};
+
+    use super::parse;
+
+    #[test]
+    fn basic_table_parse_test() {
+        let code = "
+            table %1 Person {
+                field %1 id = {
+                    datatype = Number,
+                    auto_increment=true,
+                    required =true,
+                    unique= true,
+                    auto_entry = [get(uuid)],
+                    validation_message = \"Invalid ID chosen.\",
+                }
+            }";
+
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens);
+
+        let mut expected = Table::new(1);
+
+    }
 }
