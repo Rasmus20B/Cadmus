@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{AutoEntry, AutoEntryType, DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence, Validation, ValidationTrigger}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -125,6 +125,19 @@ impl HBAMInterface {
                         name: name_,
                         created_by: String::new(),
                         modified_by: String::new(),
+                        autoentry: AutoEntry {
+                            definition: AutoEntryType::NA,
+                            nomodify: false,
+                        },
+                        validation: Validation {
+                            trigger: ValidationTrigger::OnEntry,
+                            user_override: false,
+                            checks: vec![],
+                            message: String::from("Error with validation."),
+                        },
+                        global: false,
+                        repetitions: 1,
+
                     });
                 }
             }

@@ -35,6 +35,22 @@ lookup = {
     related = <field_reference>,
 }
 ```
+```
+[creation, modification] = [Date, Time, Timestamp, Name, AccountName]
+```
+```
+last_visited = true
+```
+```
+data = <String>
+```
+```
+calculated_val = [Calculation]
+do_not_replace = [true, false]
+```
+```
+no_modify = [true, false]
+```
 
 ##### Validation
 ```
@@ -69,6 +85,12 @@ max_chars = <Integer>
 ```
 ```
 validation_message = <String>
+```
+```
+global = [true, false]
+```
+```
+repetition = <Integer>
 ```
 
 #### Table Occurrences

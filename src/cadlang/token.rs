@@ -75,6 +75,8 @@ pub enum TokenType {
     OpenSquare,
     CloseSquare,
     Comma,
+    Colon,
+    EOF,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

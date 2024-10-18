@@ -45,11 +45,73 @@ impl Table {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum SerialTrigger {
+    OnCreation,
+    OnCommit,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum AutoEntryDataPresets {
+    Date,
+    Time,
+    Timestamp,
+    Name,
+    AccountName,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum AutoEntryType {
+    NA,
+    Serial { next: usize, increment: usize, trigger: SerialTrigger },
+    Lookup { from: String, to: String },
+    Creation(AutoEntryDataPresets),
+    Modification(AutoEntryDataPresets),
+    LastVisited,
+    Data(String),
+    Calculation{code: String, noreplace: bool},
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct AutoEntry {
+    pub nomodify: bool,
+    pub definition: AutoEntryType
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum ValidationTrigger {
+    OnEntry,
+    OnCommit,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum ValidationType {
+    NotEmpty,
+    Unique,
+    Required,
+    MemberOf(String),
+    Range{start: usize, end: usize},
+    Calculation(String),
+    MaxChars(usize),
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct Validation {
+    pub trigger: ValidationTrigger,
+    pub user_override: bool,
+    pub checks: Vec<ValidationType>,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Field {
     pub id: usize,
     pub name: String,
     pub created_by: String,
     pub modified_by: String,
+    pub validation: Validation,
+    pub autoentry: AutoEntry,
+    pub global: bool,
+    pub repetitions: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

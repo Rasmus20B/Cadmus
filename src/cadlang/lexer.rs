@@ -164,6 +164,13 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     }
                 }
             }
+            ':' => {
+                if !buffer.is_empty() {
+                    tokens.push(decode_buffer(&buffer, token_start));
+                    buffer.clear();
+                }
+                tokens.push(Token::new(TokenType::Colon, cursor));
+            }
             _ => {
                 if buffer.is_empty() {
                     token_start = cursor;
@@ -173,6 +180,8 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
         };
         cursor.column += 1;
     }
+
+    tokens.push(Token::new(TokenType::EOF, cursor));
     Ok(tokens)
 }
 
