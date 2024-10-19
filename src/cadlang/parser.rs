@@ -336,6 +336,7 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Sc
     let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
     let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
     script_[0].name = name_.clone();
+    expect(tokens, &vec![TokenType::CloseBrace], info)?;
 
     Ok((id_, script_.get(0).expect("").clone()))
 }
@@ -476,7 +477,7 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test
     let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
     let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
     script_[0].name = name_.clone();
-    let code = expect(tokens, &vec![TokenType::CloseBrace], info)?;
+    expect(tokens, &vec![TokenType::CloseBrace], info)?;
 
     Ok((id_, Test {
         id: id_,
