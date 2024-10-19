@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use crate::schema::{AutoEntry, AutoEntryType, Field, Schema, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType}};
 
 use super::token::{Token, TokenType};
 
@@ -307,7 +307,7 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
     }))
 }
 
-pub fn parse_table_occurrence(tokens: &Vec<Token>, info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
+pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
 
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
@@ -324,6 +324,20 @@ pub fn parse_table_occurrence(tokens: &Vec<Token>, info: &mut ParseInfo) -> Resu
         table_actual: 0,
         table_actual_name: base_table_,
     }))
+}
+
+pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Script), ParseErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+        .value.parse::<usize>().expect("Unable to parse object number.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+    expect(tokens, &vec![TokenType::Assignment], info)?;
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
+
+    let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
+    let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
+    script_[0].name = name_.clone();
+
+    Ok((id_, script_.get(0).expect("").clone()))
 }
 
 pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
@@ -347,6 +361,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
             TokenType::ValueList => {
             },
             TokenType::Script => {
+                let (id, script) = parse_script(tokens, &mut info)
+                    .expect("Unable to parse script.");
+                result.scripts.insert(id, script);
             },
             TokenType::Test => {
             },

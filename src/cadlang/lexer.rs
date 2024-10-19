@@ -24,7 +24,7 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         }
         "do_not_replace" => {
             Token::new(TokenType::DoNotReplace, start)
-        }
+       }
         "false" => {
             Token::new(TokenType::False, start) 
         }
@@ -54,6 +54,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         },
         "required" => {
             Token::new(TokenType::Required, start) 
+        }
+        "script" => {
+            Token::new(TokenType::Script, start)
         }
         "serial" => {
             Token::new(TokenType::Serial, start) 
@@ -87,6 +90,9 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
     let mut buffer = String::new();
     let mut token_start = cursor;
 
+
+    let mut in_script = false;
+
     while let Some(c) = lex_iter.next() {
         if c.is_whitespace() && buffer.is_empty() {
             if c == '\n'{
@@ -109,7 +115,11 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
             },
             ' ' => {
                 if !buffer.is_empty() {
-                    tokens.push(decode_buffer(&buffer, token_start));
+                    let kw = decode_buffer(&buffer, token_start);
+                    if kw.ttype == TokenType::Script {
+                        in_script = true;
+                    }
+                    tokens.push(kw);
                     buffer.clear();
                 }
             }
@@ -130,7 +140,38 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
+                if in_script {
+                    let mut depth = 1;
+                    while let Some(c) = lex_iter.next() {
+                        match c {
+                            '}' => {
+                                buffer.push(c);
+                                depth -= 1;
+                            }
+                            '{' => {
+                                depth += 1;
+                                buffer.push(c);
+                            }
+                            _ => {
+                                buffer.push(c);
+                            }
+                        }
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    if depth != 0 {
+                        return Err(LexErr::UnexpectedEOF)
+                    }
+                    // Pop the script close brace at the end.
+                    buffer.pop();
                 tokens.push(Token::new(TokenType::OpenBrace, cursor));
+                tokens.push(Token::with_value(TokenType::ScriptContent, cursor, buffer.clone()));
+                tokens.push(Token::new(TokenType::CloseBrace, cursor));
+                buffer.clear();
+                } else {
+                    tokens.push(Token::new(TokenType::OpenBrace, cursor));
+                }
             },
             '}' => {
                 if !buffer.is_empty() {
@@ -199,6 +240,24 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                 }
                 tokens.push(Token::new(TokenType::Exclamation, cursor));
             }
+            '/' => {
+                if !buffer.is_empty() {
+                    tokens.push(decode_buffer(&buffer, token_start));
+                    buffer.clear();
+                }
+                let next = lex_iter.next();
+                if next == Some('/') {
+                    while let Some(c) = lex_iter.next() {
+                        if c == '\n' {
+                            cursor.line += 1;
+                            cursor.column = 0;
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+            }
             _ => {
                 if buffer.is_empty() {
                     token_start = cursor;
@@ -226,7 +285,8 @@ mod tests {
 table %1 Person {
     field %1 id = {
         datatype = Number,
-        required =true,
+        // This is a comment
+        required =true, // This is also a comment
         unique= true,
         calculated_val = [get(uuid)],
         validation_message = \"Invalid ID chosen.\",
@@ -250,28 +310,28 @@ table %1 Person {
             Token::new(TokenType::Number, Location { line: 3, column: 19 }),
             Token::new(TokenType::Comma, Location { line: 3, column: 25 }),
 
-            Token::new(TokenType::Required, Location { line: 4, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 4, column: 17 }),
-            Token::new(TokenType::True, Location { line: 4, column: 18 }),
-            Token::new(TokenType::Comma, Location { line: 4, column: 22 }),
+            Token::new(TokenType::Required, Location { line: 5, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 5, column: 17 }),
+            Token::new(TokenType::True, Location { line: 5, column: 18 }),
+            Token::new(TokenType::Comma, Location { line: 5, column: 22 }),
 
-            Token::new(TokenType::Unique, Location { line: 5, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 5, column: 14 }),
-            Token::new(TokenType::True, Location { line: 5, column: 16 }),
-            Token::new(TokenType::Comma, Location { line: 5, column: 20 }),
+            Token::new(TokenType::Unique, Location { line: 6, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 6, column: 14 }),
+            Token::new(TokenType::True, Location { line: 6, column: 16 }),
+            Token::new(TokenType::Comma, Location { line: 6, column: 20 }),
 
-            Token::new(TokenType::CalculatedVal, Location { line: 6, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 6, column: 23 }),
-            Token::with_value(TokenType::Calculation, Location { line: 6, column: 25 }, "get(uuid)".to_string()),
-            Token::new(TokenType::Comma, Location { line: 6, column: 35 }),
+            Token::new(TokenType::CalculatedVal, Location { line: 7, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 7, column: 23 }),
+            Token::with_value(TokenType::Calculation, Location { line: 7, column: 25 }, "get(uuid)".to_string()),
+            Token::new(TokenType::Comma, Location { line: 7, column: 35 }),
 
-            Token::new(TokenType::ValidationMessage, Location { line: 7, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 7, column: 27 }),
-            Token::with_value(TokenType::String, Location { line: 7, column: 29 }, "Invalid ID chosen.".to_string()),
-            Token::new(TokenType::Comma, Location { line: 7, column: 48 }),
+            Token::new(TokenType::ValidationMessage, Location { line: 8, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 8, column: 27 }),
+            Token::with_value(TokenType::String, Location { line: 8, column: 29 }, "Invalid ID chosen.".to_string()),
+            Token::new(TokenType::Comma, Location { line: 8, column: 48 }),
 
-            Token::new(TokenType::CloseBrace, Location { line: 8, column: 4 }),
-            Token::new(TokenType::CloseBrace, Location { line: 9, column: 0 }),
+            Token::new(TokenType::CloseBrace, Location { line: 9, column: 4 }),
+            Token::new(TokenType::CloseBrace, Location { line: 10, column: 0 }),
         ];
 
         let lexed = lex(&code).expect("Unable to lex code.");
