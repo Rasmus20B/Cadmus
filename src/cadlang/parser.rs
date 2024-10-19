@@ -341,6 +341,75 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Sc
     Ok((id_, script_.get(0).expect("").clone()))
 }
 
+pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<(Option<String>, ValueListSortBy), ParseErr> {
+    let mut from_ = None;
+    let mut sort_ = ValueListSortBy::FirstField;
+
+    loop {
+        match expect(tokens, &vec![TokenType::From, TokenType::Sort, TokenType::CloseBrace], info)?.ttype {
+            TokenType::From => {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                from_ = Some(expect(tokens, &vec![TokenType::Identifier], info)?.value.clone());
+                info.cursor += 1;
+                if let Some(token) = tokens.get(info.cursor) {
+                    match token.ttype {
+                        TokenType::Comma => {
+                            continue;
+                        },
+                        TokenType::CloseBrace => {
+                            return Ok((from_, sort_))
+                        }
+                        _ => {
+                            return Err(ParseErr::UnexpectedToken { 
+                                token: token.clone(),
+                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
+                            })
+                        }
+                    }
+                } else {
+                    return Err(ParseErr::UnexpectedEOF);
+                }
+            }
+            TokenType::Sort => {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                let order = expect(tokens,
+                    &vec![TokenType::FirstField, TokenType::SecondField],
+                    info)?;
+
+                sort_ = match order.ttype {
+                    TokenType::FirstField => ValueListSortBy::FirstField,
+                    TokenType::SecondField => ValueListSortBy::SecondField,
+                    _ => unreachable!()
+                };
+                info.cursor += 1;
+                if let Some(token) = tokens.get(info.cursor) {
+                    match token.ttype {
+                        TokenType::Comma => {
+                            continue;
+                        },
+                        TokenType::CloseBrace => {
+                            return Ok((from_, sort_))
+                        }
+                        _ => {
+                            return Err(ParseErr::UnexpectedToken { 
+                                token: token.clone(),
+                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
+                            })
+                        }
+                    }
+                } else {
+                    return Err(ParseErr::UnexpectedEOF);
+                }
+
+            }
+            TokenType::CloseBrace => {
+                return Ok((from_, sort_));
+            }
+            _ => unreachable!()
+        }
+    }
+}
+
 pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, ValueList), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
         .parse::<usize>().expect("Unable to parse object ID.");
@@ -349,8 +418,6 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
     println!("name: {}, id: {}", name_, id_);
     if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
         == TokenType::Colon {
-            println!("In here though?");
-
             let mut sort_ = ValueListSortBy::FirstField;
             let mut from_: Option<String> = None;
             let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
@@ -396,6 +463,22 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
 
                                 }))
                         },
+                        TokenType::Assignment => {
+                            expect(tokens, &vec![TokenType::OpenBrace], info)?;
+                            (from_, sort_) = parse_value_list_attributes(tokens, info).expect("Unable to parse value list attributes.");
+                            return Ok((id_, ValueList {
+                                id: id_,
+                                name: name_,
+                                created_by: String::from("admin"),
+                                modified_by: String::from("admin"),
+                                definition: ValueListDefinition::FromField { 
+                                    field1: first_field, 
+                                    field2: Some(second_field), 
+                                    from: from_, 
+                                    sort: sort_, }
+
+                            }))
+                        }
                         _ => {
                             return Err(ParseErr::UnexpectedToken { 
                                 token: token.clone(),
@@ -409,88 +492,19 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                 }
                 TokenType::Assignment => {
                     expect(tokens, &vec![TokenType::OpenBrace], info)?;
-                    loop {
-                        match expect(tokens, &vec![TokenType::From, TokenType::Sort], info)?.ttype {
-                            TokenType::From => {
-                                expect(tokens, &vec![TokenType::Assignment], info)?;
-                                from_ = Some(expect(tokens, &vec![TokenType::Identifier], info)?.value.clone());
-                                info.cursor += 1;
-                                if let Some(token) = tokens.get(info.cursor) {
-                                    match token.ttype {
-                                        TokenType::Comma => {
-                                            continue;
-                                        },
-                                        TokenType::CloseBrace => {
-                                            return Ok((id_, ValueList {
-                                                id: id_,
-                                                name: name_,
-                                                created_by: String::from("admin"),
-                                                modified_by: String::from("admin"),
-                                                definition: ValueListDefinition::FromField { 
-                                                    field1: first_field, 
-                                                    field2: None, 
-                                                    from: from_, 
-                                                    sort: sort_, }
+                    (from_, sort_) = parse_value_list_attributes(tokens, info).expect("Unable to parse value list attributes.");
+                    return Ok((id_, ValueList {
+                        id: id_,
+                        name: name_,
+                        created_by: String::from("admin"),
+                        modified_by: String::from("admin"),
+                        definition: ValueListDefinition::FromField { 
+                            field1: first_field, 
+                            field2: None, 
+                            from: from_, 
+                            sort: sort_, }
 
-                                            }))
-                                        }
-                                        _ => {
-                                            return Err(ParseErr::UnexpectedToken { 
-                                                token: token.clone(),
-                                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
-                                            })
-                                        }
-                                    }
-                                } else {
-                                    return Err(ParseErr::UnexpectedEOF);
-                                }
-                            }
-                            TokenType::Sort => {
-                                expect(tokens, &vec![TokenType::Assignment], info)?;
-                                let order = expect(tokens,
-                                    &vec![TokenType::FirstField, TokenType::SecondField],
-                                    info)?;
-
-                                sort_ = match order.ttype {
-                                    TokenType::FirstField => ValueListSortBy::FirstField,
-                                    TokenType::SecondField => ValueListSortBy::SecondField,
-                                    _ => unreachable!()
-                                };
-                                info.cursor += 1;
-                                if let Some(token) = tokens.get(info.cursor) {
-                                    match token.ttype {
-                                        TokenType::Comma => {
-                                            continue;
-                                        },
-                                        TokenType::CloseBrace => {
-                                            return Ok((id_, ValueList {
-                                                id: id_,
-                                                name: name_,
-                                                created_by: String::from("admin"),
-                                                modified_by: String::from("admin"),
-                                                definition: ValueListDefinition::FromField { 
-                                                    field1: first_field, 
-                                                    field2: None, 
-                                                    from: from_, 
-                                                    sort: sort_, }
-
-                                            }))
-                                        }
-                                        _ => {
-                                            return Err(ParseErr::UnexpectedToken { 
-                                                token: token.clone(),
-                                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
-                                            })
-                                        }
-                                    }
-                                } else {
-                                    return Err(ParseErr::UnexpectedEOF);
-                                }
-
-                            }
-                            _ => unreachable!()
-                        }
-                    }
+                    }))
                 }
                 _ => {
                     return Err(ParseErr::UnexpectedToken { 
@@ -808,6 +822,85 @@ mod tests {
             definition: ValueListDefinition::FromField { 
                 field1: "Person_occ::name".to_string(), 
                 field2: None,
+                from: Some(String::from("Salary_occ")), 
+                sort: ValueListSortBy::SecondField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+    }
+
+    #[test]
+    fn field_value_list_double_with_from_option() {
+        let code = "
+        value_list %1 basic : Person_occ::name = {
+            from = Salary_occ,
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: None,
+                from: Some(String::from("Salary_occ")), 
+                sort: ValueListSortBy::FirstField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+    }
+
+    #[test]
+    fn field_value_list_double_with_sort_option() {
+        let code = "
+        value_list %1 basic : Person_occ::name = {
+            sort = second_field,
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: None,
+                from: None,
+                sort: ValueListSortBy::SecondField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+    }
+
+    #[test]
+    fn field_value_list_double_with_options() {
+        let code = "
+        value_list %1 basic : Person_occ::name, Person_occ::id = {
+            from = Salary_occ,
+            sort = second_field
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: Some(String::from("Person_occ::id")),
                 from: Some(String::from("Salary_occ")), 
                 sort: ValueListSortBy::SecondField, 
             }
