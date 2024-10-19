@@ -183,14 +183,19 @@ impl Relation {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum ValueListSortBy {
+    FirstField,
+    SecondField,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum ValueListDefinition {
     CustomValues(Vec<String>),
     FromField { field1: String, 
         field2: Option<String>, 
         from: Option<String>, 
-        sort: Option<String> 
+        sort: ValueListSortBy, 
     }
-
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

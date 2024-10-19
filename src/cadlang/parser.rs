@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
 use super::token::{Token, TokenType};
 
@@ -351,6 +351,8 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
         == TokenType::Colon {
             println!("In here though?");
 
+            let sort_ = ValueListSortBy::FirstField;
+            let from_: Option<String> = None;
             let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
             info.cursor += 1;
             let token = &tokens[info.cursor];
@@ -358,7 +360,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
             match token.ttype {
                 TokenType::Table | TokenType::TableOccurrence | 
                     TokenType::Script | TokenType::ValueList | 
-                    TokenType::Test => {
+                    TokenType::Test | TokenType::EOF => {
                         return Ok((id_, ValueList {
                             id: id_,
                             name: name_,
@@ -368,7 +370,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                                 field1: first_field, 
                                 field2: None, 
                                 from: None, 
-                                sort: None, }
+                                sort: sort_, }
 
                         }))
                 },
@@ -380,7 +382,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                     match token.ttype {
                         TokenType::Table | TokenType::TableOccurrence | 
                             TokenType::Script | TokenType::ValueList | 
-                            TokenType::Test => {
+                            TokenType::Test | TokenType::EOF => {
                                 return Ok((id_, ValueList {
                                     id: id_,
                                     name: name_,
@@ -388,9 +390,9 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                                     modified_by: String::from("admin"),
                                     definition: ValueListDefinition::FromField { 
                                         field1: first_field, 
-                                        field2: None, 
-                                        from: None, 
-                                        sort: None, }
+                                        field2: Some(second_field), 
+                                        from: from_, 
+                                        sort: sort_, }
 
                                 }))
                         },
@@ -405,7 +407,91 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                         }
                     }
                 }
-                TokenType::Assignment => {}
+                TokenType::Assignment => {
+                    expect(tokens, &vec![TokenType::OpenBrace], info)?;
+                    loop {
+                        match expect(tokens, &vec![TokenType::From, TokenType::Sort], info)?.ttype {
+                            TokenType::From => {
+                                expect(tokens, &vec![TokenType::Assignment], info)?;
+                                let table = expect(tokens, &vec![TokenType::Identifier], info)?;
+                                info.cursor += 1;
+                                if let Some(token) = tokens.get(info.cursor) {
+                                    match token.ttype {
+                                        TokenType::Comma => {
+                                            continue;
+                                        },
+                                        TokenType::CloseBrace => {
+                                            return Ok((id_, ValueList {
+                                                id: id_,
+                                                name: name_,
+                                                created_by: String::from("admin"),
+                                                modified_by: String::from("admin"),
+                                                definition: ValueListDefinition::FromField { 
+                                                    field1: first_field, 
+                                                    field2: None, 
+                                                    from: from_, 
+                                                    sort: sort_, }
+
+                                            }))
+                                        }
+                                        _ => {
+                                            return Err(ParseErr::UnexpectedToken { 
+                                                token: token.clone(),
+                                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
+                                            })
+                                        }
+                                    }
+                                } else {
+                                    return Err(ParseErr::UnexpectedEOF);
+                                }
+                            }
+                            TokenType::Sort => {
+                                expect(tokens, &vec![TokenType::Assignment], info)?;
+                                let order = expect(tokens,
+                                    &vec![TokenType::FirstField, TokenType::SecondField],
+                                    info)?;
+
+                                let sort_ = match order.ttype {
+                                    TokenType::FirstField => ValueListSortBy::FirstField,
+                                    TokenType::SecondField => ValueListSortBy::SecondField,
+                                    _ => unreachable!()
+                                };
+                                info.cursor += 1;
+                                if let Some(token) = tokens.get(info.cursor) {
+                                    match token.ttype {
+                                        TokenType::Comma => {
+                                            continue;
+                                        },
+                                        TokenType::CloseBrace => {
+                                            return Ok((id_, ValueList {
+                                                id: id_,
+                                                name: name_,
+                                                created_by: String::from("admin"),
+                                                modified_by: String::from("admin"),
+                                                definition: ValueListDefinition::FromField { 
+                                                    field1: first_field, 
+                                                    field2: None, 
+                                                    from: from_, 
+                                                    sort: sort_, }
+
+                                            }))
+                                        }
+                                        _ => {
+                                            return Err(ParseErr::UnexpectedToken { 
+                                                token: token.clone(),
+                                                expected: vec![TokenType::Comma, TokenType::CloseBrace] 
+                                            })
+                                        }
+                                    }
+                                } else {
+                                    return Err(ParseErr::UnexpectedEOF);
+                                }
+
+                            }
+                            _ => unreachable!()
+                        }
+                    }
+                }
                 _ => {
                     return Err(ParseErr::UnexpectedToken { 
                         token: token.clone(),
@@ -531,6 +617,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
                 ].to_vec(),
             }) }
         }
+        if tokens[info.cursor].ttype == TokenType::EOF {
+            return Ok(result)
+        }
         info.cursor += 1;
     };
 
@@ -541,7 +630,7 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition}};
+    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
     use super::parse;
 
@@ -648,13 +737,83 @@ mod tests {
                 String::from("this is a test")
             ])
         };
-
         assert!(schema.value_lists.len() == 1);
         assert_eq!(schema.value_lists[&1], expected);
+    }
 
+    #[test]
+    fn field_value_list() {
+        let code = "
+        value_list %1 basic : Person_occ::name, Person_occ::id
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
 
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: Some("Person_occ::id".to_string()), 
+                from: None, 
+                sort: ValueListSortBy::FirstField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+    }
 
+    #[test]
+    fn field_value_list_single() {
+        let code = "
+        value_list %1 basic : Person_occ::name
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
 
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: None,
+                from: None, 
+                sort: ValueListSortBy::FirstField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+    }
+
+    #[test]
+    fn field_value_list_single_with_options() {
+        let code = "
+        value_list %1 basic : Person_occ::name = {
+            from = Salary_occ,
+            sort = second_field
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: "Person_occ::name".to_string(), 
+                field2: None,
+                from: None, 
+                sort: ValueListSortBy::SecondField, 
+            }
+        };
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]

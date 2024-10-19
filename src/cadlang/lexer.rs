@@ -17,8 +17,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
     }
 
     if buffer.split("::").collect::<Vec<_>>().len() == 2 {
-        Token::with_value(TokenType::FieldReference, start, buffer.to_string());
+        return Token::with_value(TokenType::FieldReference, start, buffer.to_string());
     }
+
     match buffer {
         "calculated_val" => {
             Token::new(TokenType::CalculatedVal, start) 
@@ -34,6 +35,12 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         }
         "field" => {
             Token::new(TokenType::Field, start) 
+        },
+        "first_field" => {
+            Token::new(TokenType::FirstField, start) 
+        }
+        "from" => {
+            Token::new(TokenType::From, start)
         },
         "generate" => {
             Token::new(TokenType::Generate, start)
@@ -62,9 +69,15 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         "script" => {
             Token::new(TokenType::Script, start)
         }
+        "second_field" => {
+            Token::new(TokenType::SecondField, start)
+        }
         "serial" => {
             Token::new(TokenType::Serial, start) 
         }
+        "sort" => {
+            Token::new(TokenType::Sort, start)
+        },
         "table" => { 
             Token::new(TokenType::Table, start) 
         },
@@ -237,6 +250,13 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                 }
             }
             ':' => {
+                if let Some(c) = lex_iter.peek() {
+                    if *c == ':' {
+                        buffer.push(':');
+                        buffer.push(lex_iter.next().unwrap());
+                        continue;
+                    }
+                }
                 if !buffer.is_empty() {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();

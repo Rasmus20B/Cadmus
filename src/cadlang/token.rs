@@ -62,6 +62,12 @@ pub enum TokenType {
     Global,
     Repetitions,
 
+    // Valuelist attributes
+    From,
+    Sort,
+    FirstField,
+    SecondField,
+
     Number,
     Text,
     Date,
