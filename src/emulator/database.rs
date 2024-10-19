@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::schema::*;
+use crate::schema::{RelationCriteria, *};
 
 use super::relation_mgr::RelationMgr;
 
@@ -46,13 +46,6 @@ impl TableObject {
     pub fn delete_record(&mut self, record_id: u16) {
         self.fields.remove(record_id.into());
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct RelationCriteria {
-    join_by: RelationComparison,
-    field1: usize,
-    field2: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -160,25 +153,23 @@ impl Database {
 
         /* Generate Relationships */ 
         for rel in file.relations.values() {
+            let reversed = match &rel.criterias[0] {
+                RelationCriteria::ById { field1, field2, comparison } => {
+                    RelationCriteria::ById { field1: *field2, field2: *field1, comparison: *comparison }
+                },
+                _ => unreachable!()
+            };
             self.table_occurrences[rel.table1 as usize].related_records.push(
                 RelatedRecordSet {
                     occurrence: rel.table2 as usize,
-                    relationship: vec![RelationCriteria {
-                        field1: rel.criterias[0].field1 as usize,
-                        field2: rel.criterias[0].field2 as usize,
-                        join_by: rel.criterias[0].comparison.clone(),
-                    }],
+                    relationship: vec![rel.criterias[0].clone()],
                     records: vec![],
                 }
             );
             self.table_occurrences[rel.table2 as usize].related_records.push(
                 RelatedRecordSet {
                     occurrence: rel.table1 as usize,
-                    relationship: vec![RelationCriteria {
-                        field1: rel.criterias[0].field2 as usize,
-                        field2: rel.criterias[0].field1 as usize,
-                        join_by: rel.criterias[0].comparison.clone(),
-                    }],
+                    relationship: vec![rel.criterias[0].clone()],
                     records: vec![],
                 }
             );
@@ -398,9 +389,14 @@ impl Database {
                 return Err("Cannot access unrelated record.");
             }
 
+            let (field1_, field2_, join_by_) = match relation[0].relationship[0] {
+                    RelationCriteria::ById { field1, field2, comparison } => (field1, field2, comparison),
+                    _ => unreachable!()
+            };
             if current_set.is_empty() {
+                let current = &self.get_current_table();
                 let tmp = &self.get_current_table()
-                    .fields[relation[0].relationship[0].field1]
+                    .fields[field1_ as usize]
                     .records[current_record.unwrap()];
                 current_set.push((current_record.unwrap(), tmp.to_string()));
             }
@@ -409,13 +405,13 @@ impl Database {
             let next_table = &self.tables[next_occurrence.table_ptr as usize];
 
             let rhs_list = &next_table
-                .fields[relation[0].relationship[0].field2]
+                .fields[field2_ as usize]
                 .records;
 
             let mut related_set = vec![];
             for lhs in &mut current_set {
                 for rhs in rhs_list.iter().enumerate() {
-                    let related = match relation[0].relationship[0].join_by {
+                    let related = match join_by_ {
                         RelationComparison::Equal => *lhs.1 == *rhs.1,
                         RelationComparison::NotEqual => *lhs.1 != *rhs.1,
                         RelationComparison::Less => *lhs.1 <= *rhs.1.to_string(),

@@ -137,7 +137,7 @@ impl TableOccurrence {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum RelationComparison {
     Equal,
     NotEqual,
@@ -149,10 +149,9 @@ pub enum RelationComparison {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct RelationCriteria {
-    pub field1: u16,
-    pub field2: u16,
-    pub comparison: RelationComparison,
+pub enum RelationCriteria {
+    ById { field1: u16, field2: u16, comparison: RelationComparison },
+    ByName { field1: String, field2: String, comparison: RelationComparison },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

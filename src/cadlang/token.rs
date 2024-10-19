@@ -77,6 +77,14 @@ pub enum TokenType {
     True,
     False,
 
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Cartesian,
+
     OpenBrace,
     CloseBrace,
     OpenParen,

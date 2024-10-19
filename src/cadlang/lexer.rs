@@ -208,7 +208,13 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
-                tokens.push(Token::new(TokenType::Assignment, cursor));
+
+                if lex_iter.peek().is_some_and(|c| *c == '=') {
+                    lex_iter.next();
+                    tokens.push(Token::new(TokenType::Eq, cursor));
+                } else {
+                    tokens.push(Token::new(TokenType::Assignment, cursor));
+                }
             },
             ',' => {
                 if !buffer.is_empty() {
@@ -268,7 +274,12 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
-                tokens.push(Token::new(TokenType::Exclamation, cursor));
+                if lex_iter.peek().is_some_and(|c| *c == '=') {
+                    lex_iter.next();
+                    tokens.push(Token::new(TokenType::Neq, cursor));
+                } else {
+                    tokens.push(Token::new(TokenType::Exclamation, cursor));
+                }
             }
             '/' => {
                 if !buffer.is_empty() {
@@ -286,7 +297,22 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     }
                     continue;
                 }
-
+            },
+            '<' => {
+                if lex_iter.peek().is_some_and(|c| *c == '=') {
+                    lex_iter.next();
+                    tokens.push(Token::new(TokenType::Lte, cursor));
+                } else {
+                    tokens.push(Token::new(TokenType::Lt, cursor));
+                }
+            },
+            '>' => {
+                if lex_iter.peek().is_some_and(|c| *c == '=') {
+                    lex_iter.next();
+                    tokens.push(Token::new(TokenType::Gte, cursor));
+                } else {
+                    tokens.push(Token::new(TokenType::Gt, cursor));
+                }
             }
             _ => {
                 if buffer.is_empty() {

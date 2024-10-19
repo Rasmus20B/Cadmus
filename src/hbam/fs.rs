@@ -102,7 +102,7 @@ impl HBAMInterface {
                     let n2 = get_path_int(&definition[start2..start2 + len2]);
                     let field1_ = n1 as u16 - 128;
                     let field2_ = n2 as u16 - 128;
-                    rel_handle.criterias.push(RelationCriteria { field1: field1_, field2: field2_, comparison: comparison_ });
+                    rel_handle.criterias.push(RelationCriteria::ById { field1: field1_, field2: field2_, comparison: comparison_ });
                     }
                 }
             } 

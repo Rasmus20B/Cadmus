@@ -1,11 +1,11 @@
 use core::fmt;
 use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
 use super::token::{Token, TokenType};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ParseErr {
     UnexpectedToken { token: Token, expected: Vec<TokenType>},
     RelationCriteria { token: Token }, // criteria must have uniform tables.
@@ -414,8 +414,6 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
         .parse::<usize>().expect("Unable to parse object ID.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
-
-    println!("name: {}, id: {}", name_, id_);
     if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
         == TokenType::Colon {
             let mut sort_ = ValueListSortBy::FirstField;
@@ -586,6 +584,89 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test
     }))
 }
 
+pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<(&'a str, &'a str, RelationComparison), ParseErr> {
+    let lhs = expect(tokens, &vec![TokenType::FieldReference], info)?.value.as_str();
+    println!("DOES GET HERE");
+    info.cursor += 1;
+    let comparison_ = match tokens[info.cursor].ttype {
+        TokenType::Eq => RelationComparison::Equal,
+        TokenType::Neq => RelationComparison::NotEqual,
+        TokenType::Gt => RelationComparison::Greater,
+        TokenType::Gte => RelationComparison::GreaterEqual,
+        TokenType::Lt => RelationComparison::Less,
+        TokenType::Lte => RelationComparison::LessEqual,
+        TokenType::Cartesian => RelationComparison::Cartesian,
+        _ => return Err(ParseErr::UnexpectedToken { 
+            token: tokens[info.cursor].clone(),
+            expected: vec![TokenType::Eq, TokenType::Neq, TokenType::Gt,
+            TokenType::Gte, TokenType::Lt, TokenType::Lte, TokenType::Cartesian] 
+        })
+    };
+    let rhs = expect(tokens, &vec![TokenType::FieldReference], info)?.value.as_str();
+    Ok((lhs, rhs, comparison_ ))
+}
+
+pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Relation), ParseErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+        .value.parse::<usize>().expect("Unable to parse object id.");
+    expect(tokens, &vec![TokenType::Assignment], info)?;
+    let token = expect(tokens, &vec![TokenType::OpenBrace, TokenType::FieldReference], info)?;
+
+    let mut criterias_ = vec![];
+    let mut tables = [None; 2];
+    if token.ttype == TokenType::OpenBrace {
+        while let Some(token) = tokens.get(info.cursor) {
+            // parse attribute
+            let (mut lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
+            let lhs_table = lhs.split("::").collect::<Vec<_>>()[0];
+            let rhs_table = rhs.split("::").collect::<Vec<_>>()[0];
+            if tables.iter().any(|t| t.is_none()) {
+                tables[0] = Some(lhs_table);
+                tables[1] = Some(rhs_table);
+            }
+            if !tables.iter().any(|search| search.unwrap().to_string() == lhs_table) {
+                return Err(ParseErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
+            }
+            if !tables.iter().any(|search| search.unwrap().to_string() == rhs_table) {
+                return Err(ParseErr::RelationCriteria { token: tokens[info.cursor].clone() })
+            }
+
+            criterias_.push(RelationCriteria::ByName { field1: lhs.to_string(), field2: rhs.to_string(), comparison: comp});
+            let token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
+            if token.ttype == TokenType::CloseBrace {
+                return Ok((id_, Relation {
+                    id: id_,
+                    table1: 0,
+                    table1_data_source: 0,
+                    table1_name: String::from(tables[0].unwrap()),
+                    table2: 0,
+                    table2_data_source: 0,
+                    table2_name: String::from(tables[1].unwrap()),
+                    criterias: criterias_,
+                }))
+            }
+        }
+        unreachable!()
+    } else {
+        info.cursor -= 1;
+        let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
+        let lhs_table = lhs.split("::").collect::<Vec<_>>()[0];
+        let rhs_table = rhs.split("::").collect::<Vec<_>>()[0];
+        criterias_.push(RelationCriteria::ByName { field1: lhs.to_string(), field2: rhs.to_string(), comparison: comp });
+        return Ok((id_, Relation {
+            id: id_,
+            table1: 0,
+            table1_data_source: 0,
+            table1_name: String::from(lhs_table),
+            table2: 0,
+            table2_data_source: 0,
+            table2_name: String::from(rhs_table),
+            criterias: criterias_,
+        }))
+    }
+
+}
+
 pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
     let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
@@ -593,30 +674,27 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
     loop {
         match &tokens[info.cursor].ttype {
             TokenType::Table => {
-                let (id, table) = parse_table(tokens, &mut info)
-                    .expect("Unable to parse table.");
+                let (id, table) = parse_table(tokens, &mut info)?;
                 result.tables.insert(id, table);
             },
             TokenType::TableOccurrence => {
-                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info)
-                    .expect("unable to parse table occurrence.");
+                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info)?;
                 result.table_occurrences.insert(id, table_occurrence);
             }
             TokenType::Relation => {
+                let (id, relation) = parse_relation(tokens, &mut info)?;
+                result.relations.insert(id, relation);
             },
             TokenType::ValueList => {
-                let (id, valuelist) = parse_value_list(tokens, &mut info)
-                    .expect("Unable to parse valuelist.");
+                let (id, valuelist) = parse_value_list(tokens, &mut info)?;
                 result.value_lists.insert(id, valuelist);
             },
             TokenType::Script => {
-                let (id, script) = parse_script(tokens, &mut info)
-                    .expect("Unable to parse script.");
+                let (id, script) = parse_script(tokens, &mut info)?;
                 result.scripts.insert(id, script);
             },
             TokenType::Test => {
-                let (id, test) = parse_test(tokens, &mut info)
-                    .expect("Unable to parse test.");
+                let (id, test) = parse_test(tokens, &mut info)?;
                 result.tests.insert(id, test);
             },
             TokenType::EOF => {
@@ -644,9 +722,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
-    use super::parse;
+    use super::{parse, ParseErr};
 
     #[test]
     fn basic_table_parse_test() {
@@ -929,5 +1007,80 @@ mod tests {
             table_actual_name: String::from("Person")
         };
         assert_eq!(expected, schema.table_occurrences[&1]);
+    }
+
+    #[test]
+    fn relation_single_criteria_test() {
+        let code = "
+        relation %1 = Person_occ::job_id == Job_occ::id
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+        let expected = Relation {
+            id: 1,
+            table1_data_source: 0,
+            table1_name: String::from("Person_occ"),
+            table1: 0,
+            table2_data_source: 0,
+            table2_name: String::from("Job_occ"),
+            table2: 0,
+            criterias: vec![RelationCriteria::ByName {
+                field1: String::from("job_id"),
+                comparison: RelationComparison::Equal,
+                field2: String::from("id")
+            }]
+        };
+    }
+
+    #[test]
+    fn relation_compound_criteria_test() {
+        let code = "
+        relation %1 = {
+            Person_occ::job_id == Job_occ::id,
+            Person_occ::first_name != Job_occ::name
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+        let expected = Relation {
+            id: 1,
+            table1_data_source: 0,
+            table1_name: String::from("Person_occ"),
+            table1: 0,
+            table2_data_source: 0,
+            table2_name: String::from("Job_occ"),
+            table2: 0,
+            criterias: vec![
+                RelationCriteria::ByName {
+                    field1: String::from("job_id"),
+                    comparison: RelationComparison::Equal,
+                    field2: String::from("id")
+                },
+                RelationCriteria::ByName {
+                    field1: String::from("name"),
+                    comparison: RelationComparison::NotEqual,
+                    field2: String::from("first_name")
+                }
+            ]
+        };
+    }
+
+    #[test]
+    fn relation_invalid_criteria_test() {
+        let code = "
+        relation %1 = {
+            Person_occ::job_id == Job_occ::id,
+            Person_occ::first_name != Salary_occ::value,
+        }
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens);
+        let expected = ParseErr::RelationCriteria { 
+            token: Token::with_value(
+                       TokenType::FieldReference, 
+                       Location { line: 3, column: 35 }, 
+                       String::from("Salary_occ::value"),
+                       ) };
+        assert!(schema.is_err_and(|e| e ==  expected));
     }
 }
