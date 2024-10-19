@@ -95,8 +95,7 @@ fn main() -> Result<(), std::io::Error>{
                 let reader = BufReader::new(in_file);
                 let objects: Schema = serde_json::from_reader(reader).expect("Unable to read text input file");
                 ctx.cad.tests.extend(objects.tests);
-            } else {
-            }
+            } 
         }
     } else if args.input.is_some() {
         /* Generate a clean file based on schema. */

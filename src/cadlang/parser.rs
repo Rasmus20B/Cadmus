@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, fmt::write};
+use std::collections::HashMap;
 
 use crate::schema::{AutoEntry, AutoEntryType, Field, Schema, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType};
 
@@ -64,23 +64,23 @@ pub struct ParseInfo {
     cursor: usize,
 }
 
-fn expect<'a>(tokens: &'a Vec<Token>, expected: &Vec<TokenType>, info: &mut ParseInfo) -> Result<&'a Token, ParseErr> {
+fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseInfo) -> Result<&'a Token, ParseErr> {
     info.cursor += 1;
     if let Some(token) = tokens.get(info.cursor) {
         if !expected.contains(&token.ttype) {
-            return Err(ParseErr::UnexpectedToken { 
+            Err(ParseErr::UnexpectedToken { 
                 token: token.clone(), 
                 expected: expected.to_vec(),
             })
         } else {
-            return Ok(&token)
+            Ok(token)
         }
     } else {
-        return Err(ParseErr::UnexpectedEOF)
+        Err(ParseErr::UnexpectedEOF)
     }
 }
 
-pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
+pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
     let mut tmp = Field {
         id: 0,
         name: String::new(),
@@ -100,12 +100,12 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
         repetitions: 1,
     };
 
-    tmp.id = expect(tokens, &vec![TokenType::ObjectNumber], &mut info)?
+    tmp.id = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse().expect("Unable to parse object id.");
-    tmp.name = expect(tokens, &vec![TokenType::Identifier], &mut info)?
+    tmp.name = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
-    expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-    expect(tokens, &vec![TokenType::OpenBrace], &mut info)?;
+    expect(tokens, &vec![TokenType::Assignment], info)?;
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
 
     let mut depth = 1;
@@ -125,12 +125,12 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
 
             // Auto Entry Switches
             TokenType::CalculatedVal => {
-                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                let calc = expect(tokens, &vec![TokenType::Exclamation, TokenType::Calculation], &mut info)?;
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                let calc = expect(tokens, &vec![TokenType::Exclamation, TokenType::Calculation], info)?;
                 match calc.ttype {
                     TokenType::Exclamation => {
                         tmp.autoentry.definition = AutoEntryType::Calculation { 
-                            code: expect(tokens, &vec![TokenType::Calculation], &mut info)?
+                            code: expect(tokens, &vec![TokenType::Calculation], info)?
                                 .value.clone(),
                             noreplace: true 
                         }
@@ -148,8 +148,8 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
             }
 
             TokenType::Serial => {
-                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                expect(tokens, &vec![TokenType::OpenBrace], &mut info)?;
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                expect(tokens, &vec![TokenType::OpenBrace], info)?;
                 info.cursor += 1;
 
                 let mut generate_: Option::<SerialTrigger> = None;
@@ -158,10 +158,10 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                 while let Some(token) = tokens.get(info.cursor) {
                     match token.ttype {
                         TokenType::Generate => {
-                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
+                            expect(tokens, &vec![TokenType::Assignment], info)?;
                             generate_ = match expect(tokens, 
                                 &vec![TokenType::OnCreation, TokenType::OnCommit], 
-                                &mut info)?.ttype {
+                                info)?.ttype {
                                 TokenType::OnCreation => {
                                     Some(SerialTrigger::OnCreation)
                                 }
@@ -172,13 +172,13 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                             };
                         }
                         TokenType::Next => {
-                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                            next_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], &mut info)?
+                            expect(tokens, &vec![TokenType::Assignment], info)?;
+                            next_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], info)?
                                 .value.parse::<usize>().expect("unable to parse next."));
                         }
                         TokenType::Increment => {
-                            expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                            increment_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], &mut info)?
+                            expect(tokens, &vec![TokenType::Assignment], info)?;
+                            increment_ = Some(expect(tokens, &vec![TokenType::IntegerLiteral], info)?
                                 .value.parse::<usize>().expect("unable to parse increment."));
                         }
                         TokenType::Comma => {}
@@ -227,8 +227,8 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
 
             // Validation Switches
             TokenType::NotEmpty => {
-                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
                         tmp.validation.checks.push(ValidationType::NotEmpty)
                     },
@@ -237,8 +237,8 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                 };
             }
             TokenType::Required => {
-                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
                         tmp.validation.checks.push(ValidationType::Required)
                     },
@@ -247,8 +247,8 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
                 };
             }
             TokenType::Unique => {
-                expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-                match expect(tokens, &vec![TokenType::True, TokenType::False], &mut info)?.ttype {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
                         tmp.validation.checks.push(ValidationType::Unique)
                     },
@@ -268,19 +268,19 @@ pub fn parse_field<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
     Ok((tmp.id, tmp))
 }
 
-pub fn parse_table<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
+pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
     info.cursor += 1;
     let id_ = tokens.get(info.cursor).expect("Unexpected end of file.").value.parse().expect("Unable to parse object ID.");
     info.cursor += 1;
     let name_ = tokens.get(info.cursor).expect("Unexpected end of file.").value.clone();
-    expect(tokens, &vec![TokenType::Assignment], &mut info)?;
-    expect(tokens, &vec![TokenType::OpenBrace], &mut info)?;
+    expect(tokens, &vec![TokenType::Assignment], info)?;
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
     let mut fields_ = HashMap::new();
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
             TokenType::Field => {
-                let tmp = parse_field(tokens, &mut info)?;
+                let tmp = parse_field(tokens, info)?;
                 fields_.insert(tmp.0, tmp.1);
             },
             TokenType::CloseBrace => {
@@ -307,14 +307,14 @@ pub fn parse_table<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Resu
     }))
 }
 
-pub fn parse_table_occurrence<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
+pub fn parse_table_occurrence(tokens: &Vec<Token>, info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
 
-    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], &mut info)?.value.parse::<usize>()
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
 
-    let name_ = expect(tokens, &vec![TokenType::Identifier], &mut info)?.value.clone();
-    expect(tokens, &vec![TokenType::Colon], &mut info)?;
-    let base_table_ = expect(tokens, &vec![TokenType::Identifier], &mut info)?.value.clone();
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+    expect(tokens, &vec![TokenType::Colon], info)?;
+    let base_table_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
     Ok((id_, TableOccurrence {
         id: id_,
@@ -326,7 +326,7 @@ pub fn parse_table_occurrence<'a>(tokens: &'a Vec<Token>, mut info: &mut ParseIn
     }))
 }
 
-pub fn parse<'a>(tokens: &'a Vec<Token>) -> Result<Schema, ParseErr> {
+pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
     let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
     

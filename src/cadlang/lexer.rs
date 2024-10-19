@@ -98,7 +98,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
             continue;
         }
 
-        let tmp = match c {
+        match c {
             '\n' => {
                 if !buffer.is_empty() {
                     tokens.push(decode_buffer(&buffer, token_start));
@@ -158,7 +158,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
-                while let Some(c) = lex_iter.next() {
+                for c in lex_iter.by_ref() {
                     if c == ']' {
                         tokens.push(Token::with_value(TokenType::Calculation, cursor, buffer.clone()));
                         cursor.column += buffer.len() as u32;
@@ -174,7 +174,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
-                while let Some(c) = lex_iter.next() {
+                for c in lex_iter.by_ref() {
                     if c == '"' {
                         tokens.push(Token::with_value(TokenType::String, cursor, buffer.clone()));
                         cursor.column += buffer.len() as u32;
