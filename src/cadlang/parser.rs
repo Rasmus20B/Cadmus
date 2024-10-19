@@ -351,8 +351,8 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
         == TokenType::Colon {
             println!("In here though?");
 
-            let sort_ = ValueListSortBy::FirstField;
-            let from_: Option<String> = None;
+            let mut sort_ = ValueListSortBy::FirstField;
+            let mut from_: Option<String> = None;
             let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
             info.cursor += 1;
             let token = &tokens[info.cursor];
@@ -413,7 +413,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                         match expect(tokens, &vec![TokenType::From, TokenType::Sort], info)?.ttype {
                             TokenType::From => {
                                 expect(tokens, &vec![TokenType::Assignment], info)?;
-                                let table = expect(tokens, &vec![TokenType::Identifier], info)?;
+                                from_ = Some(expect(tokens, &vec![TokenType::Identifier], info)?.value.clone());
                                 info.cursor += 1;
                                 if let Some(token) = tokens.get(info.cursor) {
                                     match token.ttype {
@@ -451,7 +451,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                                     &vec![TokenType::FirstField, TokenType::SecondField],
                                     info)?;
 
-                                let sort_ = match order.ttype {
+                                sort_ = match order.ttype {
                                     TokenType::FirstField => ValueListSortBy::FirstField,
                                     TokenType::SecondField => ValueListSortBy::SecondField,
                                     _ => unreachable!()
@@ -808,7 +808,7 @@ mod tests {
             definition: ValueListDefinition::FromField { 
                 field1: "Person_occ::name".to_string(), 
                 field2: None,
-                from: None, 
+                from: Some(String::from("Salary_occ")), 
                 sort: ValueListSortBy::SecondField, 
             }
         };
