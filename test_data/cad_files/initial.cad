@@ -63,12 +63,27 @@ table_occurrence %1 Person_occ : Person
 table_occurrence %2 Job_occ : Job
 table_occurrence %3 Salary_occ : Salary
 
+// Basic value list with custom values
 value_list %1 gender = {
   "male", "female"
 }
 
+// Value list that returns all value pairs of id and name
+// from Job_occ. By default all values are brought in. 
+// To bring in related we use the "from" key.
+value_list %3 all_jobs : Job_occ::id, Job_occ::name
 
-relation %1 = Person_occ::job_id == Job_occ::id;
+// Value list based on related Job_occ records starting
+// from Salary_occ occurrence.
+value_list %2 contained_jobs : Job_occ::name = {
+  from = Salary_occ
+}
+
+// Relation based on single criteria does not require 
+// compound attribute brace.
+relation %1 = Person_occ::job_id == Job_occ::id
+
+// Dual criteria relation to based on range of values.
 relation %2 = {
   Job_occ::salary >= Salary_occ::start,
   Job_occ::salary <= Salary_occ::end,

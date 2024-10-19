@@ -183,22 +183,23 @@ impl Relation {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum ValueListDefinition {
+    CustomValues(Vec<String>),
+    FromField { field1: String, 
+        field2: Option<String>, 
+        from: Option<String>, 
+        sort: Option<String> 
+    }
+
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ValueList {
     pub id: usize,
     pub name: String,
+    pub definition: ValueListDefinition,
     pub created_by: String,
     pub modified_by: String,
-}
-
-impl ValueList {
-    pub fn new(id_: usize) -> Self {
-        Self {
-            id: id_,
-            name: String::new(),
-            created_by: String::new(),
-            modified_by: String::new(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -211,34 +212,11 @@ pub struct Script {
     pub modified_by: String,
 }
 
-impl Script {
-    pub fn new() -> Self {
-        Self {
-            id: 0,
-            name: String::new(),
-            instructions: vec![],
-            arguments: vec![],
-            created_by: String::new(),
-            modified_by: String::new(),
-        }
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Test {
     pub id: usize,
     pub name: String,
     pub script: Script,
-}
-
-impl Test {
-    pub fn new() -> Self {
-        Self {
-            id: 0,
-            name: String::new(),
-            script: Script::new(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

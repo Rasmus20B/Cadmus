@@ -683,42 +683,40 @@ impl<'a> TestEnvironment<'a> {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use crate::cadlang::compiler::compile_to_schema;
     use crate::emulator::test::TestState;
     use crate::hbam::fs::HBAMInterface;
-    use crate::{compile::compiler::compile_burn, schema::Schema};
+    use crate::schema::Schema;
     use super::TestEnvironment;
 
     #[test]
     pub fn prec_test() {
         let mut file = Schema::new();
         let code = "
-        test basicTest:
-            script: [
-                define prec_test() {
-                    set_variable(x, 2 + 3 * 4);
-                    show_custom_dialog(x);
-                    assert(x == 14);
-                    set_variable(x, (2 + 3) * 4);
-                    show_custom_dialog(x);
-                    assert(x == 20);
-                    set_variable(y, 6 / 2 * 3);
-                    show_custom_dialog(y);
-                    assert(y == 9);
-                    set_variable(x, 10 - 2 + 3 * 4);
-                    show_custom_dialog(x);
-                    assert(x == 20);
-                    set_variable(x, 2 * (3 + (4 - 1)));
-                    show_custom_dialog(x);
-                    assert(x == 12);
-                    set_variable(x, 2 + 3 * (4 - 1) / 2);
-                    show_custom_dialog(x);
-                    assert(x == 6.5);
-                }
-            ]
-        end test;
-        ";
+        test %1 basicTest = {
+            define basic_test() {
+            set_variable(x, 2 + 3 * 4);
+            show_custom_dialog(x);
+            assert(x == 14);
+            set_variable(x, (2 + 3) * 4);
+            show_custom_dialog(x);
+            assert(x == 20);
+            set_variable(y, 6 / 2 * 3);
+            show_custom_dialog(y);
+            assert(y == 9);
+            set_variable(x, 10 - 2 + 3 * 4);
+            show_custom_dialog(x);
+            assert(x == 20);
+            set_variable(x, 2 * (3 + (4 - 1)));
+            show_custom_dialog(x);
+            assert(x == 12);
+            set_variable(x, 2 + 3 * (4 - 1) / 2);
+            show_custom_dialog(x);
+            assert(x == 6.5);
+            }
+        }";
 
-        let test = compile_burn(code);
+        let test = compile_to_schema(code.to_string());
         file.tests.extend(&mut test.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();
@@ -730,33 +728,30 @@ mod tests {
     pub fn calc_test() {
         let mut file = Schema::new();
         let code = "
-        test basicTest:
-            script: [
-                define paren_test() {
-                    set_variable(x, 2 + 3 * 4);
-                    show_custom_dialog(x);
-                    assert(x == 14);
-                    set_variable(x, (2 + 3) * 4);
-                    show_custom_dialog(x);
-                    assert(x == 20);
-                    set_variable(x, (2 * (2 + 3)) & \" things\");
-                    show_custom_dialog(x);
-                    assert(x == \"10 things\");
-                    set_variable(x, 2 * (2 * (2)));
-                    show_custom_dialog(x);
-                    assert(x == 8);
-                    set_variable(y, 2 * (x * (2)));
-                    show_custom_dialog(y);
-                    assert(y == 32);
-                    set_variable(x, 2 * Min((2 + 2 + 2), y));
-                    show_custom_dialog(x);
-                    assert(x == 12);
-                }
-            ]
-        end test;
-        ";
+        test %1 basicTest = {
+            define basic_test() {
+                set_variable(x, 2 + 3 * 4);
+                show_custom_dialog(x);
+                assert(x == 14);
+                set_variable(x, (2 + 3) * 4);
+                show_custom_dialog(x);
+                assert(x == 20);
+                set_variable(x, (2 * (2 + 3)) & \" things\");
+                show_custom_dialog(x);
+                assert(x == \"10 things\");
+                set_variable(x, 2 * (2 * (2)));
+                show_custom_dialog(x);
+                assert(x == 8);
+                set_variable(y, 2 * (x * (2)));
+                show_custom_dialog(y);
+                assert(y == 32);
+                set_variable(x, 2 * Min((2 + 2 + 2), y));
+                show_custom_dialog(x);
+                assert(x == 12);
+            }
+        }";
 
-        let test = compile_burn(code);
+        let test = compile_to_schema(code.to_string());
         file.tests.extend(&mut test.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();
@@ -766,56 +761,54 @@ mod tests {
     #[test]
     pub fn basic_loop_test() {
         let code = "
-        test BasicTest:
-          script: [
-            define blank_test() {
-              set_variable(x, 0);
-              go_to_layout(\"second_table\");
-              new_record_request();
-              set_field(second_table::PrimaryKey, \"Kevin\");
-              set_field(second_table::add, \"secret\");
-              go_to_layout(\"blank\");
-              loop {
-                exit_loop_if(x == 10);
+        test %1 BasicTest = {
+            define basic_test() {
+                set_variable(x, 0);
+                go_to_layout(\"second_table\");
                 new_record_request();
-                assert(x != 10);
-                if(x == 7) {
-                    set_field(blank::PrimaryKey, \"Kevin\");
-                } elif(x == 1) {
-                    set_field(blank::PrimaryKey, \"alvin\" & \" Presley\");
-                } elif(x == 2) {
-                    set_field(blank::PrimaryKey, \"NAHHH\");
-                    assert(blank::PrimaryKey == \"NAHHH\");
-                } else {
-                    set_field(blank::PrimaryKey, \"Jeff\" & \" Keighly\");
+                set_field(second_table::PrimaryKey, \"Kevin\");
+                set_field(second_table::add, \"secret\");
+                go_to_layout(\"blank\");
+                loop {
+                    exit_loop_if(x == 10);
+                    new_record_request();
+                    assert(x != 10);
+                    if(x == 7) {
+                        set_field(blank::PrimaryKey, \"Kevin\");
+                    } elif(x == 1) {
+                        set_field(blank::PrimaryKey, \"alvin\" & \" Presley\");
+                    } elif(x == 2) {
+                        set_field(blank::PrimaryKey, \"NAHHH\");
+                        assert(blank::PrimaryKey == \"NAHHH\");
+                    } else {
+                        set_field(blank::PrimaryKey, \"Jeff\" & \" Keighly\");
+                    }
+                    set_variable(x, x + 1);
                 }
-                set_variable(x, x + 1);
-              }
-              enter_find_mode();
-              set_field(blank::PrimaryKey, \"Kevin\");
-              perform_find();
-              assert(blank::PrimaryKey == \"Kevin\");
+                enter_find_mode();
+                set_field(blank::PrimaryKey, \"Kevin\");
+                perform_find();
+                assert(blank::PrimaryKey == \"Kevin\");
 
-              enter_find_mode();
-              set_field(blank::PrimaryKey, \"Jeff Keighly\");
-              perform_find();
-              go_to_record(\"first\");
-              loop {
-                assert(blank::PrimaryKey == \"Jeff Keighly\");
-                go_to_record(\"next\", \"true\");
-              }
-              show_all_records();
-              go_to_record(\"first\");
-              loop {
-                show_custom_dialog(blank::PrimaryKey);
-                go_to_record(\"next\", \"true\");
-              }
+                enter_find_mode();
+                set_field(blank::PrimaryKey, \"Jeff Keighly\");
+                perform_find();
+                go_to_record(\"first\");
+                loop {
+                    assert(blank::PrimaryKey == \"Jeff Keighly\");
+                    go_to_record(\"next\", \"true\");
+                }
+                show_all_records();
+                go_to_record(\"first\");
+                loop {
+                    show_custom_dialog(blank::PrimaryKey);
+                    go_to_record(\"next\", \"true\");
+                }
             }
-          ],
-        end test;";
+        }";
         let input = Path::new("test_data/input/mixed.fmp12");
         let mut file = Schema::from(&mut HBAMInterface::new(&input));
-        let tests = compile_burn(code);
+        let tests = compile_to_schema(code.to_string());
         file.tests.extend(&mut tests.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();

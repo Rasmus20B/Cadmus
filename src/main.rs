@@ -9,7 +9,6 @@ use schema::Schema;
 mod cadlang;
 mod util;
 mod staging_buffer;
-mod compile;
 mod burn_script;
 mod hbam;
 mod schema;

@@ -65,6 +65,7 @@ pub enum TokenType {
     Number,
     Text,
     Date,
+    FieldReference,
     ScriptContent,
 
     True,

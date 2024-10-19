@@ -1,7 +1,7 @@
 use core::fmt;
-use std::collections::HashMap;
+use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition}};
 
 use super::token::{Token, TokenType};
 
@@ -340,6 +340,151 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Sc
     Ok((id_, script_.get(0).expect("").clone()))
 }
 
+pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, ValueList), ParseErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
+        .parse::<usize>().expect("Unable to parse object ID.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    println!("name: {}, id: {}", name_, id_);
+    if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
+        == TokenType::Colon {
+            println!("In here though?");
+
+            let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
+            info.cursor += 1;
+            let token = &tokens[info.cursor];
+
+            match token.ttype {
+                TokenType::Table | TokenType::TableOccurrence | 
+                    TokenType::Script | TokenType::ValueList | 
+                    TokenType::Test => {
+                        return Ok((id_, ValueList {
+                            id: id_,
+                            name: name_,
+                            created_by: String::from("admin"),
+                            modified_by: String::from("admin"),
+                            definition: ValueListDefinition::FromField { 
+                                field1: first_field, 
+                                field2: None, 
+                                from: None, 
+                                sort: None, }
+
+                        }))
+                },
+                TokenType::Comma => {
+                    let second_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
+                    info.cursor += 1;
+                    let token = &tokens[info.cursor];
+
+                    match token.ttype {
+                        TokenType::Table | TokenType::TableOccurrence | 
+                            TokenType::Script | TokenType::ValueList | 
+                            TokenType::Test => {
+                                return Ok((id_, ValueList {
+                                    id: id_,
+                                    name: name_,
+                                    created_by: String::from("admin"),
+                                    modified_by: String::from("admin"),
+                                    definition: ValueListDefinition::FromField { 
+                                        field1: first_field, 
+                                        field2: None, 
+                                        from: None, 
+                                        sort: None, }
+
+                                }))
+                        },
+                        _ => {
+                            return Err(ParseErr::UnexpectedToken { 
+                                token: token.clone(),
+                                expected: vec![
+                                    TokenType::Table, TokenType::TableOccurrence,
+                                    TokenType::Script, TokenType::ValueList,
+                                    TokenType::Test, TokenType::Assignment]  
+                            });
+                        }
+                    }
+                }
+                TokenType::Assignment => {}
+                _ => {
+                    return Err(ParseErr::UnexpectedToken { 
+                        token: token.clone(),
+                        expected: vec![
+                            TokenType::Table, TokenType::TableOccurrence,
+                            TokenType::Script, TokenType::ValueList,
+                            TokenType::Test, TokenType::Comma, TokenType::Assignment]  
+                    });
+                }
+            }
+
+    }
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
+    info.cursor += 1;
+
+    let mut values = vec![];
+    while let Some(token) = tokens.get(info.cursor) {
+        match token.ttype {
+            TokenType::String => {
+                values.push(token.value.clone());
+                let token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
+                match token.ttype {
+                    TokenType::CloseBrace => {
+                        break;
+                    },
+                    TokenType::Comma => {}
+                    _ => {
+                        return Err(ParseErr::UnexpectedToken { 
+                            token: token.clone(),
+                            expected: vec![
+                                TokenType::CloseBrace,
+                                TokenType::Comma,
+                            ] 
+                        })
+                    }
+                }
+
+            },
+            TokenType::CloseBrace => {
+                break;
+            },
+            _ => {
+                return Err(ParseErr::UnexpectedToken { 
+                    token: token.clone(), 
+                    expected: vec![TokenType::String, TokenType::Comma, TokenType::CloseBrace] 
+                })
+            }
+        }
+        info.cursor += 1;
+    }
+
+    Ok((id_, ValueList {
+        id: id_,
+        name: name_,
+        created_by: String::from("admin"),
+        modified_by: String::from("admin"),
+        definition: ValueListDefinition::CustomValues(values)
+    }))
+}
+
+pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test), ParseErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+        .value.parse::<usize>().expect("Unable to parse object id.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
+        .value.clone();
+    expect(tokens, &vec![TokenType::Assignment], info)?;
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
+
+    let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
+    let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
+    script_[0].name = name_.clone();
+    let code = expect(tokens, &vec![TokenType::CloseBrace], info)?;
+
+    Ok((id_, Test {
+        id: id_,
+        name: name_,
+        script: script_[0].clone()
+    }))
+}
+
 pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
     let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
@@ -359,6 +504,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
             TokenType::Relation => {
             },
             TokenType::ValueList => {
+                let (id, valuelist) = parse_value_list(tokens, &mut info)
+                    .expect("Unable to parse valuelist.");
+                result.value_lists.insert(id, valuelist);
             },
             TokenType::Script => {
                 let (id, script) = parse_script(tokens, &mut info)
@@ -366,6 +514,9 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
                 result.scripts.insert(id, script);
             },
             TokenType::Test => {
+                let (id, test) = parse_test(tokens, &mut info)
+                    .expect("Unable to parse test.");
+                result.tests.insert(id, test);
             },
             TokenType::EOF => {
                 break;
@@ -374,7 +525,8 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
                 token: tokens[info.cursor].clone(), 
                 expected: [
                     TokenType::Table, TokenType::TableOccurrence, TokenType::Relation,
-                    TokenType::ValueList, TokenType::Script, TokenType::Test
+                    TokenType::ValueList, TokenType::Script, TokenType::Test,
+                    TokenType::EOF,
                 ].to_vec(),
             }) }
         }
@@ -388,7 +540,7 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType}};
+    use crate::{cadlang::lexer::lex, schema::{AutoEntry, AutoEntryType, Field, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition}};
 
     use super::parse;
 
@@ -472,6 +624,36 @@ mod tests {
             modified_by: String::from("admin"),
         };
         assert_eq!(schema.tables[&1], expected);
+    }
+
+    #[test]
+    fn custom_value_list() {
+        let code = "
+        value_list %1 basic = {
+            \"hello\", \"world\", \"this is a test\",
+        }";
+
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::CustomValues(vec![
+                String::from("hello"),
+                String::from("world"),
+                String::from("this is a test")
+            ])
+        };
+
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
+
+
+
+
     }
 
     #[test]

@@ -15,6 +15,10 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
     if let Ok(n) = buffer.parse::<usize>() {
         return Token::with_value(TokenType::IntegerLiteral, start, n.to_string())
     }
+
+    if buffer.split("::").collect::<Vec<_>>().len() == 2 {
+        Token::with_value(TokenType::FieldReference, start, buffer.to_string());
+    }
     match buffer {
         "calculated_val" => {
             Token::new(TokenType::CalculatedVal, start) 
@@ -67,6 +71,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         "table_occurrence" => { 
             Token::new(TokenType::TableOccurrence, start) 
         },
+        "test" => {
+            Token::new(TokenType::Test, start) 
+        }
         "true" => {
             Token::new(TokenType::True, start) 
         }
@@ -75,6 +82,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         }
         "validation_message" => {
             Token::new(TokenType::ValidationMessage, start) 
+        }
+        "value_list" => {
+            Token::new(TokenType::ValueList, start)
         }
         _ => { Token::with_value(TokenType::Identifier, start, buffer.to_string())},
     }
@@ -116,7 +126,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
             ' ' => {
                 if !buffer.is_empty() {
                     let kw = decode_buffer(&buffer, token_start);
-                    if kw.ttype == TokenType::Script {
+                    if [TokenType::Script, TokenType::Test].contains(&kw.ttype)  {
                         in_script = true;
                     }
                     tokens.push(kw);

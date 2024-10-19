@@ -27,7 +27,14 @@ impl Parser {
         while let Some(t) = parser_iter.next() {
             match t.ttype {
                 TokenType::Define => {
-                    let mut tmp = Script::new();
+                    let mut tmp = Script {
+                        id: 0,
+                        name: String::new(),
+                        arguments: vec![],
+                        created_by: String::new(),
+                        modified_by: String::new(),
+                        instructions: vec![],
+                    };
                     let peeked = parser_iter.next().unwrap();
                     if peeked.ttype == TokenType::Identifier {
                         tmp.name = peeked.value.clone();
@@ -201,7 +208,7 @@ impl Parser {
                     scripts.push(tmp);
                 },
                 _ => {
-                    eprintln!("Unrecognized token");
+                    eprintln!("Unrecognized token: {:?}", t);
                 }
             }
         }
