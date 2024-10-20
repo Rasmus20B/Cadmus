@@ -1174,7 +1174,7 @@ mod tests {
         let expected = ParseErr::RelationCriteria { 
             token: Token::with_value(
                        TokenType::FieldReference, 
-                       Location { line: 3, column: 35 }, 
+                       Location { line: 4, column: 36 }, 
                        String::from("Salary_occ::value"),
                        ) };
         assert!(schema.is_err_and(|e| e ==  expected));

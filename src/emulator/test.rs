@@ -716,7 +716,10 @@ mod tests {
             }
         }";
 
-        let test = compile_to_schema(code.to_string());
+        let test = match compile_to_schema(code.to_string()) {
+            Err(e) => panic!("{}", e),
+            Ok(schema) => schema
+        };
         file.tests.extend(&mut test.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();
@@ -751,7 +754,10 @@ mod tests {
             }
         }";
 
-        let test = compile_to_schema(code.to_string());
+        let test = match compile_to_schema(code.to_string()) {
+            Err(e) => panic!("{}", e),
+            Ok(schema) => schema
+        };        
         file.tests.extend(&mut test.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();
@@ -808,7 +814,10 @@ mod tests {
         }";
         let input = Path::new("test_data/input/mixed.fmp12");
         let mut file = Schema::from(&mut HBAMInterface::new(&input));
-        let tests = compile_to_schema(code.to_string());
+        let tests = match compile_to_schema(code.to_string()) {
+            Err(e) => panic!("{}", e),
+            Ok(schema) => schema
+        };
         file.tests.extend(&mut tests.tests.into_iter());
         let mut te : TestEnvironment = TestEnvironment::new(&file);
         te.generate_test_environment();

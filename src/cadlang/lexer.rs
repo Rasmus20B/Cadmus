@@ -110,7 +110,7 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
 pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
     let mut tokens = vec![];
 
-    let mut cursor = Location { line: 1, column: 0 };
+    let mut cursor = Location { line: 1, column: 1 };
 
     let mut lex_iter = code.chars().peekable();
     let mut buffer = String::new();
@@ -123,7 +123,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
         if c.is_whitespace() && buffer.is_empty() {
             if c == '\n'{
                 cursor.line += 1;
-                cursor.column = 0;
+                cursor.column = 1;
             } else {
                 cursor.column += 1;
             }
@@ -137,7 +137,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     buffer.clear();
                 }
                 cursor.line += 1;
-                cursor.column = 0;
+                cursor.column = 1;
             },
             ' ' => {
                 if !buffer.is_empty() {
@@ -354,43 +354,43 @@ table %1 Person {
             ";
 
         let expected = vec![
-            Token::new(TokenType::Table, Location { line: 1, column: 0 }),
-            Token::with_value(TokenType::ObjectNumber, Location { line: 1, column: 7 }, "1".to_string()),
-            Token::with_value(TokenType::Identifier, Location { line: 1, column: 9 }, "Person".to_string()),
-            Token::new(TokenType::OpenBrace, Location { line: 1, column: 16 }),
-            Token::new(TokenType::Field, Location { line: 2, column: 4 }),
-            Token::with_value(TokenType::ObjectNumber, Location { line: 2, column: 11 }, "1".to_string()),
-            Token::with_value(TokenType::Identifier, Location { line: 2, column: 13 }, "id".to_string()),
-            Token::new(TokenType::Assignment, Location { line: 2, column: 16 }),
-            Token::new(TokenType::OpenBrace, Location { line: 2, column: 18 }),
-
-            Token::new(TokenType::Datatype, Location { line: 3, column: 8 }),
+            Token::new(TokenType::Table, Location { line: 2, column: 1 }),
+            Token::with_value(TokenType::ObjectNumber, Location { line: 2, column: 8 }, "1".to_string()),
+            Token::with_value(TokenType::Identifier, Location { line: 2, column: 10 }, "Person".to_string()),
+            Token::new(TokenType::OpenBrace, Location { line: 2, column: 17 }),
+            Token::new(TokenType::Field, Location { line: 3, column: 5 }),
+            Token::with_value(TokenType::ObjectNumber, Location { line: 3, column: 12 }, "1".to_string()),
+            Token::with_value(TokenType::Identifier, Location { line: 3, column: 14 }, "id".to_string()),
             Token::new(TokenType::Assignment, Location { line: 3, column: 17 }),
-            Token::new(TokenType::Number, Location { line: 3, column: 19 }),
-            Token::new(TokenType::Comma, Location { line: 3, column: 25 }),
+            Token::new(TokenType::OpenBrace, Location { line: 3, column: 19 }),
 
-            Token::new(TokenType::Required, Location { line: 5, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 5, column: 17 }),
-            Token::new(TokenType::True, Location { line: 5, column: 18 }),
-            Token::new(TokenType::Comma, Location { line: 5, column: 22 }),
+            Token::new(TokenType::Datatype, Location { line: 4, column: 9 }),
+            Token::new(TokenType::Assignment, Location { line: 4, column: 18 }),
+            Token::new(TokenType::Number, Location { line: 4, column: 20 }),
+            Token::new(TokenType::Comma, Location { line: 4, column: 26 }),
 
-            Token::new(TokenType::Unique, Location { line: 6, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 6, column: 14 }),
-            Token::new(TokenType::True, Location { line: 6, column: 16 }),
-            Token::new(TokenType::Comma, Location { line: 6, column: 20 }),
+            Token::new(TokenType::Required, Location { line: 6, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 6, column: 17 }),
+            Token::new(TokenType::True, Location { line: 6, column: 18 }),
+            Token::new(TokenType::Comma, Location { line: 6, column: 22 }),
 
-            Token::new(TokenType::CalculatedVal, Location { line: 7, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 7, column: 23 }),
-            Token::with_value(TokenType::Calculation, Location { line: 7, column: 25 }, "get(uuid)".to_string()),
-            Token::new(TokenType::Comma, Location { line: 7, column: 35 }),
+            Token::new(TokenType::Unique, Location { line: 7, column: 8 }),
+            Token::new(TokenType::Assignment, Location { line: 7, column: 14 }),
+            Token::new(TokenType::True, Location { line: 7, column: 16 }),
+            Token::new(TokenType::Comma, Location { line: 7, column: 20 }),
 
-            Token::new(TokenType::ValidationMessage, Location { line: 8, column: 8 }),
-            Token::new(TokenType::Assignment, Location { line: 8, column: 27 }),
-            Token::with_value(TokenType::String, Location { line: 8, column: 29 }, "Invalid ID chosen.".to_string()),
-            Token::new(TokenType::Comma, Location { line: 8, column: 48 }),
+            Token::new(TokenType::CalculatedVal, Location { line: 8, column: 9 }),
+            Token::new(TokenType::Assignment, Location { line: 8, column: 24 }),
+            Token::with_value(TokenType::Calculation, Location { line: 8, column: 26 }, "get(uuid)".to_string()),
+            Token::new(TokenType::Comma, Location { line: 8, column: 36 }),
 
-            Token::new(TokenType::CloseBrace, Location { line: 9, column: 4 }),
-            Token::new(TokenType::CloseBrace, Location { line: 10, column: 0 }),
+            Token::new(TokenType::ValidationMessage, Location { line: 9, column: 9 }),
+            Token::new(TokenType::Assignment, Location { line: 9, column: 28 }),
+            Token::with_value(TokenType::String, Location { line: 9, column: 30 }, "Invalid ID chosen.".to_string()),
+            Token::new(TokenType::Comma, Location { line: 9, column: 49 }),
+
+            Token::new(TokenType::CloseBrace, Location { line: 10, column: 5 }),
+            Token::new(TokenType::CloseBrace, Location { line: 11, column: 1 }),
         ];
 
         let lexed = lex(&code).expect("Unable to lex code.");
