@@ -110,7 +110,7 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
 pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
     let mut tokens = vec![];
 
-    let mut cursor = Location { line: 0, column: 0 };
+    let mut cursor = Location { line: 1, column: 0 };
 
     let mut lex_iter = code.chars().peekable();
     let mut buffer = String::new();

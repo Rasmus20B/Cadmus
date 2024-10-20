@@ -1,4 +1,5 @@
-use std::{fs::{File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
+use std::{fs::{read_to_string, File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
+use cadlang::compiler::compile_to_schema;
 use clap::Parser;
 use cli::CommandLine;
 use diff::get_diffs;
@@ -37,11 +38,14 @@ fn main() -> Result<(), std::io::Error>{
 
     let args = CommandLine::parse();
     if args.input.is_some() {
-        let in_file = File::open(Path::new(&args.input.clone().unwrap()))?;
-        let reader = BufReader::new(in_file);
-        let objects: Schema = serde_json::from_reader(reader).expect("Unable to read text input file");
-        ctx.cad.tables.extend(objects.tables);
-        ctx.cad.table_occurrences.extend(objects.table_occurrences);
+        let code = read_to_string(Path::new(&args.input.clone().unwrap()))?;
+        let schema = match compile_to_schema(code) {
+            Err(e) => panic!("{}", e),
+            Ok(schema) => schema
+        };
+        
+        // ctx.cad.tables.extend(objects.tables);
+        // ctx.cad.table_occurrences.extend(objects.table_occurrences);
     }
 
     if args.fmp.is_some() {

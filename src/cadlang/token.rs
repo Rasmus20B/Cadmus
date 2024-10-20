@@ -1,3 +1,5 @@
+use core::fmt;
+
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TokenType {
@@ -98,6 +100,20 @@ pub enum TokenType {
     EOF,
 }
 
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Assignment => write!(f, "="),
+            Self::OpenBrace => write!(f, "{{"),
+            Self::CloseBrace => write!(f, "}}"),
+            Self::OpenParen => write!(f, "("),
+            Self::CloseParen => write!(f, ")"),
+            Self::FieldReference => write!(f, "Field Reference"),
+            _ => write!(f, "{:?}", self)
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Location {
     pub line: u32,
@@ -127,5 +143,4 @@ impl Token {
             location: location_,
         }
     }
-
 }

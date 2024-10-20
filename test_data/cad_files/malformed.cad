@@ -1,0 +1,7 @@
+table %2 basic_table = {
+  field %1 basic_field = {
+
+  }
+}
+
+relation %2 = }

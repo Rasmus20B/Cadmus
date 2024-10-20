@@ -21,10 +21,25 @@ impl<'a> fmt::Display for ParseErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnexpectedToken { token, expected } => {
-                if expected.len() > 1 {
-                    write!(f, "Unexpected Token: {:?}.\nExpected one of: {:?}", token, expected)
+                let mut fmt_string = String::new();
+
+                let val1 = if token.ttype == TokenType::Identifier {
+                    format!("{}: \"{}\"", token.ttype.to_string(), token.value)
                 } else {
-                    write!(f, "Unexpected Token: {:?}.\nExpected {:?}", token, expected)
+                    format!("\"{}\"", token.ttype.to_string())
+                };
+                if expected.len() > 1 {
+                    write!(f, "Unexpected {} @ {},{}. Expected one of: {:?}", 
+                        val1,
+                        token.location.line,
+                        token.location.column,
+                        expected.iter().map(|t| t.to_string()).collect::<Vec<_>>())
+                } else {
+                    write!(f, "Unexpected {} @ {},{}. Expected: {:?}", 
+                        val1,
+                        token.location.line,
+                        token.location.column,
+                        expected.iter().map(|t| t.to_string()).collect::<Vec<_>>())
                 }
             }
             Self::RelationCriteria { token } => {
@@ -269,8 +284,8 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
 }
 
 pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
-    info.cursor += 1;
-    let id_ = tokens.get(info.cursor).expect("Unexpected end of file.").value.parse().expect("Unable to parse object ID.");
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+        .value.parse().expect("Unable to parse object ID.");
     info.cursor += 1;
     let name_ = tokens.get(info.cursor).expect("Unexpected end of file.").value.clone();
     expect(tokens, &vec![TokenType::Assignment], info)?;
@@ -592,7 +607,6 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test
 
 pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<(&'a str, &'a str, RelationComparison), ParseErr> {
     let lhs = expect(tokens, &vec![TokenType::FieldReference], info)?.value.as_str();
-    println!("DOES GET HERE");
     info.cursor += 1;
     let comparison_ = match tokens[info.cursor].ttype {
         TokenType::Eq => RelationComparison::Equal,
@@ -683,7 +697,6 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
 pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, ParseErr> {
     let mut attributes = vec![];
     while let Some(token) = tokens.get(info.cursor) {
-        println!("{:?}", token);
         match token.ttype {
             TokenType::CloseBrace => {
                 return Ok(attributes);
@@ -712,7 +725,6 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
 
     info.cursor += 1;
     let attrs = parse_layout_attributes(tokens, info)?;
-    println!("LAyout: {} {}", id_, name_);
 
     Ok((1, LayoutFM {
         id: 1,
