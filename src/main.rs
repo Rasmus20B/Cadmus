@@ -12,6 +12,7 @@ mod util;
 mod staging_buffer;
 mod burn_script;
 mod hbam;
+mod hbam2;
 mod schema;
 mod fm_script_engine;
 mod emulator;

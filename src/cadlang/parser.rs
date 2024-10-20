@@ -14,6 +14,7 @@ pub enum ParseErr {
     UnknownField { token: Token },
     InvalidAssert { token: Token }, // Asserts can only be used in tests
     MissingAttribute { base_object: String, construct: String, specifier: String },
+    UnimplementedLanguageFeauture { feature: String, token: Token },
     UnexpectedEOF,
 }
 
@@ -68,6 +69,12 @@ impl<'a> fmt::Display for ParseErr {
             }
             Self::MissingAttribute { base_object, construct, specifier } => {
                 write!(f, "Missing attribute {} for {} in {}", specifier, construct, base_object)
+            }
+            Self::UnimplementedLanguageFeauture { feature, token } => {
+                write!(f, "Unimplemented language feature: {} used @ {},{}",
+                    feature,
+                    token.location.line,
+                    token.location.column)
             }
             _ => write!(f, "nah not compiling.")
         }
@@ -695,17 +702,19 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
 }
 
 pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, ParseErr> {
-    let mut attributes = vec![];
+    let attributes = vec![];
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
             TokenType::CloseBrace => {
                 return Ok(attributes);
             }
             _ => {
-                unimplemented!()
+                return Err(ParseErr::UnimplementedLanguageFeauture { 
+                    feature: String::from("Layout Attributes"),
+                    token: token.clone() 
+                })
             }
         }
-        info.cursor += 1;
     }
     unreachable!()
 }

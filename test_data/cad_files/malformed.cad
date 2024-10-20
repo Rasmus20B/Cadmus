@@ -4,4 +4,8 @@ table %2 basic_table = {
   }
 }
 
-relation %2 = }
+layout %1 basic_layout : basic_table_occ {
+  box = {
+
+  }
+}
