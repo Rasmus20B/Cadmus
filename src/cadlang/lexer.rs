@@ -48,6 +48,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         "increment" => {
             Token::new(TokenType::Increment, start)
         }
+        "layout" => {
+            Token::new(TokenType::Layout, start)
+        }
         "next" => {
             Token::new(TokenType::Next, start)
         }

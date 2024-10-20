@@ -2,7 +2,7 @@ table %1 Person = {
   field %1 id = {
     datatype = Number,
     serial = {
-      generate = OnCreation,
+      generate = on_creation,
       next = 1,
       increment = 1,
     }
@@ -40,7 +40,11 @@ table %2 Job = {
 table %3 SalaryLevel = {
   field %1 id = {
     datatype = Number,
-    auto_increment = true,
+    Serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    },
     unique = true,
     required = true,
     validation_message = "Invalid ID chosen.",
@@ -102,24 +106,24 @@ layout %3 Salary : Salary_occ {
 }
 
 script %1 make_10_people = {
-  set_variable(x, 0);
-  go_to_layout("Person");
-  loop {
-    exit_loop_if(x == 10);
-    new_record_request();
-    if(x == 7) {
-        set_field(Person::first_name, "Kevin");
-    } elif(x == 1) {
-        set_field(Person::first_name, "alvin" & " Presley");
-    } else {
-        set_field(Person::first_name, "Jeff");
-        set_field(Person::surname, "Keighly");
+  define make_10_people() {
+    set_variable(x, 0);
+    go_to_layout("Person");
+    loop {
+      exit_loop_if(x == 10);
+      new_record_request();
+      if(x == 7) {
+          set_field(Person::first_name, "Kevin");
+      } elif(x == 1) {
+          set_field(Person::first_name, "alvin" & " Presley");
+      } else {
+          set_field(Person::first_name, "Jeff");
+          set_field(Person::surname, "Keighly");
+      }
+      set_variable(x, x + 1);
     }
-    set_variable(x, x + 1);
   }
 }
-
-
 
 
 

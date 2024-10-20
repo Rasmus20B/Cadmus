@@ -6,6 +6,7 @@ pub enum TokenType {
     TableOccurrence,
     Relation,
     ValueList,
+    Layout,
     Script,
     Test,
     // Second level objects

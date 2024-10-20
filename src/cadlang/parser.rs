@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
 use super::token::{Token, TokenType};
 
@@ -425,7 +425,9 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
             match token.ttype {
                 TokenType::Table | TokenType::TableOccurrence | 
                     TokenType::Script | TokenType::ValueList | 
-                    TokenType::Test | TokenType::EOF => {
+                    TokenType::Relation | TokenType::Test | 
+                    TokenType::EOF => {
+                        info.cursor -= 1;
                         return Ok((id_, ValueList {
                             id: id_,
                             name: name_,
@@ -447,7 +449,9 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                     match token.ttype {
                         TokenType::Table | TokenType::TableOccurrence | 
                             TokenType::Script | TokenType::ValueList | 
-                            TokenType::Test | TokenType::EOF => {
+                            TokenType::Relation | TokenType::Test | 
+                            TokenType::EOF  => {
+                                info.cursor -= 1;
                                 return Ok((id_, ValueList {
                                     id: id_,
                                     name: name_,
@@ -483,7 +487,8 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                                 expected: vec![
                                     TokenType::Table, TokenType::TableOccurrence,
                                     TokenType::Script, TokenType::ValueList,
-                                    TokenType::Test, TokenType::Assignment]  
+                                    TokenType::Relation, TokenType::Test,
+                                    TokenType::Assignment]  
                             });
                         }
                     }
@@ -510,7 +515,8 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                         expected: vec![
                             TokenType::Table, TokenType::TableOccurrence,
                             TokenType::Script, TokenType::ValueList,
-                            TokenType::Test, TokenType::Comma, TokenType::Assignment]  
+                            TokenType::Test, TokenType::Comma, 
+                            TokenType::Relation, TokenType::Assignment]  
                     });
                 }
             }
@@ -632,7 +638,15 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
             }
 
             criterias_.push(RelationCriteria::ByName { field1: lhs.to_string(), field2: rhs.to_string(), comparison: comp});
-            let token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
+            let mut token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
+            if token.ttype == TokenType::Comma {
+                if let Some(end) = tokens.get(info.cursor + 1) {
+                    if end.ttype == TokenType::CloseBrace {
+                        token = end;
+                        info.cursor += 1;
+                    }
+                }
+            }
             if token.ttype == TokenType::CloseBrace {
                 return Ok((id_, Relation {
                     id: id_,
@@ -664,7 +678,48 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
             criterias: criterias_,
         }))
     }
+}
 
+pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, ParseErr> {
+    let mut attributes = vec![];
+    while let Some(token) = tokens.get(info.cursor) {
+        println!("{:?}", token);
+        match token.ttype {
+            TokenType::CloseBrace => {
+                return Ok(attributes);
+            }
+            _ => {
+                unimplemented!()
+            }
+        }
+        info.cursor += 1;
+    }
+    unreachable!()
+}
+
+pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, LayoutFM), ParseErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+        .value.parse::<usize>().expect("Unable to parse object id.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
+        .value.clone();
+
+
+    expect(tokens, &vec![TokenType::Colon], info)?;
+
+    let occurrence = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    expect(tokens, &vec![TokenType::OpenBrace], info)?;
+
+    info.cursor += 1;
+    let attrs = parse_layout_attributes(tokens, info)?;
+    println!("LAyout: {} {}", id_, name_);
+
+    Ok((1, LayoutFM {
+        id: 1,
+        name: String::from("Person"),
+        table_occurrence: 2,
+        table_occurrence_name: occurrence,
+    }))
 }
 
 pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
@@ -693,6 +748,10 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
                 let (id, script) = parse_script(tokens, &mut info)?;
                 result.scripts.insert(id, script);
             },
+            TokenType::Layout => {
+                let (id, layout) = parse_layout(tokens, &mut info)?;
+                result.layouts.insert(id, layout);
+            },
             TokenType::Test => {
                 let (id, test) = parse_test(tokens, &mut info)?;
                 result.tests.insert(id, test);
@@ -720,7 +779,7 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, fs::read_to_string};
 
     use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
@@ -961,6 +1020,31 @@ mod tests {
     }
 
     #[test]
+    fn value_list_single_followed_by_object() {
+        let code = "
+        value_list %1 basic : Person_occ::name
+
+        relation %2 = Person_occ::salary_id == Salary::id
+            ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
+
+        let expected_valuelist = ValueList {
+            id: 1,
+            name: String::from("basic"),
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            definition: ValueListDefinition::FromField { 
+                field1: String::from("Person_occ::name"),
+                field2: None,
+                from: None,
+                sort: ValueListSortBy::FirstField 
+            }
+        };
+        assert_eq!(schema.value_lists[&1], expected_valuelist);
+    }
+
+    #[test]
     fn field_value_list_double_with_options() {
         let code = "
         value_list %1 basic : Person_occ::name, Person_occ::id = {
@@ -1082,5 +1166,13 @@ mod tests {
                        String::from("Salary_occ::value"),
                        ) };
         assert!(schema.is_err_and(|e| e ==  expected));
+    }
+
+    #[test]
+    fn compile_initial_cad() {
+        let code = read_to_string("test_data/cad_files/initial.cad").expect("Unable to read file.");
+
+        let tokens = lex(&code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).expect("Parsing failed.");
     }
 }

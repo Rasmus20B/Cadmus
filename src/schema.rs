@@ -223,11 +223,18 @@ pub struct Test {
     pub script: Script,
 }
 
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LayoutFMAttribute {
+
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LayoutFM {
     pub id: usize,
     pub name: String,
     pub table_occurrence: usize,
+    pub table_occurrence_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -156,6 +156,7 @@ impl HBAMInterface {
                     id: layout_id,
                     name: name_,
                     table_occurrence: definition[1] as usize,
+                    table_occurrence_name: String::new(),
                 });
             }
         }
