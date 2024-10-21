@@ -24,6 +24,7 @@ pub enum PageHeaderErr {
 }
 
 impl PageHeader {
+    pub const SIZE: usize = 20;
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, PageHeaderErr> {
         let deleted_ = bytes[0] != 0;
         let level_ = bytes[1] as u32 & 0x00FFFFFF;
@@ -53,7 +54,7 @@ pub struct Page {
 }
 
 impl Page {
-    pub const PAGESIZE: u64 = 4096;
+    pub const SIZE: u64 = 4096;
 
     pub fn from_bytes(bytes: &[u8; 4096]) -> Self {
         Self {

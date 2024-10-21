@@ -231,6 +231,19 @@ impl HBAMFile {
         &self.get_current_block().chunks
     }
 
+    pub fn print_root_block(&mut self) {
+        let mut buffer = [0u8; Block::CAPACITY];
+        self.reader.seek(std::io::SeekFrom::Start(Block::CAPACITY as u64)).expect("Could not seek into file.");
+        self.reader.read_exact(&mut buffer).expect("Could not read from HBAM file.");
+            let leaf = Block::new(&buffer);
+            for chunk in leaf.chunks {
+                let unwrapped = Chunk::from(chunk);
+                // println!("{}", unwrapped);
+                let text = unwrapped.chunk_to_string(&buffer);
+                println!("{}", text);
+            }
+    }
+
     pub fn print_all_chunks(&mut self) {
         let mut buffer = [0u8; Block::CAPACITY];
         self.reader.seek(std::io::SeekFrom::Start(Block::CAPACITY as u64)).expect("Could not seek into file.");

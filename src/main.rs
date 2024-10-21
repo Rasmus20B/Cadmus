@@ -67,6 +67,10 @@ fn main() -> Result<(), std::io::Error>{
             base_file.inner.print_all_chunks();
         }
 
+        if args.print_root_block {
+            base_file.inner.print_root_block();
+        }
+
         if args.json_out {
             let path_text = args.fmp.clone().unwrap();
             let path = Path::new(&path_text);
