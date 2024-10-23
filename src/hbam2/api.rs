@@ -17,7 +17,6 @@ pub enum APIErr {
 pub fn get_keyvalue(key: Key, store: &PageStore) -> Result<KeyValue, APIErr> {
     // Get KeyVal pair from HBAM in byte form.
     unimplemented!()
-
 }
 
 
