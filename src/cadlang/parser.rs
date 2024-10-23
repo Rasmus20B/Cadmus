@@ -22,8 +22,6 @@ impl<'a> fmt::Display for ParseErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnexpectedToken { token, expected } => {
-                let mut fmt_string = String::new();
-
                 let val1 = if token.ttype == TokenType::Identifier {
                     format!("{}: \"{}\"", token.ttype.to_string(), token.value)
                 } else {
@@ -642,9 +640,9 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
     let mut criterias_ = vec![];
     let mut tables = [None; 2];
     if token.ttype == TokenType::OpenBrace {
-        while let Some(token) = tokens.get(info.cursor) {
+        while let Some(_) = tokens.get(info.cursor) {
             // parse attribute
-            let (mut lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
+            let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
             let lhs_table = lhs.split("::").collect::<Vec<_>>()[0];
             let rhs_table = rhs.split("::").collect::<Vec<_>>()[0];
             if tables.iter().any(|t| t.is_none()) {
@@ -733,11 +731,11 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
     info.cursor += 1;
-    let attrs = parse_layout_attributes(tokens, info)?;
+    let _attrs = parse_layout_attributes(tokens, info)?;
 
     Ok((1, LayoutFM {
-        id: 1,
-        name: String::from("Person"),
+        id: id_,
+        name: name_,
         table_occurrence: 2,
         table_occurrence_name: occurrence,
     }))
