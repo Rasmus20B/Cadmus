@@ -48,7 +48,7 @@ fn search_key_in_page(key_: &[String], page_data: &[u8; 4096]) -> Option<KeyValu
     None
 }
 
-fn get_page(index: u64, cache: &mut PageStore, file: &String) -> Result<Arc<Page>, BPlusTreeErr> {
+fn get_page(index: PageIndex, cache: &mut PageStore, file: &String) -> Result<Arc<Page>, BPlusTreeErr> {
     match cache.get_root() {
         Some(inner) => Ok(inner),
         None => {
@@ -152,7 +152,7 @@ pub fn search_key(key: &Vec<String>, cache: &mut PageStore, file_map: &HashMap<S
     unimplemented!()
 }
 
-pub fn load_page_from_disk(file: &Path, index: u64) -> Result<Page, BPlusTreeErr> {
+pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusTreeErr> {
     let mut buffer = [0u8; 4096];
     let mut handle = File::open(file)
         .expect("Unable to open file.");
