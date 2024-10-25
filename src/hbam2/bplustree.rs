@@ -7,12 +7,12 @@ use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, ParseErr}, page:
 type Offset = usize;
 
 #[derive(Debug)]
-pub(crate) enum BPlusTreeErr<'a> {
+pub(crate) enum BPlusTreeErr {
     KeyNotFound(Key),
     EmptyKey,
     PageNotFound(usize),
     RootNotFound,
-    InvalidChunkComposition(ParseErr, Option<Chunk<'a>>),
+    InvalidChunkComposition(ParseErr),
     PageCycle(PageIndex)
 }
 
@@ -21,7 +21,7 @@ pub struct Cursor {
     offset: Offset,
 }
 
-fn search_key_in_page<'a>(key_: &'a [String], page_data: &[u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> {
+fn search_key_in_page<'a>(key_: &'a [String], page_data: &[u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr> {
     if key_.is_empty() { return Ok(None); }
     let mut cursor = Cursor {
         key: vec![],
@@ -36,7 +36,7 @@ fn search_key_in_page<'a>(key_: &'a [String], page_data: &[u8; 4096]) -> Result<
             Ok(inner) => inner,
             Err(ParseErr::EndChunk) => { continue; }
             Err(e) => {
-                return Err(BPlusTreeErr::InvalidChunkComposition(e, None))
+                return Err(BPlusTreeErr::InvalidChunkComposition(e))
             }
         };
 
@@ -62,7 +62,7 @@ fn search_key_in_page<'a>(key_: &'a [String], page_data: &[u8; 4096]) -> Result<
     Ok(None)
 }
 
-fn get_page<'a, 'b>(index: PageIndex, cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> where 'a: 'b {  
+fn get_page<'a>(index: PageIndex, cache: &'a mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr> {  
     match cache.get(file.to_string(), index) {
         Some(inner) => Ok(inner),
         None => {
@@ -76,7 +76,7 @@ fn get_page<'a, 'b>(index: PageIndex, cache: &'b mut PageStore, file: &'a str) -
     }
 }
 
-fn search_index_page(key_: &[String], page: Page) -> Result<PageIndex, BPlusTreeErr<'_>> {
+fn search_index_page(key_: &[String], page: Page) -> Result<PageIndex, BPlusTreeErr> {
     let mut cur_path = HBAMPath {
         components: vec![],
     };
@@ -134,7 +134,7 @@ fn search_index_page(key_: &[String], page: Page) -> Result<PageIndex, BPlusTree
     return Err(BPlusTreeErr::KeyNotFound(key_.to_vec()));
 }
 
-fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> where 'a: 'b {
+fn get_data_page<'a>(key: &'a [String], cache: &'a mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr> { 
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -160,7 +160,7 @@ fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a 
     }
 }
 
-pub fn search_key<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr<'b>> where 'a: 'b {
+pub fn search_key<'a>(key: &'a [String], cache: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -172,7 +172,7 @@ pub fn search_key<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a
             Some(inner) => {
                 return Ok(Some(inner))
             },
-            None => {
+            _ => {
                 current_page = get_page(current_page.header.next as u64, cache, &file)?;
             }
         }
