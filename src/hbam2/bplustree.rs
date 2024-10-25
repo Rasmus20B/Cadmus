@@ -2,7 +2,9 @@ use std::{collections::HashMap, fs::File, io::{Read, Seek}, path::Path, sync::{A
 
 use crate::{hbam::{chunk::{BlockErr, Chunk, InstructionType}, path::HBAMPath}, util::encoding_util::{get_int, get_path_int}}; 
 
-use super::{api::{Key, KeyValue}, page::{Page, PageHeader, PageType}, page_store::PageStore};
+use super::{api::{Key, KeyValue}, page::{Page, PageHeader, PageType}, page_store::{PageStore, PageIndex}};
+
+type Offset = usize;
 
 #[derive(Debug)]
 pub(crate) enum BPlusTreeErr {
@@ -10,18 +12,16 @@ pub(crate) enum BPlusTreeErr {
     EmptyKey,
     PageNotFound(usize),
     RootNotFound,
+    InvalidChunkComposition(Chunk),
 }
 
 pub struct Cursor {
     key: Key,
-    offset: usize,
+    offset: Offset,
 }
 
-type PageIndex = u64;
-
-fn search_key_in_page(key_: &[String], page_data: &[u8; 4096]) -> Option<KeyValue> {
-
-    if key_.is_empty() { return None; }
+fn search_key_in_page(key_: &[String], page_data: &[u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr> {
+    if key_.is_empty() { return Ok(None); }
     let mut cursor = Cursor {
         key: vec![],
         offset: 20,
@@ -32,29 +32,35 @@ fn search_key_in_page(key_: &[String], page_data: &[u8; 4096]) -> Option<KeyValu
         let chunk = match Chunk::from_bytes(page_data, &mut cursor.offset, &mut path) {
             Ok(inner) => inner,
             Err(BlockErr::EndChunk) => { continue; }
-            _ => return None,
+            _ => return Ok(None),
         };
-        if chunk.path.components == key_[0..key_.len()-1] {
-            if chunk.ref_simple.unwrap_or(u16::max_value()).to_string() == key_[key_.len() - 1] {
-                return Some(KeyValue {
-                    key: key_.to_vec(),
-                    value: chunk.data.unwrap()
-                        .lookup_from_buffer(page_data)
-                        .expect("Unable to lookup data."),
-                })
+        let key_without_suffix = &key_[0..key_.len() - 1];
+        let suffix = &key_[key_.len() - 1];
+        if chunk.path.components == key_without_suffix && chunk.ctype == InstructionType::RefSimple {
+            if let Some(key) = chunk.ref_simple {
+                if key.to_string() == *suffix {
+                    return Ok(Some(KeyValue {
+                        key: key_.to_vec(),
+                        value: chunk.data.unwrap()
+                            .lookup_from_buffer(page_data)
+                            .expect("Unable to lookup data."),
+                    }))
+                }
+            } else {
+                return Err(BPlusTreeErr::InvalidChunkComposition(chunk))
             }
         }
     }
-    None
+    Ok(None)
 }
 
 fn get_page(index: PageIndex, cache: &mut PageStore, file: &String) -> Result<Arc<Page>, BPlusTreeErr> {
-    match cache.get_root() {
+    match cache.get(file.to_string(), index) {
         Some(inner) => Ok(inner),
         None => {
             if let Ok(page) = load_page_from_disk(Path::new(file), index) {
-                cache.put(1, &page);
-                Ok(cache.get_root().unwrap())
+                cache.put(file.to_string(), index, &page);
+                Ok(cache.get(file.to_string(), index).unwrap())
             } else {
                 return Err(BPlusTreeErr::RootNotFound)
             }
@@ -122,34 +128,47 @@ fn search_index_page(key: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeE
     return Err(BPlusTreeErr::KeyNotFound(key.components.to_vec()));
 }
 
-fn get_data_page(key: &Vec<String>, cache: &mut PageStore, file_map: &HashMap<String, String>) -> Result<Arc<Page>, BPlusTreeErr> {
+fn get_data_page(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
     // Once we get to the data node, we can use the next ptrs on the blocks.
 
-    let file = file_map.get(&key[0]).unwrap();
-    let root = get_page(1, cache, file).expect("Unable to get page from file.");
+    let root = get_page(1, cache, &file.to_string()).expect("Unable to get page from file.");
 
     let key = HBAMPath::new(key.to_vec());
     let mut cur_page = root;
     // TODO: detect page loops. I.e. page 64 -> 62 -> 64 -> 62
     loop {
-        let next_index = search_index_page(&key, *cur_page);
-        cur_page = get_page(next_index.unwrap(), cache, file)?;
-        if cur_page.header.page_type == PageType::Data { return Ok(cur_page) }
+        match cur_page.header.page_type {
+            PageType::Data => {
+                return Ok(cur_page);
+            },
+            PageType::Index | PageType::Root => {
+                let next_index = search_index_page(&key, *cur_page);
+                cur_page = get_page(next_index.unwrap(), cache, &file.to_string())?;
+            }
+        }
     }
 }
 
-pub fn search_key(key: &Vec<String>, cache: &mut PageStore, file_map: &HashMap<String, String>) -> Result<KeyValue, BPlusTreeErr> {
+pub fn search_key(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Result<Option<KeyValue>, BPlusTreeErr> {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
     // Once we get to the data node, we can use the next ptrs on the blocks.
 
-    let page = get_data_page(key, cache, file_map)?;
-
-    unimplemented!()
+    let mut current_page = get_data_page(key, cache, file)?;
+    loop {
+        match search_key_in_page(&key, &current_page.data)? {
+            Some(inner) => {
+                return Ok(Some(inner))
+            },
+            None => {
+                current_page = get_page(current_page.header.next as u64, cache, &file.to_string())?;
+            }
+        }
+    }
 }
 
 pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusTreeErr> {
@@ -190,10 +209,10 @@ mod tests {
         let val = search_key_in_page(&key,
             &buffer).expect("Unable to find test key \"3, 17, 1, 0\" in blank file.");
 
-        assert_eq!(KeyValue {
+        assert_eq!(Some(KeyValue {
             key: key,
             value: vec![3, 208, 0, 1],
-        }, val);
+        }), val);
     }
 
     #[test]

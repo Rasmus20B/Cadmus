@@ -1,5 +1,6 @@
-use super::page_store::PageStore;
+use super::{page_store::PageStore, bplustree::{search_key, BPlusTreeErr}};
 
+use std::collections::hash_map::HashMap;
 
 pub type Key = Vec<String>;
 pub type Value = String;
@@ -10,21 +11,20 @@ pub struct KeyValue {
     pub value: Vec<u8>,
 }
 
-pub enum APIErr {
-    KeyNotFound(Key)
-}
-
-pub fn get_keyvalue(key: Key, store: &PageStore) -> Result<KeyValue, APIErr> {
+pub fn get_keyvalue(key: &Key, store: &mut PageStore, file: &str) -> Result<Option<KeyValue>, BPlusTreeErr> {
     // Get KeyVal pair from HBAM in byte form.
-    unimplemented!()
+    match search_key(key, store, file) {
+        Ok(inner) => Ok(inner),
+        Err(e) => return Err(e),
+    }
 }
 
 
-pub fn get_data(key: Key) -> Result<KeyValue, APIErr> {
+pub fn get_data(key: Key) -> Result<KeyValue, BPlusTreeErr> {
     unimplemented!()
 }
 
-pub fn set_keyvalue(key: Key, val: Value) -> Result<(), APIErr> {
+pub fn set_keyvalue(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
     // setting a keyvalue to a Page
     // Process involes
     // 1. get a copy of the page from the block store
@@ -33,4 +33,32 @@ pub fn set_keyvalue(key: Key, val: Value) -> Result<(), APIErr> {
     // 3.5 push page with new key, and new page with keys after the new one. 
     // 4. else just push the page as is to the cache.
     unimplemented!()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::{KeyValue, get_keyvalue, PageStore};
+    #[test]
+    fn get_keyval_test() {
+
+        let key_ = vec![
+            String::from("3"),
+            String::from("17"),
+            String::from("1"),
+            String::from("0"),
+        ];
+        let expected = KeyValue {
+            key: key_.clone(),
+            value: vec![3, 208, 0, 1],
+        };
+
+        let mut cache = PageStore::new();
+
+        let result = get_keyvalue(&key_, &mut cache, "test_data/input/blank.fmp12").expect("Unable to get keyval");
+
+        assert_eq!(result, Some(expected));
+    }
+
+
 }
