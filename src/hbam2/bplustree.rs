@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
+use std::{collections::{HashMap, HashSet}, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
 
 use crate::{hbam::path::HBAMPath, util::encoding_util::{get_int, get_path_int}}; 
 
@@ -20,7 +20,7 @@ pub struct Cursor {
     offset: Offset,
 }
 
-fn search_key_in_page<'a, 'b>(key_: &'a [String], page_data: &'b [u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> {
+fn search_key_in_page<'a>(key_: &'a [String], page_data: &[u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> {
     if key_.is_empty() { return Ok(None); }
     let mut cursor = Cursor {
         key: vec![],
@@ -49,7 +49,7 @@ fn search_key_in_page<'a, 'b>(key_: &'a [String], page_data: &'b [u8; 4096]) -> 
                         }))
                 }
             },
-            ChunkContents::Push { ref key } => {
+            ChunkContents::Push { key } => {
                 path.push(get_int(key).to_string());
             },
             ChunkContents::Pop => {
@@ -57,22 +57,6 @@ fn search_key_in_page<'a, 'b>(key_: &'a [String], page_data: &'b [u8; 4096]) -> 
             },
             _ => {},
         }
-
-
-        // if chunk.path.components == key_without_suffix && chunk.ctype == InstructionType::RefSimple {
-            // if let Some(key) = chunk.ref_simple {
-            //     if key.to_string() == *suffix {
-            //         return Ok(Some(KeyValue {
-            //             key: key_.to_vec(),
-            //             value: chunk.data.unwrap()
-            //                 .lookup_from_buffer(page_data)
-            //                 .expect("Unable to lookup data."),
-            //         }))
-            //     }
-            // } else {
-            //     return Err(BPlusTreeErr::InvalidChunkComposition(ParseErr::MalformedChunk, Some(chunk)))
-            // }
-        // }
     }
     Ok(None)
 }
@@ -91,17 +75,16 @@ fn get_page<'a, 'b>(index: PageIndex, cache: &'b mut PageStore, file: &'a str) -
     }
 }
 
-fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeErr> {
+fn search_index_page(key_: &[String], page: Page) -> Result<PageIndex, BPlusTreeErr<'_>> {
     let mut cur_path = HBAMPath {
         components: vec![],
     };
     let mut offset = PageHeader::SIZE as usize;
-    let search_key = HBAMPath::new(key_.components[0..key_.components.len() - 2].to_vec());
+    let search_key = HBAMPath::new(key_.to_vec());
     let mut cur_index = 1;
     let mut delayed_pops = 0;
     while cur_path <= search_key  && offset < Page::SIZE as usize {
         if let Ok(chunk) = Chunk::from_bytes(&page.data, &mut(offset)) {
-            println!("{:?}", chunk);
             match chunk.contents {
                 ChunkContents::Push { key } => {
                     let data = key;
@@ -116,10 +99,8 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
                     } else {
                         cur_path.components.push(key_component.clone());
                     }
-                    if data.len() == 1 {
-                        if *key_ < cur_path {
-                            return Ok(cur_index as u64);
-                        }
+                    if data.len() == 1 && search_key < cur_path {
+                        return Ok(cur_index as u64);
                     }
                     if chunk.delayed {
                         delayed_pops += 1;
@@ -131,7 +112,7 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
                 ChunkContents::SimpleRef { key, data } => {
                     cur_index = get_int(data);
                     cur_path.components.push(key.to_string());
-                    if *key_ <= cur_path {
+                    if search_key <= cur_path {
                         return Ok(cur_index as u64);
                     }
                     cur_path.components.pop();
@@ -146,21 +127,20 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
                 _ => {}
             }
         } else {
-            return Err(BPlusTreeErr::KeyNotFound(key_.components.to_vec()))
+            return Err(BPlusTreeErr::KeyNotFound(key_.to_vec()))
         }
     }
-    return Err(BPlusTreeErr::KeyNotFound(key_.components.to_vec()));
+    return Err(BPlusTreeErr::KeyNotFound(key_.to_vec()));
 }
 
-fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> {
+fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> where 'a: 'b {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
     // Once we get to the data node, we can use the next ptrs on the blocks.
 
+    let mut page_set = HashSet::new();
     let root = get_page(1, cache, &file.to_string()).expect("Unable to get page from file.");
-
-    let key = HBAMPath::new(key.to_vec());
     let mut cur_page = root;
     // TODO: detect page loops. I.e. page 64 -> 62 -> 64 -> 62
     loop {
@@ -169,14 +149,15 @@ fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a 
                 return Ok(cur_page);
             },
             PageType::Index | PageType::Root => {
-                let next_index = search_index_page(&key, *cur_page);
-                cur_page = get_page(next_index.unwrap(), cache, file)?;
+                let next_index = search_index_page(key, *cur_page)?;
+                page_set.insert(next_index.clone());
+                cur_page = get_page(next_index, cache, file)?;
             }
         }
     }
 }
 
-pub fn search_key<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> where 'b: 'a {
+pub fn search_key<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr<'b>> where 'a: 'b {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -249,12 +230,12 @@ mod tests {
 
         let page = Page::from_bytes(&buffer);
 
-        let key = HBAMPath::new(vec![
+        let key = vec![
             String::from("3"),
             String::from("17"),
             String::from("1"),
             String::from("0"),
-        ]);
+        ];
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
         assert_eq!(next_index, 64);
@@ -268,13 +249,13 @@ mod tests {
         reader.seek(std::io::SeekFrom::Start(Page::SIZE)).expect("Unable to seek into the file.");
         reader.read_exact(&mut buffer).expect("Unable to read from file.");
         let page = Page::from_bytes(&buffer);
-        let key = HBAMPath::new(vec![
+        let key = vec![
             String::from("4"),
             String::from("5"),
             String::from("1"),
             String::from("13"),
             String::from("7"),
-        ]);
+        ];
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
         assert_eq!(next_index, 62);
@@ -290,13 +271,13 @@ mod tests {
 
         let page = Page::from_bytes(&buffer);
 
-        let key = HBAMPath::new(vec![
+        let key = vec![
             String::from("4"),
             String::from("5"),
             String::from("1"),
             String::from("13"),
             String::from("8"),
-        ]);
+        ];
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
         assert_eq!(next_index, 62);
@@ -313,14 +294,14 @@ mod tests {
 
         let page = Page::from_bytes(&buffer);
 
-        let key = HBAMPath::new(vec![
+        let key = vec![
             String::from("6"),
             String::from("5"),
             String::from("1"),
             String::from("14"),
             String::from("0"),
             String::from("1"),
-        ]);
+        ];
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
         assert_eq!(next_index, 61);
@@ -336,14 +317,14 @@ mod tests {
 
         let page = Page::from_bytes(&buffer);
 
-        let key = HBAMPath::new(vec![
+        let key = vec![
             String::from("6"),
             String::from("5"),
             String::from("1"),
             String::from("14"),
             String::from("0"),
             String::from("59"),
-        ]);
+        ];
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
         assert_eq!(next_index, 28);
