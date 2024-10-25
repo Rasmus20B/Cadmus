@@ -1,4 +1,4 @@
-use std::{collections::hash_map::{HashMap, Entry}, sync::Arc};
+use std::{collections::hash_map::HashMap, sync::Arc};
 
 use super::{api::Key, bplustree::load_page_from_disk, page::Page};
 
@@ -30,9 +30,8 @@ impl PageStore {
     }
 
     pub fn put(&mut self, file: String, index: u64, page: &Page) {
-
         let file_map_len = self.file_map.len();
-        let file_index = *self.file_map.entry(file).or_insert_with(|| file_map_len as u8);
+        let file_index = *self.file_map.entry(file).or_insert_with_key(|_| file_map_len as u8);
         let mut handle = self.store.get_mut(&(file_index, index));
         if let Some(ref mut unwrapped) = handle {
             *unwrapped = &mut Arc::new(*page);
