@@ -1,31 +1,31 @@
 
 type Data = Vec<u8>;
 
-enum B<'a> {
-    KeyVals(Vec<&'a AB<'a>>),
+enum Value<'a> {
+    KeyVals(Vec<&'a KeyValue<'a>>),
     Collect(Vec<Data>),
     Single(Data),
 }
 
-struct AB<'a> {
+struct KeyValue<'a> {
     a: u8,
-    b: B<'a>,
+    b: Value<'a>,
 }
 
-fn inspect(keyvalue: &AB) {
+fn inspect(keyvalue: &KeyValue) {
     match &keyvalue.b {
-        B::KeyVals(inner) => {
+        Value::KeyVals(inner) => {
             for keyval in inner {
                 inspect(keyval)
             }
         },
-        B::Collect(inner) => {
+        Value::Collect(inner) => {
             println!("key: {}", keyvalue.a);
             for value in inner {
                 println!("value: {:?}", value);
             }
         }
-        B::Single(value) => {
+        Value::Single(value) => {
             println!("key: {}, value: {:?}", keyvalue.a, value);
         }
     }

@@ -1,6 +1,7 @@
 pub mod api;
 mod kv_cache;
 mod bplustree;
+mod keyvalue;
 mod page;
 mod page_store;
 mod chunk;

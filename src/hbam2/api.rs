@@ -15,7 +15,7 @@ pub fn get_keyvalue<'a>(key: &'a Key, store: &'a mut PageStore, file: &'a str) -
     // Get KeyVal pair from HBAM in byte form.
     match search_key(key, store, file) {
         Ok(inner) => Ok(inner),
-        Err(e) => return Err(e),
+        Err(e) => Err(e),
     }
 }
 

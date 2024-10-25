@@ -38,8 +38,8 @@ fn main() -> Result<(), std::io::Error>{
     let mut ctx = InputContext::new();
 
     let args = CommandLine::parse();
-    if args.input.is_some() {
-        let code = read_to_string(Path::new(&args.input.clone().unwrap()))?;
+    if let Some(ref input) = args.input {
+        let code = read_to_string(Path::new(&input))?;
         let schema = match compile_to_schema(code) {
             Err(e) => panic!("{}", e),
             Ok(schema) => schema

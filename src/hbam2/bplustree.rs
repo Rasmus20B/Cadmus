@@ -13,6 +13,7 @@ pub(crate) enum BPlusTreeErr<'a> {
     PageNotFound(usize),
     RootNotFound,
     InvalidChunkComposition(ParseErr, Option<Chunk<'a>>),
+    PageCycle(PageIndex)
 }
 
 pub struct Cursor {
@@ -142,7 +143,6 @@ fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a 
     let mut page_set = HashSet::new();
     let root = get_page(1, cache, &file.to_string()).expect("Unable to get page from file.");
     let mut cur_page = root;
-    // TODO: detect page loops. I.e. page 64 -> 62 -> 64 -> 62
     loop {
         match cur_page.header.page_type {
             PageType::Data => {
@@ -150,6 +150,9 @@ fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a 
             },
             PageType::Index | PageType::Root => {
                 let next_index = search_index_page(key, *cur_page)?;
+                if page_set.contains(&next_index) {
+                    return Err(BPlusTreeErr::PageCycle(next_index))
+                }
                 page_set.insert(next_index.clone());
                 cur_page = get_page(next_index, cache, file)?;
             }
@@ -192,9 +195,7 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
 #[cfg(test)]
 mod tests {
     use std::{fs::File, io::{BufReader, Read, Seek}};
-
-    use crate::{hbam2::{api::KeyValue, page::Page}, HBAMPath};
-
+    use crate::hbam2::{api::KeyValue, page::Page};
     use super::{search_key_in_page, search_index_page};
  
     #[test]

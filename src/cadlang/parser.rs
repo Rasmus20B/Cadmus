@@ -741,7 +741,7 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
     }))
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Schema, ParseErr> {
+pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
     let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
     
