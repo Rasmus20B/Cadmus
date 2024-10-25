@@ -11,7 +11,7 @@ pub struct KeyValue {
     pub value: Vec<u8>,
 }
 
-pub fn get_keyvalue(key: &Key, store: &mut PageStore, file: &str) -> Result<Option<KeyValue>, BPlusTreeErr> {
+pub fn get_keyvalue<'a>(key: &'a Key, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> {
     // Get KeyVal pair from HBAM in byte form.
     match search_key(key, store, file) {
         Ok(inner) => Ok(inner),
@@ -20,11 +20,11 @@ pub fn get_keyvalue(key: &Key, store: &mut PageStore, file: &str) -> Result<Opti
 }
 
 
-pub fn get_data(key: Key) -> Result<KeyValue, BPlusTreeErr> {
+pub fn get_data<'a>(key: Key) -> Result<KeyValue, BPlusTreeErr<'a>> {
     unimplemented!()
 }
 
-pub fn set_keyvalue(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
+pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr<'a>> {
     // setting a keyvalue to a Page
     // Process involes
     // 1. get a copy of the page from the block store

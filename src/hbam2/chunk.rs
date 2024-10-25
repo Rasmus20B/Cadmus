@@ -130,7 +130,7 @@ impl<'a> Chunk<'a> {
             let len = (chunk_code == 0x09) as usize + (2 *(chunk_code - 0x09) as usize);
             contents = ChunkContents::SimpleRef { 
                 key: key_, 
-                data: &code[*offset..=*offset+len]
+                data: &code[*offset..*offset+len]
             };
             *offset += len;
         } else if chunk_code == 0x0E {
@@ -144,7 +144,7 @@ impl<'a> Chunk<'a> {
             *offset += 1;
             contents = ChunkContents::SimpleRef { 
                 key: key_, 
-                data: &code[*offset..=*offset+len] 
+                data: &code[*offset..*offset+len] 
             };
             *offset += len;
         } else if chunk_code == 0x0F && (code[21] & 0x80 > 0 || (code[*offset+1] & 0x80) > 0) {
@@ -212,7 +212,7 @@ impl<'a> Chunk<'a> {
             *offset += 1;
             contents = ChunkContents::SimpleRef { 
                 key: key_,
-                data: &code[*offset..=*offset+4] 
+                data: &code[*offset..*offset+4] 
             };
             *offset += 4;
         } else if (0x19..=0x1D).contains(&chunk_code) {
@@ -273,7 +273,7 @@ impl<'a> Chunk<'a> {
             if code[*offset] == 0xFE {
                 *offset += 1;
                 contents = ChunkContents::Push { 
-                    key: &code[*offset..=*offset+8] 
+                    key: &code[*offset..*offset+8] 
                 };
                 *offset += 8;
             } else {
@@ -296,13 +296,13 @@ impl<'a> Chunk<'a> {
         } else if chunk_code == 0x28 {
             *offset += 1;
             contents = ChunkContents::Push { 
-                key: &code[*offset..=*offset+2] 
+                key: &code[*offset..*offset+2] 
             };
             *offset += 2;
         } else if chunk_code == 0x30 {
             *offset += 1;
             contents = ChunkContents::Push { 
-                key: &code[*offset..=*offset+3] 
+                key: &code[*offset..*offset+3] 
             };
             *offset += 3;
         } else if chunk_code == 0x38 {
@@ -313,7 +313,7 @@ impl<'a> Chunk<'a> {
             let len = code[*offset] as usize;
             *offset += 1;
             contents = ChunkContents::Push { 
-                key: &code[*offset..=*offset+len] 
+                key: &code[*offset..*offset+len] 
             };
             *offset += len;
         } else if chunk_code == 0x3d || chunk_code == 0x40 {

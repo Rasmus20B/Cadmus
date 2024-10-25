@@ -1,18 +1,18 @@
 use std::{collections::HashMap, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
 
-use crate::{hbam::{chunk::{BlockErr, Chunk, InstructionType}, path::HBAMPath}, util::encoding_util::{get_int, get_path_int}}; 
+use crate::{hbam::path::HBAMPath, util::encoding_util::{get_int, get_path_int}}; 
 
-use super::{api::{Key, KeyValue}, page::{Page, PageHeader, PageType}, page_store::{PageStore, PageIndex}};
+use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}};
 
 type Offset = usize;
 
 #[derive(Debug)]
-pub(crate) enum BPlusTreeErr {
+pub(crate) enum BPlusTreeErr<'a> {
     KeyNotFound(Key),
     EmptyKey,
     PageNotFound(usize),
     RootNotFound,
-    InvalidChunkComposition(Chunk),
+    InvalidChunkComposition(ParseErr, Option<Chunk<'a>>),
 }
 
 pub struct Cursor {
@@ -20,41 +20,64 @@ pub struct Cursor {
     offset: Offset,
 }
 
-fn search_key_in_page(key_: &[String], page_data: &[u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr> {
+fn search_key_in_page<'a, 'b>(key_: &'a [String], page_data: &'b [u8; 4096]) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> {
     if key_.is_empty() { return Ok(None); }
     let mut cursor = Cursor {
         key: vec![],
         offset: 20,
     };
 
-    let mut path = vec![];
+    let key_without_suffix = &key_[0..key_.len() - 1];
+    let suffix = &key_[key_.len() - 1];
+    let mut path: Vec<String> = vec![];
     while cursor.offset < page_data.len() {
-        let chunk = match Chunk::from_bytes(page_data, &mut cursor.offset, &mut path) {
+        let chunk = match Chunk::from_bytes(page_data, &mut cursor.offset) {
             Ok(inner) => inner,
-            Err(BlockErr::EndChunk) => { continue; }
-            _ => return Ok(None),
-        };
-        let key_without_suffix = &key_[0..key_.len() - 1];
-        let suffix = &key_[key_.len() - 1];
-        if chunk.path.components == key_without_suffix && chunk.ctype == InstructionType::RefSimple {
-            if let Some(key) = chunk.ref_simple {
-                if key.to_string() == *suffix {
-                    return Ok(Some(KeyValue {
-                        key: key_.to_vec(),
-                        value: chunk.data.unwrap()
-                            .lookup_from_buffer(page_data)
-                            .expect("Unable to lookup data."),
-                    }))
-                }
-            } else {
-                return Err(BPlusTreeErr::InvalidChunkComposition(chunk))
+            Err(ParseErr::EndChunk) => { continue; }
+            Err(e) => {
+                return Err(BPlusTreeErr::InvalidChunkComposition(e, None))
             }
+        };
+
+        match &chunk.contents {
+            ChunkContents::SimpleRef { key, data } => {
+                if path == key_without_suffix
+                    && key.to_string() == *suffix {
+                        return Ok(Some(KeyValue {
+                            key: key_.to_vec(),
+                            value: data.to_vec()
+                        }))
+                }
+            },
+            ChunkContents::Push { ref key } => {
+                path.push(get_int(key).to_string());
+            },
+            ChunkContents::Pop => {
+                path.pop();
+            },
+            _ => {},
         }
+
+
+        // if chunk.path.components == key_without_suffix && chunk.ctype == InstructionType::RefSimple {
+            // if let Some(key) = chunk.ref_simple {
+            //     if key.to_string() == *suffix {
+            //         return Ok(Some(KeyValue {
+            //             key: key_.to_vec(),
+            //             value: chunk.data.unwrap()
+            //                 .lookup_from_buffer(page_data)
+            //                 .expect("Unable to lookup data."),
+            //         }))
+            //     }
+            // } else {
+            //     return Err(BPlusTreeErr::InvalidChunkComposition(ParseErr::MalformedChunk, Some(chunk)))
+            // }
+        // }
     }
     Ok(None)
 }
 
-fn get_page(index: PageIndex, cache: &mut PageStore, file: &String) -> Result<Arc<Page>, BPlusTreeErr> {
+fn get_page<'a, 'b>(index: PageIndex, cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> where 'a: 'b {  
     match cache.get(file.to_string(), index) {
         Some(inner) => Ok(inner),
         None => {
@@ -68,20 +91,21 @@ fn get_page(index: PageIndex, cache: &mut PageStore, file: &String) -> Result<Ar
     }
 }
 
-fn search_index_page(key: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeErr> {
+fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeErr> {
     let mut cur_path = HBAMPath {
         components: vec![],
     };
     let mut offset = PageHeader::SIZE as usize;
-    let search_key = HBAMPath::new(key.components[0..key.components.len() - 2].to_vec());
+    let search_key = HBAMPath::new(key_.components[0..key_.components.len() - 2].to_vec());
     let mut cur_index = 1;
     let mut delayed_pops = 0;
     while cur_path <= search_key  && offset < Page::SIZE as usize {
-        if let Ok((chunk, delayed_pop)) = Chunk::from_bytes_new(&page.data, &mut(offset), &mut vec![]) {
-            match chunk.ctype {
-                InstructionType::PathPush => {
-                    let data = chunk.data.unwrap().lookup_from_buffer(&page.data).unwrap();
-                    let key_component = get_int(&chunk.data.unwrap().lookup_from_buffer(&page.data).unwrap()).to_string();
+        if let Ok(chunk) = Chunk::from_bytes(&page.data, &mut(offset)) {
+            println!("{:?}", chunk);
+            match chunk.contents {
+                ChunkContents::Push { key } => {
+                    let data = key;
+                    let key_component = get_int(key).to_string();
 
                     // FIXME: This is a total hack. a segment identifier seems to be known by a
                     // 4byte timestamp. This code turns that timestamp into a 0 to help with
@@ -93,25 +117,25 @@ fn search_index_page(key: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeE
                         cur_path.components.push(key_component.clone());
                     }
                     if data.len() == 1 {
-                        if *key < cur_path {
+                        if *key_ < cur_path {
                             return Ok(cur_index as u64);
                         }
                     }
-                    if delayed_pop {
+                    if chunk.delayed {
                         delayed_pops += 1;
                     }
                 }
-                InstructionType::PathPop => {
+                ChunkContents::Pop => {
                     cur_path.components.pop();
                 }
-                InstructionType::RefSimple => {
-                    cur_index = get_int(&chunk.data.unwrap().lookup_from_buffer(&page.data).unwrap());
-                    cur_path.components.push(chunk.ref_simple.unwrap().to_string());
-                    if *key <= cur_path {
+                ChunkContents::SimpleRef { key, data } => {
+                    cur_index = get_int(data);
+                    cur_path.components.push(key.to_string());
+                    if *key_ <= cur_path {
                         return Ok(cur_index as u64);
                     }
                     cur_path.components.pop();
-                    if delayed_pop {
+                    if chunk.delayed {
                         delayed_pops += 1;
                         while delayed_pops > 0 {
                             cur_path.components.pop();
@@ -122,13 +146,13 @@ fn search_index_page(key: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTreeE
                 _ => {}
             }
         } else {
-            return Err(BPlusTreeErr::KeyNotFound(key.components.to_vec()))
+            return Err(BPlusTreeErr::KeyNotFound(key_.components.to_vec()))
         }
     }
-    return Err(BPlusTreeErr::KeyNotFound(key.components.to_vec()));
+    return Err(BPlusTreeErr::KeyNotFound(key_.components.to_vec()));
 }
 
-fn get_data_page(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> {
+fn get_data_page<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr<'a>> {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -146,13 +170,13 @@ fn get_data_page(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Result
             },
             PageType::Index | PageType::Root => {
                 let next_index = search_index_page(&key, *cur_page);
-                cur_page = get_page(next_index.unwrap(), cache, &file.to_string())?;
+                cur_page = get_page(next_index.unwrap(), cache, file)?;
             }
         }
     }
 }
 
-pub fn search_key(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Result<Option<KeyValue>, BPlusTreeErr> {
+pub fn search_key<'a, 'b>(key: &'a [String], cache: &'b mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr<'a>> where 'b: 'a {
     if key.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -160,12 +184,12 @@ pub fn search_key(key: &Vec<String>, cache: &mut PageStore, file: &str) -> Resul
 
     let mut current_page = get_data_page(key, cache, file)?;
     loop {
-        match search_key_in_page(&key, &current_page.data)? {
+        match search_key_in_page(key, &current_page.data)? {
             Some(inner) => {
                 return Ok(Some(inner))
             },
             None => {
-                current_page = get_page(current_page.header.next as u64, cache, &file.to_string())?;
+                current_page = get_page(current_page.header.next as u64, cache, &file)?;
             }
         }
     }
@@ -186,9 +210,9 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::{BufReader, Read, Seek}, collections::hash_map::HashMap};
+    use std::{fs::File, io::{BufReader, Read, Seek}};
 
-    use crate::{hbam2::{api::KeyValue, page::Page, page_store::PageStore}, HBAMPath};
+    use crate::{hbam2::{api::KeyValue, page::Page}, HBAMPath};
 
     use super::{search_key_in_page, search_index_page};
  
