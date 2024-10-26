@@ -228,6 +228,7 @@ impl<'a> TestEnvironment<'a> {
                 if let Some(occurrence_uw) = occurrence {
                     self.database.set_current_occurrence(occurrence_uw as u16);
                 }
+                println!("going to layout: {} with occurrence: {}", name.to_string(), occurrence.unwrap());
                 self.instruction_ptr[n_stack].1 += 1;
             },
             Instruction::GoToRecordRequestPage => {
@@ -325,6 +326,7 @@ impl<'a> TestEnvironment<'a> {
 
                 match self.mode {
                     Mode::Browse => {
+                        println!("{:?}", parts);
                         *self.database.get_current_record_by_table_field_mut(parts[0], parts[1]).unwrap() = val.to_string();
                     },
                     Mode::Find => {
@@ -491,7 +493,7 @@ impl<'a> TestEnvironment<'a> {
 
         let fieldname = val.split("::").collect::<Vec<&str>>();
         if fieldname.len() == 2 {
-            let val = self.database.get_found_set_record_field(fieldname[1]);
+            let val = self.database.get_found_set_record_field(fieldname[0], fieldname[1]);
             return self.get_operand_val(val);
         } else {
             let scope = self.instruction_ptr.len() - 1;
@@ -600,6 +602,24 @@ impl<'a> TestEnvironment<'a> {
                             // TODO: Evaluate expression into string and then do the match.
                             _ => unimplemented!()
                         }
+                    },
+                    "Count" => {
+                        let (table, field) = match &args[0] {
+                            Node::Unary { value, child: _ } => {
+                                let parts = value.split("::").collect::<Vec<_>>();
+                                (parts[0], parts[1])
+                            },
+                            Node::Field(inner) => {
+                                let parts = inner.split("::").collect::<Vec<_>>();
+                                (parts[0], parts[1])
+                            },
+                            _ => { unimplemented!() }
+                        };
+                        let records = match self.database.get_related_records(table) {
+                            Ok(inner) => inner,
+                            Err(e) => vec![],
+                        };
+                        Ok(records.len().to_string())
                     }
                     _ => { Err(EvaluateError::UnimplementedFunction { function: name }) }
                 }

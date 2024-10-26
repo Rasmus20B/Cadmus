@@ -93,15 +93,15 @@ relation %2 = {
   Job_occ::salary <= Salary_occ::end,
 }
 
-layout %1 Person : Person_occ {
+layout %1 Person : Person_occ = {
   // Layout object definitions can go here
 }
 
-layout %2 Job : Job_occ {
+layout %2 Job : Job_occ = {
   // Layout object definitions can go here
 }
 
-layout %3 Salary : Salary_occ {
+layout %3 Salary : Salary_occ = {
   // Layout object definitions can go here
 }
 

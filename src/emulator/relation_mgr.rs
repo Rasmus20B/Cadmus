@@ -26,9 +26,9 @@ impl RelationMgr {
     }
 
     pub fn get_path(&self, occ1: usize, occ2: usize) -> Option<Vec<usize>> {
-
         let mut visited = Vec::new();
         let mut queue = VecDeque::<(usize, Vec<usize>)>::new();
+        println!("{}", self.graph.len());
         queue.push_back((occ1, vec![occ1]));
 
         while !queue.is_empty() {

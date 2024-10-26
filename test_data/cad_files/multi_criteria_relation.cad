@@ -1,0 +1,95 @@
+table %1 Person = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    },
+  },
+  field %2 name = {
+    datatype = Text,
+  },
+  field %3 salary = {
+    datatype = Number,
+  },
+}
+
+table %2 SalaryLevel = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    },
+  },
+  field %2 start = {
+    datatype = Number,
+  },
+  field %3 end = {
+    datatype = Number,
+  }
+}
+
+table_occurrence %1 Person : Person
+table_occurrence %2 SalaryLevel : SalaryLevel
+
+relation %1 = {
+  Person::salary >= SalaryLevel::start,
+  Person::salary <= SalaryLevel::end,
+}
+
+layout %1 Person : Person = {
+}
+
+layout %2 SalaryLevel : SalaryLevel = {
+}
+
+test %1 multi_crit_test = {
+  define multi_crit_test() {
+    go_to_layout("Person");
+    new_record_request();
+    set_field(Person::name, "first");
+    set_field(Person::salary, 40000);
+    new_record_request();
+    set_field(Person::name, "second");
+    set_field(Person::salary, 60000);
+    new_record_request();
+    set_field(Person::name, "third");
+    set_field(Person::salary, 20000);
+    new_record_request();
+    set_field(Person::name, "fourth");
+    set_field(Person::salary, 100000);
+
+    go_to_layout("SalaryLevel");
+    new_record_request();
+    set_field(SalaryLevel::id, 1);
+    set_field(SalaryLevel::start, 30000);
+    set_field(SalaryLevel::end, 50000);
+    new_record_request();
+    set_field(SalaryLevel::id, 2);
+    set_field(SalaryLevel::start, 90000);
+    set_field(SalaryLevel::end, 120000);
+
+    go_to_layout("Person");
+    go_to_record("first");
+    assert(SalaryLevel::id == 1);
+    go_to_record("next");
+    show_custom_dialog(Count(SalaryLevel::id));
+    assert(Count(SalaryLevel::id) == 0);
+    go_to_record("next");
+    assert(Count(SalaryLevel::id) == 0);
+    go_to_record("next");
+    assert(Count(SalaryLevel::id) == 1);
+    assert(SalaryLevel::id == 2);
+  }
+}
+
+
+
+
+
+
+
+
