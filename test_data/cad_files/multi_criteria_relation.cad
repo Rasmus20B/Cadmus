@@ -76,7 +76,6 @@ test %1 multi_crit_test = {
     go_to_record("first");
     assert(SalaryLevel::id == 1);
     go_to_record("next");
-    show_custom_dialog(Count(SalaryLevel::id));
     assert(Count(SalaryLevel::id) == 0);
     go_to_record("next");
     assert(Count(SalaryLevel::id) == 0);

@@ -90,6 +90,9 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         "test" => {
             Token::new(TokenType::Test, start) 
         }
+        "Text" => {
+            Token::new(TokenType::Text, start)
+        }
         "true" => {
             Token::new(TokenType::True, start) 
         }

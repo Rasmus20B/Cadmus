@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, DataType, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
 use super::token::{Token, TokenType};
 
@@ -104,6 +104,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
     let mut tmp = Field {
         id: 0,
         name: String::new(),
+        dtype: DataType::Text,
         created_by: String::from("admin"),
         modified_by: String::from("admin"),
         autoentry: AutoEntry {
@@ -165,6 +166,16 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                     _ => unreachable!()
 
                 }
+            }
+
+            TokenType::Datatype => {
+                expect(tokens, &vec![TokenType::Assignment], info)?;
+                tmp.dtype = match expect(tokens, &vec![TokenType::Text, TokenType::Number, TokenType::Date], info)?.ttype {
+                    TokenType::Text => DataType::Text,
+                    TokenType::Number => DataType::Number,
+                    TokenType::Date => DataType::Date,
+                    _ => todo!("add more datatypes")
+                };
             }
 
             TokenType::Serial => {
@@ -895,7 +906,7 @@ fn validate_relation_references(schema: &mut Schema) -> Result<(), &str> {
 mod tests {
     use std::{collections::HashMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, DataType, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
     use super::{parse, ParseErr};
 
@@ -930,6 +941,7 @@ mod tests {
                     created_by: String::from("admin"),
                     modified_by: String::from("admin"),
                     repetitions: 1,
+                    dtype: DataType::Number,
                     global: false,
                     autoentry: AutoEntry {
                         nomodify: false,
@@ -953,6 +965,7 @@ mod tests {
                     name: String::from("counter"),
                     created_by: String::from("admin"),
                     modified_by: String::from("admin"),
+                    dtype: DataType::Number,
                     repetitions: 1,
                     global: false,
                     autoentry: AutoEntry {

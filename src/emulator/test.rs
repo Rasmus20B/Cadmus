@@ -228,7 +228,6 @@ impl<'a> TestEnvironment<'a> {
                 if let Some(occurrence_uw) = occurrence {
                     self.database.set_current_occurrence(occurrence_uw as u16);
                 }
-                println!("going to layout: {} with occurrence: {}", name.to_string(), occurrence.unwrap());
                 self.instruction_ptr[n_stack].1 += 1;
             },
             Instruction::GoToRecordRequestPage => {
@@ -326,7 +325,6 @@ impl<'a> TestEnvironment<'a> {
 
                 match self.mode {
                     Mode::Browse => {
-                        println!("{:?}", parts);
                         *self.database.get_current_record_by_table_field_mut(parts[0], parts[1]).unwrap() = val.to_string();
                     },
                     Mode::Find => {

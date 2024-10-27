@@ -51,6 +51,16 @@ pub enum SerialTrigger {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub enum DataType {
+    Text,
+    Number,
+    Time,
+    Date,
+    Timestamp,
+    Container,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum AutoEntryDataPresets {
     Date,
     Time,
@@ -106,12 +116,13 @@ pub struct Validation {
 pub struct Field {
     pub id: usize,
     pub name: String,
-    pub created_by: String,
-    pub modified_by: String,
+    pub dtype: DataType,
     pub validation: Validation,
     pub autoentry: AutoEntry,
     pub global: bool,
     pub repetitions: usize,
+    pub created_by: String,
+    pub modified_by: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

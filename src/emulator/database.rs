@@ -8,6 +8,7 @@ use super::relation_mgr::RelationMgr;
 pub struct Field {
     id: usize,
     pub name: String,
+    pub dtype: DataType,
     pub records: Vec<String>,
 }
 
@@ -16,6 +17,7 @@ impl Field {
         Self {
             id: 0,
             name: "".to_string(),
+            dtype: DataType::Text,
             records: vec![],
         }
     }
@@ -117,7 +119,6 @@ impl Database {
 
         /* Generate Base Tables */
         let tables_size = file.tables.keys().max().unwrap_or(&0);
-        println!("Max table id: {}", tables_size);
         self.tables.resize(*tables_size + 1, TableObject::new("".to_string()));
         for (i, table) in &file.tables {
             let tmp = TableObject {
@@ -127,13 +128,12 @@ impl Database {
             self.tables[*i] = tmp;
 
             let fields_size = table.fields.keys().max().unwrap_or(&0);
-            println!("{} total fields: {}", table.name, fields_size);
             self.tables[*i].fields.resize(*fields_size + 1, Field::new());
             for (j, field) in &table.fields {
-                //println!("Pushing field: {} to table: {}", field.name, self.tables[*i].name);
                 self.tables[*i].fields[*j] = Field {
                     id: *j,
                     name: field.name.to_string(),
+                    dtype: field.dtype.clone(),
                     records: vec![]
                 }
             }
@@ -148,7 +148,6 @@ impl Database {
                 occurrence.name.clone(),
                 *i as u16);
 
-            println!("occurrence: {}, Table ptr: {}", i, occurrence.table_actual);
             let tmp = TableOccurrence {
                 found_set: vec![],
                 record_ptr: 0,
@@ -160,7 +159,6 @@ impl Database {
 
         /* Generate Relationships */ 
         for rel in file.relations.values() {
-            println!("Relationship: {:?}", rel);
             self.table_occurrences[rel.table1 as usize].related_records.push(
                 RelatedRecordSet {
                     occurrence: rel.table2 as usize,
@@ -201,7 +199,6 @@ impl Database {
          */ 
         
         let handle = self.occurrence_handle;
-        println!("occurrence when creating: {}", handle);
         let t = self.table_occurrences[handle as usize].clone();
         let name = self.tables[t.table_ptr as usize].name.clone();
         let table_idx = self.get_current_occurrence().table_ptr;
@@ -457,52 +454,37 @@ impl Database {
                         _ => unreachable!()
                     };
                     let lhs = self.get_current_record_field_by_id(*field1_ as usize);
+                    let lhs_dtype = current_table.fields[*field1_ as usize].dtype.clone();
                     let rhs = &next_table.fields[*field2_ as usize].records[next_record_idx];
-                    related = match comparison_ {
-                        RelationComparison::Equal => *lhs == *rhs,
-                        RelationComparison::NotEqual => *lhs != *rhs,
-                        RelationComparison::Less => *lhs < **rhs,
-                        RelationComparison::LessEqual => *lhs <= **rhs,
-                        RelationComparison::Greater => *lhs > **rhs,
-                        RelationComparison::GreaterEqual => *lhs >= **rhs,
-                        RelationComparison::Cartesian => true,
-                    };
-                    println!("{} {:?} {} == {}", lhs, comparison_, rhs, related);
+                    let rhs_dtype = current_table.fields[*field1_ as usize].dtype.clone();
+                    if rhs_dtype == DataType::Text || lhs_dtype == DataType::Text {
+                        related = match comparison_ {
+                            RelationComparison::Equal => *lhs == *rhs,
+                            RelationComparison::NotEqual => *lhs != *rhs,
+                            RelationComparison::Less => *lhs < **rhs,
+                            RelationComparison::LessEqual => *lhs <= **rhs,
+                            RelationComparison::Greater => *lhs > **rhs,
+                            RelationComparison::GreaterEqual => *lhs >= **rhs,
+                            RelationComparison::Cartesian => true,
+                        };
+                    } else {
+                        related = match comparison_ {
+                            RelationComparison::Equal => lhs.parse::<f32>().unwrap() == rhs.parse::<f32>().unwrap(),
+                            RelationComparison::NotEqual => lhs.parse::<f32>().unwrap() != rhs.parse::<f32>().unwrap(),
+                            RelationComparison::Less => lhs.parse::<f32>().unwrap() < rhs.parse::<f32>().unwrap(),
+                            RelationComparison::LessEqual => lhs.parse::<f32>().unwrap() <= rhs.parse::<f32>().unwrap(),
+                            RelationComparison::Greater => lhs.parse::<f32>().unwrap() > rhs.parse::<f32>().unwrap(),
+                            RelationComparison::GreaterEqual => lhs.parse::<f32>().unwrap() >= rhs.parse::<f32>().unwrap(),
+                            RelationComparison::Cartesian => true,
+                        };
+                    }
+                    //println!("{} {:?} {} == {}", lhs, comparison_, rhs, related);
                     if !related { break }
                 }
                 if related {
                     current_set.push(next_record_idx);
-                }
+                } 
             }
-
-            let mut next_set = vec![];
-            for record_idx in 0..current_table.fields[0].records.len() {
-                for relation in &relations[0].relationship {
-                    let (field1_, field2_, comparison_) = match relation {
-                        RelationCriteria::ById { field1, field2, comparison } => { (field1, field2, comparison) },
-                        _ => unreachable!()
-                    };
-
-                    let lhs = &current_table.fields[*field1_ as usize].records[record_idx];
-                    for next_record_idx in 0..next_table.fields[0].records.len() {
-                        let rhs = &next_table.fields[*field2_ as usize].records[next_record_idx];
-                        let related = match comparison_ {
-                            RelationComparison::Equal => *lhs == *rhs,
-                            RelationComparison::NotEqual => *lhs != *rhs,
-                            RelationComparison::Less => *lhs < *rhs,
-                            RelationComparison::LessEqual => *lhs <= *rhs,
-                            RelationComparison::Greater => *lhs > *rhs,
-                            RelationComparison::GreaterEqual => *lhs >= *rhs,
-                            RelationComparison::Cartesian => true,
-                        };
-
-                        if related {
-                            next_set.push(next_record_idx);
-                        }
-                    }
-                }
-            }
-            current_set = next_set;
         }
         Ok(current_set)
     }

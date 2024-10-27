@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{AutoEntry, AutoEntryType, DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence, Validation, ValidationTrigger}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence, Validation, ValidationTrigger}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -123,6 +123,7 @@ impl HBAMInterface {
                     table_handle.fields.insert(field_id, Field {
                         id: field_id,
                         name: name_,
+                        dtype: DataType::Text,
                         created_by: String::new(),
                         modified_by: String::new(),
                         autoentry: AutoEntry {
