@@ -805,15 +805,12 @@ pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
         info.cursor += 1;
     };
 
-    validate_table_occurrence_references(&mut result).expect("Unable to validate");
-    validate_layout_references(&mut result).expect("Unable to validate");
-    validate_relation_references(&mut result).expect("Unable to validate");
 
     Ok(result)
 }
 
 // TODO: This needs to be done for all objects after successful compilation of syntax.
-fn validate_table_occurrence_references(schema: &mut Schema) -> Result<(), &str> {
+pub fn validate_table_occurrence_references(schema: &mut Schema) -> Result<(), &str> {
     for ref mut table_occurrence in &mut schema.table_occurrences {
         table_occurrence.1.table_actual = match schema.tables
             .iter()
@@ -828,7 +825,7 @@ fn validate_table_occurrence_references(schema: &mut Schema) -> Result<(), &str>
     Ok(())
 }
 
-fn validate_layout_references(schema: &mut Schema) -> Result<(), &str> {
+pub fn validate_layout_references(schema: &mut Schema) -> Result<(), &str> {
     for ref mut layout in &mut schema.layouts {
         layout.1.table_occurrence = match schema.table_occurrences
             .iter()
@@ -842,7 +839,7 @@ fn validate_layout_references(schema: &mut Schema) -> Result<(), &str> {
     Ok(())
 }
 
-fn validate_relation_references(schema: &mut Schema) -> Result<(), &str> {
+pub fn validate_relation_references(schema: &mut Schema) -> Result<(), &str> {
     for ref mut relation in &mut schema.relations {
         let table_occ1 = match schema.table_occurrences
             .iter()
@@ -1257,20 +1254,20 @@ mod tests {
             id: 1,
             table1_data_source: 0,
             table1_name: String::from("Person_occ"),
-            table1: 0,
+            table1: 1,
             table2_data_source: 0,
             table2_name: String::from("Job_occ"),
-            table2: 0,
+            table2: 2,
             criterias: vec![
-                RelationCriteria::ByName {
-                    field1: String::from("job_id"),
+                RelationCriteria::ById {
+                    field1: 1,
                     comparison: RelationComparison::Equal,
-                    field2: String::from("id")
+                    field2: 1,
                 },
-                RelationCriteria::ByName {
-                    field1: String::from("name"),
+                RelationCriteria::ById {
+                    field1: 1,
                     comparison: RelationComparison::NotEqual,
-                    field2: String::from("first_name")
+                    field2: 1,
                 }
             ]
         };
