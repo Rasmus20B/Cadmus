@@ -1,12 +1,16 @@
 use crate::{cadlang::lexer::lex, schema::Schema};
 
-use super::parser::{parse, validate_table_occurrence_references, validate_layout_references, validate_relation_references, ParseErr};
+use super::{parser::{parse, ParseErr}, validate::*};
 
 pub fn compile_to_schema(code: String) -> Result<Schema, ParseErr> {
     let tokens = lex(&code).expect("Unable to lex cadmus code.");
-    let mut result = parse(&tokens)?;
-    validate_table_occurrence_references(&mut result).expect("Unable to validate");
-    validate_layout_references(&mut result).expect("Unable to validate");
-    validate_relation_references(&mut result).expect("Unable to validate");
-    Ok(result)
+    let (mut schema, bindings) = match parse(&tokens) {
+        Ok((s, b)) => (s, b),
+        Err(e) => { eprintln!("{:?}", e); panic!(); }
+    };
+    match validate(&mut schema, &bindings) {
+        Ok(()) => {},
+        Err(e) => { eprintln!("{:?}", e); panic!(); }
+    };
+    Ok(schema)
 }

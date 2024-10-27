@@ -18,6 +18,15 @@ pub enum ParseErr {
     UnexpectedEOF,
 }
 
+pub struct BindingList {
+    pub tables: Vec<(usize, String)>,
+    pub fields: Vec<(usize, usize, String)>,
+    pub table_occurrences: Vec<(usize, String)>,
+    pub scripts: Vec<(usize, String)>,
+    pub value_lists: Vec<(usize, String)>,
+    pub tests: Vec<(usize, String)>,
+}
+
 impl<'a> fmt::Display for ParseErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -100,7 +109,7 @@ fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseIn
     }
 }
 
-pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
+pub fn parse_field(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Field), ParseErr> {
     let mut tmp = Field {
         id: 0,
         name: String::new(),
@@ -125,6 +134,8 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
         .value.parse().expect("Unable to parse object id.");
     tmp.name = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
+
+    bindings.fields.push((bindings.tables.last().unwrap().0, tmp.id, tmp.name.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -299,11 +310,12 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
     Ok((tmp.id, tmp))
 }
 
-pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
+pub fn parse_table(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Table), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse().expect("Unable to parse object ID.");
-    info.cursor += 1;
-    let name_ = tokens.get(info.cursor).expect("Unexpected end of file.").value.clone();
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    bindings.tables.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -311,7 +323,7 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
             TokenType::Field => {
-                let tmp = parse_field(tokens, info)?;
+                let tmp = parse_field(tokens, info, bindings)?;
                 fields_.insert(tmp.0, tmp.1);
             },
             TokenType::CloseBrace => {
@@ -338,12 +350,14 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
     }))
 }
 
-pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
+pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, TableOccurrence), ParseErr> {
 
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
 
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    bindings.table_occurrences.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Colon], info)?;
     let base_table_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
@@ -357,10 +371,12 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
     }))
 }
 
-pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Script), ParseErr> {
+pub fn parse_script(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Script), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<usize>().expect("Unable to parse object number.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    bindings.scripts.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -441,10 +457,12 @@ pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Re
     }
 }
 
-pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, ValueList), ParseErr> {
+pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, ValueList), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
         .parse::<usize>().expect("Unable to parse object ID.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+
+    bindings.value_lists.push((id_, name_.clone()));
     if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
         == TokenType::Colon {
             let mut sort_ = ValueListSortBy::FirstField;
@@ -601,11 +619,13 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
     }))
 }
 
-pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test), ParseErr> {
+pub fn parse_test(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Test), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<usize>().expect("Unable to parse object id.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
+
+    bindings.tests.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -753,18 +773,26 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
     }))
 }
 
-pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
+pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
     let mut result = Schema::new();
     let mut info =  ParseInfo { cursor: 0 };
+    let mut bindings = BindingList {
+        tables: vec![],
+        fields: vec![],
+        tests: vec![],
+        scripts: vec![],
+        table_occurrences: vec![],
+        value_lists: vec![],
+    };
     
     loop {
         match &tokens[info.cursor].ttype {
             TokenType::Table => {
-                let (id, table) = parse_table(tokens, &mut info)?;
+                let (id, table) = parse_table(tokens, &mut info, &mut bindings)?;
                 result.tables.insert(id, table);
             },
             TokenType::TableOccurrence => {
-                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info)?;
+                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info, &mut bindings)?;
                 result.table_occurrences.insert(id, table_occurrence);
             }
             TokenType::Relation => {
@@ -772,11 +800,11 @@ pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
                 result.relations.insert(id, relation);
             },
             TokenType::ValueList => {
-                let (id, valuelist) = parse_value_list(tokens, &mut info)?;
+                let (id, valuelist) = parse_value_list(tokens, &mut info, &mut bindings)?;
                 result.value_lists.insert(id, valuelist);
             },
             TokenType::Script => {
-                let (id, script) = parse_script(tokens, &mut info)?;
+                let (id, script) = parse_script(tokens, &mut info, &mut bindings)?;
                 result.scripts.insert(id, script);
             },
             TokenType::Layout => {
@@ -784,7 +812,7 @@ pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
                 result.layouts.insert(id, layout);
             },
             TokenType::Test => {
-                let (id, test) = parse_test(tokens, &mut info)?;
+                let (id, test) = parse_test(tokens, &mut info, &mut bindings)?;
                 result.tests.insert(id, test);
             },
             TokenType::EOF => {
@@ -800,104 +828,16 @@ pub fn parse(tokens: &[Token]) -> Result<Schema, ParseErr> {
             }) }
         }
         if tokens[info.cursor].ttype == TokenType::EOF {
-            return Ok(result)
+            break;
         }
         info.cursor += 1;
     };
 
 
-    Ok(result)
+    Ok((result, bindings))
 }
 
 // TODO: This needs to be done for all objects after successful compilation of syntax.
-pub fn validate_table_occurrence_references(schema: &mut Schema) -> Result<(), &str> {
-    for ref mut table_occurrence in &mut schema.table_occurrences {
-        table_occurrence.1.table_actual = match schema.tables
-            .iter()
-            .find(|table| table.1.name == table_occurrence.1.name) {
-                Some(inner) => *inner.0 as u16,
-                None => {
-                    return Err("No matching occurrence for layout.");
-                }
-        }
-    }
-
-    Ok(())
-}
-
-pub fn validate_layout_references(schema: &mut Schema) -> Result<(), &str> {
-    for ref mut layout in &mut schema.layouts {
-        layout.1.table_occurrence = match schema.table_occurrences
-            .iter()
-            .find(|occ| occ.1.name == layout.1.name) {
-                Some(inner) => *inner.0,
-                None => {
-                    return Err("No matching occurrence for layout.");
-                }
-        }
-    }
-    Ok(())
-}
-
-pub fn validate_relation_references(schema: &mut Schema) -> Result<(), &str> {
-    for ref mut relation in &mut schema.relations {
-        let table_occ1 = match schema.table_occurrences
-            .iter()
-            .find(|occ| occ.1.name == relation.1.table1_name) {
-                Some(inner) => *inner.0 as u16,
-                None => {
-                    return Err("No Matching occurrence for relation.")
-                }
-            };
-        let table_occ2 = match schema.table_occurrences
-            .iter()
-            .find(|occ| occ.1.name == relation.1.table2_name) {
-                Some(inner) => *inner.0 as u16,
-                None => {
-                    return Err("No Matching occurrence for relation.")
-                }
-            };
-
-        let table1 = schema.table_occurrences.get(&(table_occ1 as usize)).unwrap().table_actual;
-        let table2 = schema.table_occurrences.get(&(table_occ2 as usize)).unwrap().table_actual;
-        relation.1.table1 = table1;
-        relation.1.table2 = table2;
-
-
-        for criteria in &mut relation.1.criterias {
-            let (field1_, field2_, comp) = match criteria {
-                RelationCriteria::ByName { field1, field2, comparison } => {
-                    (field1, field2, comparison)
-                },
-                RelationCriteria::ById { .. } => {
-                    continue
-                },
-            };
-
-            let field1_ = field1_.split("::").collect::<Vec<_>>()[1];
-            let field2_ = field2_.split("::").collect::<Vec<_>>()[1];
-
-            let mut field1_idx = 0;
-            let mut field2_idx = 0;
-            for field in &schema.tables.get(&(table1 as usize)).unwrap().fields {
-                if field.1.name == *field1_ {
-                    field1_idx = *field.0;
-                }
-            }
-
-            for field in &schema.tables.get(&(table2 as usize)).unwrap().fields {
-                if field.1.name == *field2_ {
-                    field2_idx = *field.0;
-                }
-            }
-            *criteria = RelationCriteria::ById { field1: field1_idx as u16, field2: field2_idx as u16, comparison: *comp };
-
-        }
-        
-    }
-
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
@@ -988,7 +928,7 @@ mod tests {
             created_by: String::from("admin"),
             modified_by: String::from("admin"),
         };
-        assert_eq!(schema.tables[&1], expected);
+        assert_eq!(schema.0.tables[&1], expected);
     }
 
     #[test]
@@ -1012,8 +952,8 @@ mod tests {
                 String::from("this is a test")
             ])
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1036,8 +976,8 @@ mod tests {
                 sort: ValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1060,8 +1000,8 @@ mod tests {
                 sort: ValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1087,8 +1027,8 @@ mod tests {
                 sort: ValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1113,8 +1053,8 @@ mod tests {
                 sort: ValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1139,8 +1079,8 @@ mod tests {
                 sort: ValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1165,7 +1105,7 @@ mod tests {
                 sort: ValueListSortBy::FirstField 
             }
         };
-        assert_eq!(schema.value_lists[&1], expected_valuelist);
+        assert_eq!(schema.0.value_lists[&1], expected_valuelist);
     }
 
     #[test]
@@ -1191,8 +1131,8 @@ mod tests {
                 sort: ValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.value_lists.len() == 1);
-        assert_eq!(schema.value_lists[&1], expected);
+        assert!(schema.0.value_lists.len() == 1);
+        assert_eq!(schema.0.value_lists[&1], expected);
     }
 
     #[test]
@@ -1214,7 +1154,7 @@ mod tests {
             table_actual: 0,
             table_actual_name: String::from("Person")
         };
-        assert_eq!(expected, schema.table_occurrences[&1]);
+        assert_eq!(expected, schema.0.table_occurrences[&1]);
     }
 
     #[test]
@@ -1233,11 +1173,12 @@ mod tests {
             table2_name: String::from("Job_occ"),
             table2: 0,
             criterias: vec![RelationCriteria::ByName {
-                field1: String::from("job_id"),
+                field1: String::from("Person_occ::job_id"),
                 comparison: RelationComparison::Equal,
-                field2: String::from("id")
+                field2: String::from("Job_occ::id")
             }]
         };
+        assert_eq!(expected, schema.0.relations[&1])
     }
 
     #[test]
@@ -1254,23 +1195,24 @@ mod tests {
             id: 1,
             table1_data_source: 0,
             table1_name: String::from("Person_occ"),
-            table1: 1,
+            table1: 0,
             table2_data_source: 0,
             table2_name: String::from("Job_occ"),
-            table2: 2,
+            table2: 0,
             criterias: vec![
-                RelationCriteria::ById {
-                    field1: 1,
+                RelationCriteria::ByName {
+                    field1: String::from("Person_occ::job_id"),
                     comparison: RelationComparison::Equal,
-                    field2: 1,
+                    field2: String::from("Job_occ::id"),
                 },
-                RelationCriteria::ById {
-                    field1: 1,
+                RelationCriteria::ByName {
+                    field1: String::from("Person_occ::first_name"),
                     comparison: RelationComparison::NotEqual,
-                    field2: 1,
+                    field2: String::from("Job_occ::name"),
                 }
             ]
         };
+        assert_eq!(expected, schema.0.relations[&1])
     }
 
     #[test]
