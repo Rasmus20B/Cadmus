@@ -89,8 +89,10 @@ impl<'a> fmt::Display for ParseErr {
 
 }
 
-pub struct ParseInfo {
+pub struct ParseInfo<'a> {
     cursor: usize,
+    unmapped: Vec<(Token, &'a mut usize)>,
+    bindings: BindingList,
 }
 
 fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseInfo) -> Result<&'a Token, ParseErr> {
@@ -109,7 +111,7 @@ fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseIn
     }
 }
 
-pub fn parse_field(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Field), ParseErr> {
+pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
     let mut tmp = Field {
         id: 0,
         name: String::new(),
@@ -135,7 +137,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo, bindings: &mut Bindin
     tmp.name = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
 
-    bindings.fields.push((bindings.tables.last().unwrap().0, tmp.id, tmp.name.clone()));
+    info.bindings.fields.push((info.bindings.tables.last().unwrap().0, tmp.id, tmp.name.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -310,12 +312,12 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo, bindings: &mut Bindin
     Ok((tmp.id, tmp))
 }
 
-pub fn parse_table(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Table), ParseErr> {
+pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse().expect("Unable to parse object ID.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
-    bindings.tables.push((id_, name_.clone()));
+    info.bindings.tables.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -323,7 +325,7 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo, bindings: &mut Bindin
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
             TokenType::Field => {
-                let tmp = parse_field(tokens, info, bindings)?;
+                let tmp = parse_field(tokens, info)?;
                 fields_.insert(tmp.0, tmp.1);
             },
             TokenType::CloseBrace => {
@@ -350,14 +352,14 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo, bindings: &mut Bindin
     }))
 }
 
-pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, TableOccurrence), ParseErr> {
+pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
 
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
 
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
-    bindings.table_occurrences.push((id_, name_.clone()));
+    info.bindings.table_occurrences.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Colon], info)?;
     let base_table_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
@@ -371,12 +373,12 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo, bindings: 
     }))
 }
 
-pub fn parse_script(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Script), ParseErr> {
+pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Script), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<usize>().expect("Unable to parse object number.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
-    bindings.scripts.push((id_, name_.clone()));
+    info.bindings.scripts.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -457,12 +459,12 @@ pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Re
     }
 }
 
-pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, ValueList), ParseErr> {
+pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, ValueList), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
         .parse::<usize>().expect("Unable to parse object ID.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
-    bindings.value_lists.push((id_, name_.clone()));
+    info.bindings.value_lists.push((id_, name_.clone()));
     if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
         == TokenType::Colon {
             let mut sort_ = ValueListSortBy::FirstField;
@@ -619,13 +621,13 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo, bindings: &mut B
     }))
 }
 
-pub fn parse_test(tokens: &[Token], info: &mut ParseInfo, bindings: &mut BindingList) -> Result<(usize, Test), ParseErr> {
+pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test), ParseErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<usize>().expect("Unable to parse object id.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
 
-    bindings.tests.push((id_, name_.clone()));
+    info.bindings.tests.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -775,24 +777,25 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
 
 pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
     let mut result = Schema::new();
-    let mut info =  ParseInfo { cursor: 0 };
-    let mut bindings = BindingList {
+    let mut info =  ParseInfo { cursor: 0, bindings: BindingList {
         tables: vec![],
         fields: vec![],
         tests: vec![],
         scripts: vec![],
         table_occurrences: vec![],
         value_lists: vec![],
+    },
+    unmapped: vec![],
     };
     
     loop {
         match &tokens[info.cursor].ttype {
             TokenType::Table => {
-                let (id, table) = parse_table(tokens, &mut info, &mut bindings)?;
+                let (id, table) = parse_table(tokens, &mut info)?;
                 result.tables.insert(id, table);
             },
             TokenType::TableOccurrence => {
-                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info, &mut bindings)?;
+                let (id, table_occurrence) = parse_table_occurrence(tokens, &mut info)?;
                 result.table_occurrences.insert(id, table_occurrence);
             }
             TokenType::Relation => {
@@ -800,11 +803,11 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
                 result.relations.insert(id, relation);
             },
             TokenType::ValueList => {
-                let (id, valuelist) = parse_value_list(tokens, &mut info, &mut bindings)?;
+                let (id, valuelist) = parse_value_list(tokens, &mut info)?;
                 result.value_lists.insert(id, valuelist);
             },
             TokenType::Script => {
-                let (id, script) = parse_script(tokens, &mut info, &mut bindings)?;
+                let (id, script) = parse_script(tokens, &mut info)?;
                 result.scripts.insert(id, script);
             },
             TokenType::Layout => {
@@ -812,7 +815,7 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
                 result.layouts.insert(id, layout);
             },
             TokenType::Test => {
-                let (id, test) = parse_test(tokens, &mut info, &mut bindings)?;
+                let (id, test) = parse_test(tokens, &mut info)?;
                 result.tests.insert(id, test);
             },
             TokenType::EOF => {
@@ -834,7 +837,7 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
     };
 
 
-    Ok((result, bindings))
+    Ok((result, info.bindings))
 }
 
 // TODO: This needs to be done for all objects after successful compilation of syntax.
