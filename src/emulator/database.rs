@@ -151,7 +151,7 @@ impl Database {
             let tmp = TableOccurrence {
                 found_set: vec![],
                 record_ptr: 0,
-                table_ptr: occurrence.table_actual,
+                table_ptr: occurrence.base_table.top_id,
                 related_records: Vec::new(),
             };
             self.table_occurrences[*i] = tmp;

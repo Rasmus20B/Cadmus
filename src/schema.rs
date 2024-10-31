@@ -24,6 +24,13 @@ pub enum DBObjectStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct DBObjectReference {
+    pub data_source: u16,
+    pub top_id: u16,
+    pub inner_id: u16,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Table {
     pub id: usize,
     pub name: String,
@@ -73,7 +80,7 @@ pub enum AutoEntryDataPresets {
 pub enum AutoEntryType {
     NA,
     Serial { next: usize, increment: usize, trigger: SerialTrigger },
-    Lookup { from: String, to: String },
+    Lookup { from: DBObjectReference, to: DBObjectReference },
     Creation(AutoEntryDataPresets),
     Modification(AutoEntryDataPresets),
     LastVisited,
@@ -129,23 +136,9 @@ pub struct Field {
 pub struct TableOccurrence {
     pub id: usize,
     pub name: String,
-    pub table_actual: u16,
-    pub table_actual_name: String,
+    pub base_table: DBObjectReference,
     pub created_by: String,
     pub modified_by: String,
-}
-
-impl TableOccurrence {
-    pub fn new(id_: usize) -> Self {
-        Self {
-            id: id_,
-            name: String::new(),
-            table_actual: 0,
-            table_actual_name: String::new(),
-            created_by: String::new(),
-            modified_by: String::new(),
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]

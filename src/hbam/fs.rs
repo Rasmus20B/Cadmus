@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectStatus, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence, Validation, ValidationTrigger}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
+use crate::{diff::{DiffCollection, SchemaDiff}, hbam::{btree::HBAMCursor, chunk::{ChunkType, InstructionType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectStatus, DBObjectReference, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Schema, Table, TableOccurrence, Validation, ValidationTrigger}, staging_buffer::DataStaging, util::{dbcharconv::encode_text, encoding_util::{fm_string_decrypt, fm_string_encrypt, get_int, get_path_int, put_int, put_path_int}}};
 
 use super::{btree::HBAMFile, path::HBAMPath};
 
@@ -49,14 +49,20 @@ impl HBAMInterface {
             table_storage_path.components.push(x.to_string());
             if let Ok(()) = self.goto_directory(&table_storage_path) {
                 let definition = &self.get_kv_value(2).expect("Unable to get keyvalue");
-                let name = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
-                let created_by = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
-                let modified_by = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
-                let mut tmp_occurrence = TableOccurrence::new(x);
-                tmp_occurrence.name = name;
-                tmp_occurrence.created_by = created_by;
-                tmp_occurrence.modified_by = modified_by;
-                tmp_occurrence.table_actual = definition[6] as u16 + 128;
+                let name_ = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
+                let created_by_ = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
+                let modified_by_ = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
+                let mut tmp_occurrence = TableOccurrence {
+                    id: x,
+                    name: name_,
+                    created_by: created_by_,
+                    modified_by: modified_by_,
+                    base_table: DBObjectReference { 
+                        data_source: 0,
+                        top_id: definition[6] as u16 + 128,
+                        inner_id: 0,
+                    }
+                };
                 schema.table_occurrences.insert(x, tmp_occurrence);
 
                 table_storage_path.components.push(251.to_string());

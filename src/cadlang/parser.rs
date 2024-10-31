@@ -1,9 +1,16 @@
 use core::fmt;
 use std::{collections::HashMap, io::ErrorKind};
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, DataType, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, DataType, DBObjectReference, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
 use super::token::{Token, TokenType};
+
+pub enum FMObjType {
+    Table,
+    TableOccurrence,
+    Field,
+    ValueList,
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseErr {
@@ -91,7 +98,7 @@ impl<'a> fmt::Display for ParseErr {
 
 pub struct ParseInfo<'a> {
     cursor: usize,
-    unmapped: Vec<(Token, &'a mut usize)>,
+    unmapped: Vec<(&'a Token, FMObjType, &'a mut usize)>,
     bindings: BindingList,
 }
 
@@ -316,8 +323,8 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse().expect("Unable to parse object ID.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
-
     info.bindings.tables.push((id_, name_.clone()));
+
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -354,6 +361,14 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
 
 pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
 
+    let result = TableOccurrence {
+        id: 0,
+        created_by: String::from("admin"),
+        modified_by: String::from("admin"),
+        name: String::new(),
+        base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 },
+    };
+
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
         .expect("Unable to parse object id.");
 
@@ -361,15 +376,17 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
 
     info.bindings.table_occurrences.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Colon], info)?;
-    let base_table_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+    let tok = expect(tokens, &vec![TokenType::Identifier], info)?;
+    let base_table_ = tok.value.clone();
+    //info.unmapped.push((tok, DBobjectReference, FMobjType::Table, ));
+
 
     Ok((id_, TableOccurrence {
         id: id_,
         created_by: String::from("admin"),
         modified_by: String::from("admin"),
         name: name_,
-        table_actual: 0,
-        table_actual_name: base_table_,
+        base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 }
     }))
 }
 
@@ -835,18 +852,14 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
         }
         info.cursor += 1;
     };
-
-
     Ok((result, info.bindings))
 }
-
-// TODO: This needs to be done for all objects after successful compilation of syntax.
 
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, DataType, AutoEntryType, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectReference, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
     use super::{parse, ParseErr};
 
@@ -1154,8 +1167,7 @@ mod tests {
             created_by: String::from("admin"),
             modified_by: String::from("admin"),
             name: String::from("Person_occ"),
-            table_actual: 0,
-            table_actual_name: String::from("Person")
+            base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 }
         };
         assert_eq!(expected, schema.0.table_occurrences[&1]);
     }

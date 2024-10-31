@@ -10,7 +10,7 @@ pub enum ValidationErr {
 
 pub fn validate_table_occurrence_references(schema: &mut Schema, bindings: &BindingList) -> Result<(), ValidationErr> {
     for ref mut table_occurrence in &mut schema.table_occurrences {
-        table_occurrence.1.table_actual = match bindings.tables
+        table_occurrence.1.base_table.top_id = match bindings.tables
             .iter()
             .find(|table| table.1 == table_occurrence.1.name) {
                 Some(inner) => inner.0 as u16,
@@ -56,8 +56,8 @@ pub fn validate_relation_references(schema: &mut Schema, bindings: &BindingList)
                 }
             };
 
-        let table1 = schema.table_occurrences.get(&(table_occ1 as usize)).unwrap().table_actual;
-        let table2 = schema.table_occurrences.get(&(table_occ2 as usize)).unwrap().table_actual;
+        let table1 = schema.table_occurrences.get(&(table_occ1 as usize)).unwrap().base_table.top_id;
+        let table2 = schema.table_occurrences.get(&(table_occ2 as usize)).unwrap().base_table.top_id;
         relation.1.table1 = table1;
         relation.1.table2 = table2;
 
