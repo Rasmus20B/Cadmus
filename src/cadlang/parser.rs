@@ -787,7 +787,11 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
     Ok((id_, LayoutFM {
         id: id_,
         name: name_,
-        table_occurrence: 0,
+        table_occurrence: DBObjectReference {
+            data_source: 0,
+            top_id: 0,
+            inner_id: 0,
+        },
         table_occurrence_name: occurrence,
     }))
 }

@@ -122,7 +122,7 @@ impl<'a> TestEnvironment<'a> {
 
     pub fn generate_layout_mgr(&mut self) {
         for layout in self.file_handle.layouts.values() {
-            self.layout_mgr.add_mapping(layout.name.clone(), layout.table_occurrence);
+            self.layout_mgr.add_mapping(layout.name.clone(), layout.table_occurrence.top_id as usize);
         }
     }
 

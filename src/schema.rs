@@ -237,7 +237,7 @@ pub struct LayoutFMAttribute {
 pub struct LayoutFM {
     pub id: usize,
     pub name: String,
-    pub table_occurrence: usize,
+    pub table_occurrence: DBObjectReference,
     pub table_occurrence_name: String,
 }
 

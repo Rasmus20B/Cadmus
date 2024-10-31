@@ -162,7 +162,11 @@ impl HBAMInterface {
                 schema.layouts.insert(layout_id, LayoutFM {
                     id: layout_id,
                     name: name_,
-                    table_occurrence: definition[1] as usize,
+                    table_occurrence: DBObjectReference {
+                        data_source: 0,
+                        top_id: definition[1] as u16,
+                        inner_id: 0,
+                    },
                     table_occurrence_name: String::new(),
                 });
             }

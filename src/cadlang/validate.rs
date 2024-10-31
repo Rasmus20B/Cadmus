@@ -1,4 +1,4 @@
-use crate::schema::{Schema, RelationCriteria};
+use crate::schema::{Schema, RelationCriteria, DBObjectReference};
 use super::parser::BindingList;
 
 #[derive(Debug)]
@@ -28,7 +28,11 @@ pub fn validate_layout_references(schema: &mut Schema, bindings: &BindingList) -
         layout.1.table_occurrence = match bindings.table_occurrences
             .iter()
             .find(|occ| occ.1 == layout.1.name) {
-                Some(inner) => inner.0,
+                Some(inner) => DBObjectReference { 
+                    data_source: 0,
+                    top_id: inner.0 as u16,
+                    inner_id: 0,
+                },
                 None => {
                     return Err(ValidationErr::UnknownTableOccurrence(layout.1.table_occurrence_name.clone()));
                 }
