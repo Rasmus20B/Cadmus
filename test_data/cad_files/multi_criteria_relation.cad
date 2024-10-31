@@ -50,11 +50,14 @@ test %1 multi_crit_test = {
   define multi_crit_test() {
     go_to_layout("Person");
     new_record_request();
+    show_custom_dialog("new rec");
     set_field(Person::name, "first");
     set_field(Person::salary, 40000);
+    show_custom_dialog("added first");
     new_record_request();
     set_field(Person::name, "second");
     set_field(Person::salary, 60000);
+    show_custom_dialog("added second");
     new_record_request();
     set_field(Person::name, "third");
     set_field(Person::salary, 20000);
@@ -63,6 +66,7 @@ test %1 multi_crit_test = {
     set_field(Person::salary, 100000);
 
     go_to_layout("SalaryLevel");
+    show_custom_dialog("moved to salarylvel");
     new_record_request();
     set_field(SalaryLevel::id, 1);
     set_field(SalaryLevel::start, 30000);

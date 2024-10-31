@@ -72,9 +72,16 @@ impl HBAMInterface {
                     let relation_definition = relation_definitions[0].clone();
                     let mut tmp = Relation::new(0);
                     let relation_index = relation_definition[4];
-                    tmp.table1 = x as u16;
-                    tmp.table2 = relation_definition[2] as u16 + 128;
-                    tmp.id = relation_index as usize;
+                    tmp.table1 = DBObjectReference { 
+                        data_source: 0,
+                        top_id: x as u16,
+                        inner_id: 0,
+                    };
+                    tmp.table2 = DBObjectReference { 
+                        data_source: 0,
+                        top_id: relation_definition[2] as u16 + 128,
+                        inner_id: 0,
+                    };                    tmp.id = relation_index as usize;
                     schema.relations.insert(relation_index as usize, tmp);
                 }
                 table_storage_path.components.pop();

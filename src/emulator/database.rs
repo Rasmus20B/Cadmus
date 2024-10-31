@@ -130,6 +130,7 @@ impl Database {
             let fields_size = table.fields.keys().max().unwrap_or(&0);
             self.tables[*i].fields.resize(*fields_size + 1, Field::new());
             for (j, field) in &table.fields {
+                println!("pushing field: {:?}", field);
                 self.tables[*i].fields[*j] = Field {
                     id: *j,
                     name: field.name.to_string(),
@@ -159,18 +160,18 @@ impl Database {
 
         /* Generate Relationships */ 
         for rel in file.relations.values() {
-            self.table_occurrences[rel.table1 as usize].related_records.push(
+            self.table_occurrences[rel.table1.top_id as usize].related_records.push(
                 RelatedRecordSet {
-                    occurrence: rel.table2 as usize,
+                    occurrence: rel.table2.top_id as usize,
                     relationship: vec![],
                     records: vec![],
                 }
             );
 
 
-            self.table_occurrences[rel.table2 as usize].related_records.push(
+            self.table_occurrences[rel.table2.top_id as usize].related_records.push(
                 RelatedRecordSet {
-                    occurrence: rel.table1 as usize,
+                    occurrence: rel.table1.top_id as usize,
                     relationship: vec![],
                     records: vec![],
                 }
@@ -185,10 +186,10 @@ impl Database {
                         RelationCriteria::ByName { field1: field2.clone(), field2: field1.clone(), comparison: *comparison }
                     }
                 };
-                self.table_occurrences[rel.table1 as usize].related_records.last_mut().unwrap().relationship.push(criteria.clone());
-                self.table_occurrences[rel.table2 as usize].related_records.last_mut().unwrap().relationship.push(reversed.clone());
+                self.table_occurrences[rel.table1.top_id as usize].related_records.last_mut().unwrap().relationship.push(criteria.clone());
+                self.table_occurrences[rel.table2.top_id as usize].related_records.last_mut().unwrap().relationship.push(reversed.clone());
             }
-            self.relation_mgr.add_relation(rel.table1 as usize, rel.table2 as usize);
+            self.relation_mgr.add_relation(rel.table1.top_id as usize, rel.table2.top_id as usize);
         }
     }
 
@@ -408,6 +409,11 @@ impl Database {
 
         if id.is_err() {
             return Err("Record not found.");
+        }
+
+        println!("table ptr: {}", table);
+        for field in &self.tables[table as usize].fields {
+            println!("field: {}", field.name);
         }
 
         let field = self.tables[table as usize].fields

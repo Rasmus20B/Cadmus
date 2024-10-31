@@ -161,12 +161,8 @@ pub enum RelationCriteria {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Relation {
     pub id: usize,
-    pub table1: u16,
-    pub table1_name: String,
-    pub table1_data_source: u8,
-    pub table2: u16,
-    pub table2_name: String,
-    pub table2_data_source: u8,
+    pub table1: DBObjectReference,
+    pub table2: DBObjectReference,
     pub criterias: Vec<RelationCriteria>,
 }
 
@@ -174,12 +170,16 @@ impl Relation {
     pub fn new(id_: usize) -> Self {
         Self {
             id: id_,
-            table1: 0,
-            table1_name: String::new(),
-            table1_data_source: 0,
-            table2: 0,
-            table2_name: String::new(),
-            table2_data_source: 0,
+            table1: DBObjectReference {
+                data_source: 0,
+                top_id: 0,
+                inner_id: 0
+            },
+            table2: DBObjectReference {
+                data_source: 0,
+                top_id: 0,
+                inner_id: 0
+            },
             criterias: vec![],
         }
     }
@@ -212,7 +212,7 @@ pub struct ValueList {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Script {
-    pub id: usize,
+    pub id: u16,
     pub name: String,
     pub instructions: Vec<ScriptStep>,
     pub arguments: Vec<String>,
@@ -222,7 +222,7 @@ pub struct Script {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Test {
-    pub id: usize,
+    pub id: u16,
     pub name: String,
     pub script: Script,
 }
@@ -249,8 +249,8 @@ pub struct Schema {
     pub relations: HashMap<usize, Relation>,
     pub value_lists: HashMap<usize, ValueList>,
     pub layouts: HashMap<usize, LayoutFM>,
-    pub scripts: HashMap<usize, Script>,
-    pub tests: HashMap<usize, Test>,
+    pub scripts: HashMap<u16, Script>,
+    pub tests: HashMap<u16, Test>,
 }
 
 impl Schema {

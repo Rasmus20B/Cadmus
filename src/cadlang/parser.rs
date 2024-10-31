@@ -3,8 +3,11 @@ use std::{collections::HashMap, io::ErrorKind};
 
 use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, DataType, DBObjectReference, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
+use super::{staging::*, error::CompileErr};
 use super::token::{Token, TokenType};
 
+
+#[derive(PartialEq, Eq, Debug)]
 pub enum FMObjType {
     Table,
     TableOccurrence,
@@ -12,101 +15,27 @@ pub enum FMObjType {
     ValueList,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ParseErr {
-    UnexpectedToken { token: Token, expected: Vec<TokenType>},
-    RelationCriteria { token: Token }, // criteria must have uniform tables.
-    UnknownTable { token: Token },
-    UnknownTableOccurrence { token: Token },
-    UnknownField { token: Token },
-    InvalidAssert { token: Token }, // Asserts can only be used in tests
-    MissingAttribute { base_object: String, construct: String, specifier: String },
-    UnimplementedLanguageFeauture { feature: String, token: Token },
-    UnexpectedEOF,
-}
-
-pub struct BindingList {
-    pub tables: Vec<(usize, String)>,
-    pub fields: Vec<(usize, usize, String)>,
-    pub table_occurrences: Vec<(usize, String)>,
-    pub scripts: Vec<(usize, String)>,
-    pub value_lists: Vec<(usize, String)>,
-    pub tests: Vec<(usize, String)>,
-}
-
-impl<'a> fmt::Display for ParseErr {
+impl<'a> fmt::Display for FMObjType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnexpectedToken { token, expected } => {
-                let val1 = if token.ttype == TokenType::Identifier {
-                    format!("{}: \"{}\"", token.ttype.to_string(), token.value)
-                } else {
-                    format!("\"{}\"", token.ttype.to_string())
-                };
-                if expected.len() > 1 {
-                    write!(f, "Unexpected {} @ {},{}. Expected one of: {:?}", 
-                        val1,
-                        token.location.line,
-                        token.location.column,
-                        expected.iter().map(|t| t.to_string()).collect::<Vec<_>>())
-                } else {
-                    write!(f, "Unexpected {} @ {},{}. Expected: {:?}", 
-                        val1,
-                        token.location.line,
-                        token.location.column,
-                        expected.iter().map(|t| t.to_string()).collect::<Vec<_>>())
-                }
-            }
-            Self::RelationCriteria { token } => {
-                write!(f, "Found non-matching table \"{}\" reference in relation criteria. @ {}, {}", 
-                    token.value,
-                    token.location.line,
-                    token.location.column)
-            }
-            Self::UnknownTable { token } => {
-                write!(f, "Invalid reference to table: {} @ {}, {}", 
-                    token.value,
-                    token.location.line,
-                    token.location.column)
-            }
-            Self::UnknownTableOccurrence { token } => {
-                write!(f, "Invalid reference to table occurrence: {} @ {}, {}", 
-                    token.value,
-                    token.location.line,
-                    token.location.column)
-            }
-            Self::UnknownField { token } => {
-                write!(f, "Invalid reference to field: {} @ {}, {}", 
-                    token.value,
-                    token.location.line,
-                    token.location.column)
-            }
-            Self::MissingAttribute { base_object, construct, specifier } => {
-                write!(f, "Missing attribute {} for {} in {}", specifier, construct, base_object)
-            }
-            Self::UnimplementedLanguageFeauture { feature, token } => {
-                write!(f, "Unimplemented language feature: {} used @ {},{}",
-                    feature,
-                    token.location.line,
-                    token.location.column)
-            }
-            _ => write!(f, "nah not compiling.")
+            Self::Table => write!(f, "table"),
+            Self::TableOccurrence => write!(f, "table occurrence"),
+            Self::Field => write!(f, "field"),
+            Self::ValueList => write!(f, "valuelist")
         }
     }
-
 }
 
-pub struct ParseInfo<'a> {
+
+pub struct ParseInfo {
     cursor: usize,
-    unmapped: Vec<(&'a Token, FMObjType, &'a mut usize)>,
-    bindings: BindingList,
 }
 
-fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseInfo) -> Result<&'a Token, ParseErr> {
+fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseInfo) -> Result<&'a Token, CompileErr> {
     info.cursor += 1;
     if let Some(token) = tokens.get(info.cursor) {
         if !expected.contains(&token.ttype) {
-            Err(ParseErr::UnexpectedToken { 
+            Err(CompileErr::UnexpectedToken { 
                 token: token.clone(), 
                 expected: expected.to_vec(),
             })
@@ -114,37 +43,27 @@ fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseIn
             Ok(token)
         }
     } else {
-        Err(ParseErr::UnexpectedEOF)
+        Err(CompileErr::UnexpectedEOF)
     }
 }
 
-pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Field), ParseErr> {
-    let mut tmp = Field {
-        id: 0,
-        name: String::new(),
-        dtype: DataType::Text,
-        created_by: String::from("admin"),
-        modified_by: String::from("admin"),
-        autoentry: AutoEntry {
-            definition: AutoEntryType::NA,
-            nomodify: false,
-        },
-        validation: Validation {
-            trigger: ValidationTrigger::OnEntry,
-            user_override: true,
-            checks: vec![],
-            message: String::from("Error with field validation."),
-        },
-        global: false,
-        repetitions: 1,
+pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedField), CompileErr> {
+    let mut checks_ = vec![];
+    let validation_msg = String::from("Error with field validation.");
+    let mut validation_trigger = ValidationTrigger::OnEntry;
+    let mut user_override_ = true;
+    let mut autoentry_ = StagedAutoEntry {
+        definition: StagedAutoEntryType::NA,
+        nomodify: false,
     };
+    let repetitions_ = 1;
+    let global_ = false;
+    let mut dtype_ = DataType::Text;
 
-    tmp.id = expect(tokens, &vec![TokenType::ObjectNumber], info)?
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse().expect("Unable to parse object id.");
-    tmp.name = expect(tokens, &vec![TokenType::Identifier], info)?
-        .value.clone();
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
-    info.bindings.fields.push((info.bindings.tables.last().unwrap().0, tmp.id, tmp.name.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
@@ -170,7 +89,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                 let calc = expect(tokens, &vec![TokenType::Exclamation, TokenType::Calculation], info)?;
                 match calc.ttype {
                     TokenType::Exclamation => {
-                        tmp.autoentry.definition = AutoEntryType::Calculation { 
+                        autoentry_.definition = StagedAutoEntryType::Calculation { 
                             code: expect(tokens, &vec![TokenType::Calculation], info)?
                                 .value.clone(),
                             noreplace: true 
@@ -178,7 +97,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
 
                     },
                     TokenType::Calculation => {
-                        tmp.autoentry.definition = AutoEntryType::Calculation { 
+                        autoentry_.definition = StagedAutoEntryType::Calculation { 
                             code: calc.value.clone(),
                             noreplace: false 
                         }
@@ -190,7 +109,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
 
             TokenType::Datatype => {
                 expect(tokens, &vec![TokenType::Assignment], info)?;
-                tmp.dtype = match expect(tokens, &vec![TokenType::Text, TokenType::Number, TokenType::Date], info)?.ttype {
+                dtype_ = match expect(tokens, &vec![TokenType::Text, TokenType::Number, TokenType::Date], info)?.ttype {
                     TokenType::Text => DataType::Text,
                     TokenType::Number => DataType::Number,
                     TokenType::Date => DataType::Date,
@@ -238,7 +157,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                             break;
                         }
                         _ => {
-                            return Err(ParseErr::UnexpectedToken { 
+                            return Err(CompileErr::UnexpectedToken { 
                                 token: token.clone(), 
                                 expected: vec![TokenType::Generate, TokenType::Next, TokenType::Increment] 
                             });
@@ -248,27 +167,27 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                 }
 
                 if generate_.is_none() {
-                    return Err(ParseErr::MissingAttribute { 
-                        base_object: tmp.name,
+                    return Err(CompileErr::MissingAttribute { 
+                        base_object: name_.value.clone(),
                         construct: String::from("Serial"), 
                         specifier: String::from("generate") 
                     })
                 }
                 if next_.is_none() {
-                    return Err(ParseErr::MissingAttribute { 
-                        base_object: tmp.name,
+                    return Err(CompileErr::MissingAttribute { 
+                        base_object: name_.value.clone(),
                         construct: String::from("Serial"), 
                         specifier: String::from("next") 
                     })
                 }
                 if increment_.is_none() {
-                    return Err(ParseErr::MissingAttribute { 
-                        base_object: tmp.name,
+                    return Err(CompileErr::MissingAttribute { 
+                        base_object: name_.value.clone(),
                         construct: String::from("Serial"), 
                         specifier: String::from("increment") 
                     })
                 }
-                tmp.autoentry.definition = AutoEntryType::Serial { 
+                autoentry_.definition = StagedAutoEntryType::Serial { 
                     next: next_.unwrap(), 
                     increment: increment_.unwrap(), 
                     trigger: generate_.unwrap() 
@@ -281,7 +200,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                 expect(tokens, &vec![TokenType::Assignment], info)?;
                 match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
-                        tmp.validation.checks.push(ValidationType::NotEmpty)
+                        checks_.push(StagedValidationType::NotEmpty)
                     },
                     TokenType::False => {},
                     _ => unreachable!()
@@ -291,7 +210,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                 expect(tokens, &vec![TokenType::Assignment], info)?;
                 match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
-                        tmp.validation.checks.push(ValidationType::Required)
+                        checks_.push(StagedValidationType::Required)
                     },
                     TokenType::False => {},
                     _ => unreachable!()
@@ -301,7 +220,7 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
                 expect(tokens, &vec![TokenType::Assignment], info)?;
                 match expect(tokens, &vec![TokenType::True, TokenType::False], info)?.ttype {
                     TokenType::True => {
-                        tmp.validation.checks.push(ValidationType::Unique)
+                        checks_.push(StagedValidationType::Unique)
                     },
                     TokenType::False => {},
                     _ => unreachable!()
@@ -314,16 +233,28 @@ pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Fie
     }
 
     if tokens.get(info.cursor).is_none() {
-        return Err(ParseErr::UnexpectedEOF);
+        return Err(CompileErr::UnexpectedEOF);
     }
-    Ok((tmp.id, tmp))
+    Ok((id_, StagedField {
+        id: id_,
+        name: name_.clone(),
+        dtype: dtype_,
+        validation: StagedValidation {
+            checks: checks_,
+            message: validation_msg,
+            trigger: validation_trigger,
+            user_override: user_override_
+        },
+        autoentry: autoentry_,
+        global: global_,
+        repetitions: repetitions_,
+    }))
 }
 
-pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Table), ParseErr> {
+pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedTable), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
-        .value.parse().expect("Unable to parse object ID.");
-    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
-    info.bindings.tables.push((id_, name_.clone()));
+        .value.parse::<u16>().expect("Unable to parse object ID.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
@@ -340,7 +271,7 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
             }
             TokenType::Comma => {
             }
-            _ => return Err(ParseErr::UnexpectedToken { 
+            _ => return Err(CompileErr::UnexpectedToken { 
                 token: token.clone(), 
                 expected: vec![TokenType::Field, TokenType::CloseBrace] 
             })
@@ -348,18 +279,16 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Tab
         info.cursor += 1;
     }
     if tokens.get(info.cursor).is_none() {
-        return Err(ParseErr::UnexpectedEOF);
+        return Err(CompileErr::UnexpectedEOF);
     }
-    Ok((id_, Table {
+    Ok((id_, StagedTable {
         id: id_,
-        name: name_,
-        created_by: String::from("admin"),
-        modified_by: String::from("admin"),
+        name: name_.clone(),
         fields: fields_,
     }))
 }
 
-pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, TableOccurrence), ParseErr> {
+pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedOccurrence), CompileErr> {
 
     let result = TableOccurrence {
         id: 0,
@@ -369,33 +298,29 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
         base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 },
     };
 
-    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<usize>()
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<u16>()
         .expect("Unable to parse object id.");
 
-    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
-    info.bindings.table_occurrences.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Colon], info)?;
     let tok = expect(tokens, &vec![TokenType::Identifier], info)?;
-    let base_table_ = tok.value.clone();
+    let base_table_ = tok;
     //info.unmapped.push((tok, DBobjectReference, FMobjType::Table, ));
 
 
-    Ok((id_, TableOccurrence {
+    Ok((id_, StagedOccurrence {
         id: id_,
-        created_by: String::from("admin"),
-        modified_by: String::from("admin"),
-        name: name_,
-        base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 }
+        name: name_.clone(),
+        base_table: base_table_.clone(),
     }))
 }
 
-pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Script), ParseErr> {
+pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Script), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
-        .value.parse::<usize>().expect("Unable to parse object number.");
+        .value.parse::<u16>().expect("Unable to parse object number.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
 
-    info.bindings.scripts.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -407,15 +332,15 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Sc
     Ok((id_, script_.get(0).expect("").clone()))
 }
 
-pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<(Option<String>, ValueListSortBy), ParseErr> {
+pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<(Option<Token>, StagedValueListSortBy), CompileErr> {
     let mut from_ = None;
-    let mut sort_ = ValueListSortBy::FirstField;
+    let mut sort_ = StagedValueListSortBy::FirstField;
 
     loop {
         match expect(tokens, &vec![TokenType::From, TokenType::Sort, TokenType::CloseBrace], info)?.ttype {
             TokenType::From => {
                 expect(tokens, &vec![TokenType::Assignment], info)?;
-                from_ = Some(expect(tokens, &vec![TokenType::Identifier], info)?.value.clone());
+                from_ = Some(expect(tokens, &vec![TokenType::Identifier], info)?);
                 info.cursor += 1;
                 if let Some(token) = tokens.get(info.cursor) {
                     match token.ttype {
@@ -423,17 +348,17 @@ pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Re
                             continue;
                         },
                         TokenType::CloseBrace => {
-                            return Ok((from_, sort_))
+                            return Ok((from_.cloned(), sort_))
                         }
                         _ => {
-                            return Err(ParseErr::UnexpectedToken { 
+                            return Err(CompileErr::UnexpectedToken { 
                                 token: token.clone(),
                                 expected: vec![TokenType::Comma, TokenType::CloseBrace] 
                             })
                         }
                     }
                 } else {
-                    return Err(ParseErr::UnexpectedEOF);
+                    return Err(CompileErr::UnexpectedEOF);
                 }
             }
             TokenType::Sort => {
@@ -443,8 +368,8 @@ pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Re
                     info)?;
 
                 sort_ = match order.ttype {
-                    TokenType::FirstField => ValueListSortBy::FirstField,
-                    TokenType::SecondField => ValueListSortBy::SecondField,
+                    TokenType::FirstField => StagedValueListSortBy::FirstField,
+                    TokenType::SecondField => StagedValueListSortBy::SecondField,
                     _ => unreachable!()
                 };
                 info.cursor += 1;
@@ -454,39 +379,38 @@ pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Re
                             continue;
                         },
                         TokenType::CloseBrace => {
-                            return Ok((from_, sort_))
+                            return Ok((from_.cloned(), sort_))
                         }
                         _ => {
-                            return Err(ParseErr::UnexpectedToken { 
+                            return Err(CompileErr::UnexpectedToken { 
                                 token: token.clone(),
                                 expected: vec![TokenType::Comma, TokenType::CloseBrace] 
                             })
                         }
                     }
                 } else {
-                    return Err(ParseErr::UnexpectedEOF);
+                    return Err(CompileErr::UnexpectedEOF);
                 }
 
             }
             TokenType::CloseBrace => {
-                return Ok((from_, sort_));
+                return Ok((from_.cloned(), sort_));
             }
             _ => unreachable!()
         }
     }
 }
 
-pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, ValueList), ParseErr> {
+pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedValueList), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value
-        .parse::<usize>().expect("Unable to parse object ID.");
-    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+        .parse::<u16>().expect("Unable to parse object ID.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
-    info.bindings.value_lists.push((id_, name_.clone()));
     if expect(tokens, &vec![TokenType::Assignment, TokenType::Colon], info)?.ttype 
         == TokenType::Colon {
-            let mut sort_ = ValueListSortBy::FirstField;
-            let mut from_: Option<String> = None;
-            let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
+            let mut sort_ = StagedValueListSortBy::FirstField;
+            let mut from_: Option<Token> = None;
+            let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?;
             info.cursor += 1;
             let token = &tokens[info.cursor];
 
@@ -496,13 +420,11 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                     TokenType::Relation | TokenType::Test | 
                     TokenType::EOF => {
                         info.cursor -= 1;
-                        return Ok((id_, ValueList {
+                        return Ok((id_, StagedValueList {
                             id: id_,
-                            name: name_,
-                            created_by: String::from("admin"),
-                            modified_by: String::from("admin"),
-                            definition: ValueListDefinition::FromField { 
-                                field1: first_field, 
+                            name: name_.clone(),
+                            definition: StagedValueListDefinition::FromField { 
+                                field1: first_field.clone(), 
                                 field2: None, 
                                 from: None, 
                                 sort: sort_, }
@@ -510,7 +432,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                         }))
                 },
                 TokenType::Comma => {
-                    let second_field = expect(tokens, &vec![TokenType::FieldReference], info)?.value.clone();
+                    let second_field = expect(tokens, &vec![TokenType::FieldReference], info)?;
                     info.cursor += 1;
                     let token = &tokens[info.cursor];
 
@@ -520,14 +442,12 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                             TokenType::Relation | TokenType::Test | 
                             TokenType::EOF  => {
                                 info.cursor -= 1;
-                                return Ok((id_, ValueList {
+                                return Ok((id_, StagedValueList {
                                     id: id_,
-                                    name: name_,
-                                    created_by: String::from("admin"),
-                                    modified_by: String::from("admin"),
-                                    definition: ValueListDefinition::FromField { 
-                                        field1: first_field, 
-                                        field2: Some(second_field), 
+                                    name: name_.clone(),
+                                    definition: StagedValueListDefinition::FromField { 
+                                        field1: first_field.clone(), 
+                                        field2: Some(second_field.clone()), 
                                         from: from_, 
                                         sort: sort_, }
 
@@ -536,21 +456,19 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                         TokenType::Assignment => {
                             expect(tokens, &vec![TokenType::OpenBrace], info)?;
                             (from_, sort_) = parse_value_list_attributes(tokens, info).expect("Unable to parse value list attributes.");
-                            return Ok((id_, ValueList {
+                            return Ok((id_, StagedValueList {
                                 id: id_,
-                                name: name_,
-                                created_by: String::from("admin"),
-                                modified_by: String::from("admin"),
-                                definition: ValueListDefinition::FromField { 
-                                    field1: first_field, 
-                                    field2: Some(second_field), 
+                                name: name_.clone(),
+                                definition: StagedValueListDefinition::FromField { 
+                                    field1: first_field.clone(), 
+                                    field2: Some(second_field.clone()), 
                                     from: from_, 
                                     sort: sort_, }
 
                             }))
                         }
                         _ => {
-                            return Err(ParseErr::UnexpectedToken { 
+                            return Err(CompileErr::UnexpectedToken { 
                                 token: token.clone(),
                                 expected: vec![
                                     TokenType::Table, TokenType::TableOccurrence,
@@ -564,13 +482,11 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                 TokenType::Assignment => {
                     expect(tokens, &vec![TokenType::OpenBrace], info)?;
                     (from_, sort_) = parse_value_list_attributes(tokens, info).expect("Unable to parse value list attributes.");
-                    return Ok((id_, ValueList {
+                    return Ok((id_, StagedValueList {
                         id: id_,
-                        name: name_,
-                        created_by: String::from("admin"),
-                        modified_by: String::from("admin"),
-                        definition: ValueListDefinition::FromField { 
-                            field1: first_field, 
+                        name: name_.clone(),
+                        definition: StagedValueListDefinition::FromField { 
+                            field1: first_field.clone(), 
                             field2: None, 
                             from: from_, 
                             sort: sort_, }
@@ -578,7 +494,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                     }))
                 }
                 _ => {
-                    return Err(ParseErr::UnexpectedToken { 
+                    return Err(CompileErr::UnexpectedToken { 
                         token: token.clone(),
                         expected: vec![
                             TokenType::Table, TokenType::TableOccurrence,
@@ -605,7 +521,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                     },
                     TokenType::Comma => {}
                     _ => {
-                        return Err(ParseErr::UnexpectedToken { 
+                        return Err(CompileErr::UnexpectedToken { 
                             token: token.clone(),
                             expected: vec![
                                 TokenType::CloseBrace,
@@ -620,7 +536,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
                 break;
             },
             _ => {
-                return Err(ParseErr::UnexpectedToken { 
+                return Err(CompileErr::UnexpectedToken { 
                     token: token.clone(), 
                     expected: vec![TokenType::String, TokenType::Comma, TokenType::CloseBrace] 
                 })
@@ -629,22 +545,19 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize
         info.cursor += 1;
     }
 
-    Ok((id_, ValueList {
+    Ok((id_, StagedValueList {
         id: id_,
-        name: name_,
-        created_by: String::from("admin"),
-        modified_by: String::from("admin"),
-        definition: ValueListDefinition::CustomValues(values)
+        name: name_.clone(),
+        definition: StagedValueListDefinition::CustomValues(values)
     }))
 }
 
-pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test), ParseErr> {
+pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Test), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
-        .value.parse::<usize>().expect("Unable to parse object id.");
+        .value.parse::<u16>().expect("Unable to parse object id.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
         .value.clone();
 
-    info.bindings.tests.push((id_, name_.clone()));
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
@@ -660,8 +573,8 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Test
     }))
 }
 
-pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<(&'a str, &'a str, RelationComparison), ParseErr> {
-    let lhs = expect(tokens, &vec![TokenType::FieldReference], info)?.value.as_str();
+pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<(&'a Token, &'a Token, RelationComparison), CompileErr> {
+    let lhs = expect(tokens, &vec![TokenType::FieldReference], info)?;
     info.cursor += 1;
     let comparison_ = match tokens[info.cursor].ttype {
         TokenType::Eq => RelationComparison::Equal,
@@ -671,19 +584,19 @@ pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) ->
         TokenType::Lt => RelationComparison::Less,
         TokenType::Lte => RelationComparison::LessEqual,
         TokenType::Cartesian => RelationComparison::Cartesian,
-        _ => return Err(ParseErr::UnexpectedToken { 
+        _ => return Err(CompileErr::UnexpectedToken { 
             token: tokens[info.cursor].clone(),
             expected: vec![TokenType::Eq, TokenType::Neq, TokenType::Gt,
             TokenType::Gte, TokenType::Lt, TokenType::Lte, TokenType::Cartesian] 
         })
     };
-    let rhs = expect(tokens, &vec![TokenType::FieldReference], info)?.value.as_str();
+    let rhs = expect(tokens, &vec![TokenType::FieldReference], info)?;
     Ok((lhs, rhs, comparison_ ))
 }
 
-pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, Relation), ParseErr> {
+pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedRelation), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
-        .value.parse::<usize>().expect("Unable to parse object id.");
+        .value.parse::<u16>().expect("Unable to parse object id.");
     expect(tokens, &vec![TokenType::Assignment], info)?;
     let token = expect(tokens, &vec![TokenType::OpenBrace, TokenType::FieldReference], info)?;
 
@@ -693,20 +606,20 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
         while let Some(_) = tokens.get(info.cursor) {
             // parse attribute
             let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
-            let lhs_table = lhs.split("::").collect::<Vec<_>>()[0];
-            let rhs_table = rhs.split("::").collect::<Vec<_>>()[0];
+            let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
+            let rhs_table = rhs.value.split("::").collect::<Vec<_>>()[0];
             if tables.iter().any(|t| t.is_none()) {
                 tables[0] = Some(lhs_table);
                 tables[1] = Some(rhs_table);
             }
             if !tables.iter().any(|search| search.unwrap().to_string() == lhs_table) {
-                return Err(ParseErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
+                return Err(CompileErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
             }
             if !tables.iter().any(|search| search.unwrap().to_string() == rhs_table) {
-                return Err(ParseErr::RelationCriteria { token: tokens[info.cursor].clone() })
+                return Err(CompileErr::RelationCriteria { token: tokens[info.cursor].clone() })
             }
 
-            criterias_.push(RelationCriteria::ByName { field1: lhs.to_string(), field2: rhs.to_string(), comparison: comp});
+            criterias_.push(StagedRelationCriteria { field1: lhs.clone(), field2: rhs.clone(), comparison: comp});
             let mut token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
             if token.ttype == TokenType::Comma {
                 if let Some(end) = tokens.get(info.cursor + 1) {
@@ -717,14 +630,10 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
                 }
             }
             if token.ttype == TokenType::CloseBrace {
-                return Ok((id_, Relation {
+                return Ok((id_, StagedRelation {
                     id: id_,
-                    table1: 0,
-                    table1_data_source: 0,
-                    table1_name: String::from(tables[0].unwrap()),
-                    table2: 0,
-                    table2_data_source: 0,
-                    table2_name: String::from(tables[1].unwrap()),
+                    table1: lhs_table.to_string(),
+                    table2: rhs_table.to_string(),
                     criterias: criterias_,
                 }))
             }
@@ -733,23 +642,19 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, 
     } else {
         info.cursor -= 1;
         let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
-        let lhs_table = lhs.split("::").collect::<Vec<_>>()[0];
-        let rhs_table = rhs.split("::").collect::<Vec<_>>()[0];
-        criterias_.push(RelationCriteria::ByName { field1: lhs.to_string(), field2: rhs.to_string(), comparison: comp });
-        return Ok((id_, Relation {
+        let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
+        let rhs_table = rhs.value.split("::").collect::<Vec<_>>()[0];
+        criterias_.push(StagedRelationCriteria { field1: lhs.clone(), field2: rhs.clone(), comparison: comp });
+        return Ok((id_, StagedRelation {
             id: id_,
-            table1: 0,
-            table1_data_source: 0,
-            table1_name: String::from(lhs_table),
-            table2: 0,
-            table2_data_source: 0,
-            table2_name: String::from(rhs_table),
+            table1: lhs_table.to_string(),
+            table2: rhs_table.to_string(),
             criterias: criterias_,
         }))
     }
 }
 
-pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, ParseErr> {
+pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, CompileErr> {
     let attributes = vec![];
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
@@ -757,7 +662,7 @@ pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result
                 return Ok(attributes);
             }
             _ => {
-                return Err(ParseErr::UnimplementedLanguageFeauture { 
+                return Err(CompileErr::UnimplementedLanguageFeauture { 
                     feature: String::from("Layout Attributes"),
                     token: token.clone() 
                 })
@@ -767,16 +672,15 @@ pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result
     unreachable!()
 }
 
-pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, LayoutFM), ParseErr> {
+pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedLayout), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
-        .value.parse::<usize>().expect("Unable to parse object id.");
-    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
-        .value.clone();
+        .value.parse::<u16>().expect("Unable to parse object id.");
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
 
     expect(tokens, &vec![TokenType::Colon], info)?;
 
-    let occurrence = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
+    let occurrence = expect(tokens, &vec![TokenType::Identifier], info)?;
 
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
@@ -784,30 +688,16 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(usize, La
     info.cursor += 1;
     let _attrs = parse_layout_attributes(tokens, info)?;
 
-    Ok((id_, LayoutFM {
+    Ok((id_, StagedLayout {
         id: id_,
-        name: name_,
-        table_occurrence: DBObjectReference {
-            data_source: 0,
-            top_id: 0,
-            inner_id: 0,
-        },
-        table_occurrence_name: occurrence,
+        name: name_.clone(),
+        base_occurrence: occurrence.clone(),
     }))
 }
 
-pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
-    let mut result = Schema::new();
-    let mut info =  ParseInfo { cursor: 0, bindings: BindingList {
-        tables: vec![],
-        fields: vec![],
-        tests: vec![],
-        scripts: vec![],
-        table_occurrences: vec![],
-        value_lists: vec![],
-    },
-    unmapped: vec![],
-    };
+pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
+    let mut result = Stage::new();
+    let mut info =  ParseInfo { cursor: 0 };
     
     loop {
         match &tokens[info.cursor].ttype {
@@ -842,7 +732,7 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
             TokenType::EOF => {
                 break;
             }
-            _ => { return Err(ParseErr::UnexpectedToken { 
+            _ => { return Err(CompileErr::UnexpectedToken { 
                 token: tokens[info.cursor].clone(), 
                 expected: [
                     TokenType::Table, TokenType::TableOccurrence, TokenType::Relation,
@@ -856,7 +746,7 @@ pub fn parse(tokens: &[Token]) -> Result<(Schema, BindingList), ParseErr> {
         }
         info.cursor += 1;
     };
-    Ok((result, info.bindings))
+    Ok((result))
 }
 
 #[cfg(test)]
@@ -865,7 +755,7 @@ mod tests {
 
     use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectReference, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
 
-    use super::{parse, ParseErr};
+    use super::*;
 
     #[test]
     fn basic_table_parse_test() {
@@ -892,48 +782,52 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
         let mut expected_fields = HashMap::new();
-        expected_fields.insert(1, Field {
+        expected_fields.insert(1, StagedField {
                     id: 1,
-                    name: String::from("id"),
-                    created_by: String::from("admin"),
-                    modified_by: String::from("admin"),
+                    name: Token::with_value(
+                        TokenType::Identifier,
+                        Location { line: 3, column: 26 },
+                        String::from("id")
+                    ),
                     repetitions: 1,
                     dtype: DataType::Number,
                     global: false,
-                    autoentry: AutoEntry {
+                    autoentry: StagedAutoEntry {
                         nomodify: false,
-                        definition: AutoEntryType::Calculation { 
+                        definition: StagedAutoEntryType::Calculation { 
                             code: String::from("get(uuid)"), 
                             noreplace: false, 
                         }
                     },
-                    validation: Validation {
+                    validation: StagedValidation {
                         checks: vec![
-                            ValidationType::Required,
-                            ValidationType::Unique
+                            StagedValidationType::Required,
+                            StagedValidationType::Unique
                         ],
                         message: String::from("Error with field validation."),
                         trigger: ValidationTrigger::OnEntry,
                         user_override: true,
                     }
                 });
-        expected_fields.insert(2, Field {
+        expected_fields.insert(2, StagedField {
                     id: 2,
-                    name: String::from("counter"),
-                    created_by: String::from("admin"),
-                    modified_by: String::from("admin"),
+                    name: Token::with_value(
+                        TokenType::Identifier,
+                        Location { line: 10, column: 26 },
+                        String::from("counter")
+                    ),
                     dtype: DataType::Number,
                     repetitions: 1,
                     global: false,
-                    autoentry: AutoEntry {
+                    autoentry: StagedAutoEntry {
                         nomodify: false,
-                        definition: AutoEntryType::Serial { 
+                        definition: StagedAutoEntryType::Serial { 
                             next: 1, 
                             increment: 1, 
                             trigger: SerialTrigger::OnCreation 
                         }
                     },
-                    validation: Validation {
+                    validation: StagedValidation {
                         checks: vec![
                         ],
                         message: String::from("Error with field validation."),
@@ -941,14 +835,17 @@ mod tests {
                         user_override: true,
                     }
                 });
-        let expected = Table {
+        let expected = StagedTable {
             id: 1,
-            name: String::from("Person"),
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 22},
+                "Person".to_string()),
             fields: expected_fields,
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
         };
-        assert_eq!(schema.0.tables[&1], expected);
+        println!("{:?}\n", schema.tables[&1]);
+        println!("{:?}\n", expected);
+        assert_eq!(schema.tables[&1], expected);
     }
 
     #[test]
@@ -961,19 +858,20 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::CustomValues(vec![
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                "basic".to_string()),
+            definition: StagedValueListDefinition::CustomValues(vec![
                 String::from("hello"),
                 String::from("world"),
                 String::from("this is a test")
             ])
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -984,20 +882,29 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
-                field2: Some("Person_occ::id".to_string()), 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                "basic".to_string()),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 31 },
+                            "Person_occ::name".to_string()
+                            ),
+                field2: Some(Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 47 },
+                            "Person_occ::id".to_string()
+                            )),
                 from: None, 
-                sort: ValueListSortBy::FirstField, 
+                sort: StagedValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1008,20 +915,25 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                "basic".to_string()),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 31 },
+                            "Person_occ::name".to_string()
+                            ),
                 field2: None,
                 from: None, 
-                sort: ValueListSortBy::FirstField, 
+                sort: StagedValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1035,20 +947,28 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                "basic".to_string()),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 31 },
+                            "Person_occ::name".to_string()
+                            ),
                 field2: None,
-                from: Some(String::from("Salary_occ")), 
-                sort: ValueListSortBy::SecondField, 
+                from: Some(Token::with_value(
+                    TokenType::Identifier,
+                    Location { line: 3, column: 20 },
+                    String::from("Salary_occ"))),
+                sort: StagedValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1061,20 +981,28 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                String::from("basic")),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column:  31 },
+                            String::from("Person_occ::name"),
+                        ),
                 field2: None,
-                from: Some(String::from("Salary_occ")), 
-                sort: ValueListSortBy::FirstField, 
+                from: Some(Token::with_value(
+                    TokenType::Identifier,
+                    Location { line: 3, column: 20 }, 
+                    String::from("Salary_occ"))), 
+                sort: StagedValueListSortBy::FirstField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1087,20 +1015,25 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                String::from("basic")),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 31 },
+                            String::from("Person_occ::name"),
+                        ),
                 field2: None,
                 from: None,
-                sort: ValueListSortBy::SecondField, 
+                sort: StagedValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1113,19 +1046,24 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected_valuelist = ValueList {
+        let expected_valuelist = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: String::from("Person_occ::name"),
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                String::from("basic")),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column:  31 },
+                            String::from("Person_occ::name"),
+                        ),
                 field2: None,
                 from: None,
-                sort: ValueListSortBy::FirstField 
+                sort: StagedValueListSortBy::FirstField 
             }
         };
-        assert_eq!(schema.0.value_lists[&1], expected_valuelist);
+        assert_eq!(schema.value_lists[&1], expected_valuelist);
     }
 
     #[test]
@@ -1139,20 +1077,32 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = ValueList {
+        let expected = StagedValueList {
             id: 1,
-            name: String::from("basic"),
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            definition: ValueListDefinition::FromField { 
-                field1: "Person_occ::name".to_string(), 
-                field2: Some(String::from("Person_occ::id")),
-                from: Some(String::from("Salary_occ")), 
-                sort: ValueListSortBy::SecondField, 
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 2, column: 23 },
+                String::from("basic")),
+            definition: StagedValueListDefinition::FromField { 
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column:  31 },
+                            String::from("Person_occ::name"),
+                        ),
+                field2: Some(Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column:  47 },
+                            String::from("Person_occ::id"),
+                        )),
+                from: Some(Token::with_value(
+                    TokenType::Identifier,
+                    Location { line: 3, column: 20 },
+                    String::from("Salary_occ"))),
+                sort: StagedValueListSortBy::SecondField, 
             }
         };
-        assert!(schema.0.value_lists.len() == 1);
-        assert_eq!(schema.0.value_lists[&1], expected);
+        assert!(schema.value_lists.len() == 1);
+        assert_eq!(schema.value_lists[&1], expected);
     }
 
     #[test]
@@ -1166,14 +1116,18 @@ mod tests {
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
 
-        let expected = TableOccurrence {
+        let expected = StagedOccurrence {
             id: 1,
-            created_by: String::from("admin"),
-            modified_by: String::from("admin"),
-            name: String::from("Person_occ"),
-            base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 }
+            name: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 4, column: 33 },
+                String::from("Person_occ")),
+            base_table: Token::with_value(
+                TokenType::Identifier,
+                Location { line: 4, column: 46 },
+                String::from("Person")),
         };
-        assert_eq!(expected, schema.0.table_occurrences[&1]);
+        assert_eq!(expected, schema.table_occurrences[&1]);
     }
 
     #[test]
@@ -1183,21 +1137,23 @@ mod tests {
         ";
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
-        let expected = Relation {
+        let expected = StagedRelation {
             id: 1,
-            table1_data_source: 0,
-            table1_name: String::from("Person_occ"),
-            table1: 0,
-            table2_data_source: 0,
-            table2_name: String::from("Job_occ"),
-            table2: 0,
-            criterias: vec![RelationCriteria::ByName {
-                field1: String::from("Person_occ::job_id"),
+            table1: String::from("Person_occ"),
+            table2: String::from("Job_occ"),
+            criterias: vec![StagedRelationCriteria {
+                field1: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 23 },
+                            String::from("Person_occ::job_id")),
                 comparison: RelationComparison::Equal,
-                field2: String::from("Job_occ::id")
+                field2: Token::with_value(
+                            TokenType::FieldReference,
+                            Location { line: 2, column: 42 },
+                            String::from("Job_occ::id")),
             }]
         };
-        assert_eq!(expected, schema.0.relations[&1])
+        assert_eq!(expected, schema.relations[&1])
     }
 
     #[test]
@@ -1210,28 +1166,36 @@ mod tests {
         ";
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens).expect("Parsing failed.");
-        let expected = Relation {
+        let expected = StagedRelation {
             id: 1,
-            table1_data_source: 0,
-            table1_name: String::from("Person_occ"),
-            table1: 0,
-            table2_data_source: 0,
-            table2_name: String::from("Job_occ"),
-            table2: 0,
+            table1: String::from("Person_occ"),
+            table2: String::from("Job_occ"),
             criterias: vec![
-                RelationCriteria::ByName {
-                    field1: String::from("Person_occ::job_id"),
+                StagedRelationCriteria {
+                    field1: Token::with_value(
+                                TokenType::FieldReference,
+                                Location { line: 3, column: 13 },
+                                String::from("Person_occ::job_id")),
                     comparison: RelationComparison::Equal,
-                    field2: String::from("Job_occ::id"),
+                    field2: Token::with_value(
+                                TokenType::FieldReference,
+                                Location { line: 3, column: 32 },
+                                String::from("Job_occ::id")),
                 },
-                RelationCriteria::ByName {
-                    field1: String::from("Person_occ::first_name"),
+                StagedRelationCriteria {
+                    field1: Token::with_value(
+                                TokenType::FieldReference,
+                                Location { line: 4, column: 13 },
+                                String::from("Person_occ::first_name")),
                     comparison: RelationComparison::NotEqual,
-                    field2: String::from("Job_occ::name"),
+                    field2: Token::with_value(
+                                TokenType::FieldReference,
+                                Location { line: 4, column: 36 },
+                                String::from("Job_occ::name")),
                 }
             ]
         };
-        assert_eq!(expected, schema.0.relations[&1])
+        assert_eq!(expected, schema.relations[&1])
     }
 
     #[test]
@@ -1244,7 +1208,7 @@ mod tests {
         ";
         let tokens = lex(code).expect("Tokenisation failed.");
         let schema = parse(&tokens);
-        let expected = ParseErr::RelationCriteria { 
+        let expected = CompileErr::RelationCriteria { 
             token: Token::with_value(
                        TokenType::FieldReference, 
                        Location { line: 4, column: 36 }, 
