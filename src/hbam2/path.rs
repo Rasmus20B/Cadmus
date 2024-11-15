@@ -13,6 +13,16 @@ impl HBAMPath {
             components: components_.iter().map(|c| c.to_vec()).collect()
         }
     }
+
+    pub fn contains(&self, contained: &HBAMPath) -> bool {
+        if self.components.len() > contained.components.len() { return false }
+        for (idx, _) in self.components.iter().enumerate() {
+            if self.components[idx] != contained.components[idx] {
+                return false
+            }
+        }
+        true
+    }
 }
 
 impl PartialOrd for HBAMPath {

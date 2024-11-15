@@ -14,6 +14,16 @@ pub enum ChunkContents<'a> {
     Pop,
     Noop, 
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum LocalChunkContents {
+    SimpleData { data: Vec<u8> },
+    SimpleRef { key: u16, data: Vec<u8> },
+    LongRef { key: Vec<u8>, data: Vec<u8> },
+    Segment { index: u16, data: Vec<u8> },
+    Push { key: Vec<u8> },
+    Pop,
+    Noop, 
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum ParseErr {
@@ -22,6 +32,14 @@ pub enum ParseErr {
     UnrecognizedOpcode(u8),
     MalformedChunk,
     DataExceedsSectorSize,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalChunk {
+    pub offset: u16,
+    pub opcode: u16,
+    pub contents: LocalChunkContents,
+    pub delayed: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +65,39 @@ impl<'a> Chunk<'a> {
         }
     }
 
-    pub fn from_bytes(code: &'a [u8], offset: &'a mut usize) -> Result<Chunk<'a>, ParseErr> {
+    pub fn copy_to_local(&self) -> LocalChunk {
+        LocalChunk {
+            offset: self.offset,
+            opcode: self.opcode,
+            delayed: self.delayed,
+            contents: match self.contents {
+                ChunkContents::SimpleData { data } => {
+                    LocalChunkContents::SimpleData { data: data.to_vec() }
+                }
+                ChunkContents::SimpleRef { key, data } => {
+                    LocalChunkContents::SimpleRef { key: key.clone(), data: data.to_vec() }
+                }
+                ChunkContents::LongRef { key, data } => {
+                    LocalChunkContents::LongRef { key: key.to_vec(), data: data.to_vec() }
+                }
+                ChunkContents::Pop => {
+                    LocalChunkContents::Pop
+                },
+                ChunkContents::Push { key } => {
+                    LocalChunkContents::Push { key: key.to_vec() }
+                }
+                ChunkContents::Segment { ref index, data } => {
+                    LocalChunkContents::Segment { index: *index, data: data.to_vec() }
+                }
+                ChunkContents::Noop => {
+                    LocalChunkContents::Noop
+                }
+            }
+        }
+    }
+
+    pub fn from_bytes<'b>(code: &'a [u8], offset: &'b mut usize) -> Result<Chunk<'b>, ParseErr> 
+        where 'a: 'b {
         let mut chunk_code = code[*offset];
         let mut delayed = false;
         let saved_offset = *offset as u16;

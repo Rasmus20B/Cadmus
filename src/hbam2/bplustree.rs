@@ -71,7 +71,7 @@ fn search_key_in_page<'a>(key_: &HBAMPath, page_data: &[u8; 4096]) -> Result<Opt
     Ok(None)
 }
 
-fn get_page<'a>(index: PageIndex, cache: &'a mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr> {  
+fn get_page<'a>(index: PageIndex, cache: &'a mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> {  
     match cache.get(file.to_string(), index) {
         Some(inner) => Ok(inner),
         None => {
@@ -139,7 +139,7 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
     return Err(BPlusTreeErr::KeyNotFound(key_.components.clone()));
 }
 
-fn get_data_page<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) -> Result<Arc<Page>, BPlusTreeErr> { 
+fn get_data_page<'a, 'b>(key: &HBAMPath, cache: &'b mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> { 
     if key.components.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
@@ -165,12 +165,42 @@ fn get_data_page<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) ->
     }
 }
 
-pub fn get_view_from_key<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) -> Result<Option<View<'a>>, BPlusTreeErr> {
+pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &str) -> Result<Option<View>, BPlusTreeErr> 
+    where 'a: 'b
+{
     if key.components.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
-
     let mut current_page = get_data_page(&key, cache, file)?;
+    let mut current_path = HBAMPath::new(vec![]);
 
-    unimplemented!()
+    let mut chunks = vec![];
+
+    loop {
+        let mut offset = 20usize;
+        while offset < Page::SIZE as usize {
+            let chunk = Chunk::from_bytes(&current_page.data, &mut offset).expect("Unable to decode chunk.");
+
+            if key.contains(&current_path) {
+                chunks.push(chunk.copy_to_local())
+            } else if current_path > *key {
+                if chunks.is_empty() { return Ok(None) }
+                else {
+                    return Ok(Some(View::new(key.clone(), chunks)))
+                }
+            }
+
+            match chunk.contents {
+                ChunkContents::Push { key } => {
+                    current_path.components.push(key.to_vec());
+                },
+                ChunkContents::Pop => {
+                    current_path.components.pop();
+                },
+                _ => {}
+            }
+        }
+        current_page = get_page(current_page.header.next.into(), cache, file)?;
+    }
+
 }
 
 pub fn search_key<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
