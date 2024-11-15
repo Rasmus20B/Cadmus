@@ -1,4 +1,4 @@
-use super::{page_store::PageStore, bplustree::{search_key, BPlusTreeErr}};
+use super::{page_store::PageStore, path::HBAMPath, bplustree::{search_key, BPlusTreeErr}};
 
 use std::collections::hash_map::HashMap;
 
@@ -7,11 +7,11 @@ pub type Value = String;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct KeyValue {
-    pub key: Vec<String>,
+    pub key: Vec<Vec<u8>>,
     pub value: Vec<u8>,
 }
 
-pub fn get_keyvalue<'a>(key: &'a Key, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
+pub fn get_keyvalue<'a>(key: &HBAMPath, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
     // Get KeyVal pair from HBAM in byte form.
     match search_key(key, store, file) {
         Ok(inner) => Ok(inner),
@@ -40,23 +40,21 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 mod tests {
 
     use super::{KeyValue, get_keyvalue, PageStore};
+    use crate::hbam2::path::HBAMPath;
     #[test]
     fn get_keyval_test() {
 
-        let key_ = vec![
-            String::from("3"),
-            String::from("17"),
-            String::from("1"),
-            String::from("0"),
-        ];
+        let key = HBAMPath::new(vec![
+            &[3], &[17], &[1], &[0]
+        ]);
         let expected = KeyValue {
-            key: key_.clone(),
+            key: key.components.clone(),
             value: vec![3, 208, 0, 1],
         };
 
         let mut cache = PageStore::new();
 
-        let result = get_keyvalue(&key_, &mut cache, "test_data/input/blank.fmp12").expect("Unable to get keyval");
+        let result = get_keyvalue(&key, &mut cache, "test_data/input/blank.fmp12").expect("Unable to get keyval");
 
         assert_eq!(result, Some(expected));
     }

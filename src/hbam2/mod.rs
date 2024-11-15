@@ -5,4 +5,6 @@ mod keyvalue;
 mod page;
 mod page_store;
 mod chunk;
+mod path;
 mod parser;
+mod view;
