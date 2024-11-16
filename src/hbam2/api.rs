@@ -1,3 +1,5 @@
+use crate::{hbam2::bplustree::get_view_from_key, schema::Table, util::encoding_util::{fm_string_decrypt, get_path_int}};
+
 use super::{page_store::PageStore, path::HBAMPath, bplustree::{search_key, BPlusTreeErr}};
 
 use std::collections::hash_map::HashMap;
@@ -9,6 +11,27 @@ pub type Value = String;
 pub struct KeyValue {
     pub key: Vec<Vec<u8>>,
     pub value: Vec<u8>,
+}
+
+pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Table> {
+    let view_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[16], &[5]]), cache, file)
+        .expect("Unable to get table info from file.") {
+            Some(inner) => inner,
+            None => return HashMap::new()
+        };
+
+    let mut result = HashMap::new();
+    for dir in view_option.get_dirs().unwrap() {
+        let id_ = get_path_int(&dir.path.components[dir.path.components.len()-1]);
+        result.insert(id_ as usize, Table {
+            id: id_ as usize,
+            name: fm_string_decrypt(dir.get_value(16).unwrap()),
+            created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
+            modified_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
+            fields: HashMap::new(),
+        });
+    }
+    result
 }
 
 pub fn get_keyvalue<'a>(key: &HBAMPath, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
@@ -39,7 +62,7 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 #[cfg(test)]
 mod tests {
 
-    use super::{KeyValue, get_keyvalue, PageStore};
+    use super::{get_keyvalue, get_table_catalog, KeyValue, PageStore};
     use crate::hbam2::path::HBAMPath;
     #[test]
     fn get_keyval_test() {
@@ -59,5 +82,13 @@ mod tests {
         assert_eq!(result, Some(expected));
     }
 
-
+    #[test]
+    fn get_table_catalog_test() {
+        let mut cache = PageStore::new();
+        let result = get_table_catalog(&mut cache, "test_data/input/blank.fmp12");
+        assert_eq!(1, result.len());
+        for (_, table) in result {
+            println!("Table: {:?}", table);
+        }
+    }
 }

@@ -8,7 +8,7 @@ pub struct View {
 
 #[derive(Debug)]
 pub struct SubView<'a> {
-    path: HBAMPath,
+    pub path: HBAMPath,
     chunks: Vec<&'a LocalChunk>,
 }
 
