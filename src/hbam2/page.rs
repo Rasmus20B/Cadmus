@@ -32,9 +32,9 @@ impl PageHeader {
         let next_ = get_int(&bytes[8..12]) as u32;
         let page_type_ = match bytes[13] {
             0 => PageType::Data,
-            1 => PageType::Index,
-            3 => PageType::Root,
-            _ => return Err(PageHeaderErr::InvalidPageType(previous_, next_))
+            _ => PageType::Index,
+            // 3 => PageType::Root,
+            // _ => return Err(PageHeaderErr::InvalidPageType(previous_, next_))
         };
         Ok(Self {
             index: 0,

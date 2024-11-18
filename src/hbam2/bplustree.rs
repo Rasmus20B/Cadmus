@@ -91,7 +91,7 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
     let search_key = key_.clone();
     let mut cur_index = 1;
     let mut delayed_pops = 0;
-    //println!("Current: {:?}, search: {:?}", cur_path, search_key);
+
     while cur_path <= search_key  && offset < Page::SIZE as usize {
         if let Ok(chunk) = Chunk::from_bytes(&page.data, &mut(offset)) {
             match chunk.contents {
@@ -133,7 +133,7 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
                 _ => {}
             }
         } else {
-            return Err(BPlusTreeErr::KeyNotFound(key_.components.to_vec()))
+            return Ok(cur_index as u64)
         }
     }
     return Err(BPlusTreeErr::KeyNotFound(key_.components.clone()));
@@ -154,7 +154,11 @@ fn get_data_page<'a, 'b>(key: &HBAMPath, cache: &'b mut PageStore, file: &str) -
                 return Ok(cur_page);
             },
             PageType::Index | PageType::Root => {
-                let next_index = search_index_page(&key, *cur_page)?;
+                let next_index = match search_index_page(&key, *cur_page) {
+                    Ok(inner) => inner,
+                    Err(BPlusTreeErr::KeyNotFound(_)) => cur_page.header.next as u64,
+                    Err(e) => return Err(e)
+                };
                 if page_set.contains(&next_index) {
                     return Err(BPlusTreeErr::PageCycle(next_index))
                 }
@@ -177,7 +181,12 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
     loop {
         let mut offset = 20usize;
         while offset < Page::SIZE as usize {
-            let chunk = Chunk::from_bytes(&current_page.data, &mut offset).expect("Unable to decode chunk.");
+            let chunk = match Chunk::from_bytes(&current_page.data, &mut offset) {
+                Ok(inner) => inner,
+                Err(ParseErr::EndChunk) => {break;}
+                Err(e) => return Err(BPlusTreeErr::InvalidChunkComposition(e)),
+            };
+
 
             if key.contains(&current_path) {
                 chunks.push(chunk.copy_to_local())
@@ -198,6 +207,7 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
                 _ => {}
             }
         }
+        if current_page.header.next == 0 { return Ok(None) }
         current_page = get_page(current_page.header.next.into(), cache, file)?;
     }
 
@@ -232,6 +242,46 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
         .expect("Unable to read from file.");
 
     Ok(Page::from_bytes(&buffer))
+}
+
+pub fn print_tree(cache: &mut PageStore, file: &str) {
+    let mut index = 1u32;
+    
+    let mut cursor = Cursor {
+        key: vec![],
+        offset: 20,
+    };
+    
+    while index > 0 {
+        let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
+        index = current_page.header.next;
+
+        let mut path = HBAMPath::new(vec![]);
+
+        while cursor.offset < Page::SIZE as usize {
+            let chunk = Chunk::from_bytes(&current_page.data, &mut cursor.offset);
+            let unwrapped = match chunk {
+                Ok(inner) => inner,
+                Err(ParseErr::EndChunk) => {continue;}
+                Err(..) => return
+            };
+
+            match unwrapped.contents {
+                ChunkContents::Push { key } => {
+                    path.components.push(key.to_vec());
+                }
+                ChunkContents::Pop => {
+                    path.components.pop();
+                }
+                _ => {}
+            }
+            if unwrapped.delayed {
+                path.components.pop();
+            }
+        }
+
+        cursor.offset = 20;
+    }
 }
 
 

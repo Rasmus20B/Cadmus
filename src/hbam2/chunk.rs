@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Formatter;
 use serde::{self, Deserialize, Serialize};
 use crate::util::encoding_util::{get_int, get_path_int};
 
@@ -382,25 +383,51 @@ impl<'a> Chunk<'a> {
                 delayed))
     }
 }
-// impl fmt::Display for Chunk {
-//     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-//     match self.ctype {
-//         InstructionType::DataSegment => {
-//             write!(f, "path:{:?}::segment:{:?}::data:{:?}::size:{:?}::ins:{:x}", 
-//                 self.path.components,
-//                  self.segment_idx.unwrap(),
-//                  self.data.unwrap(),
-//                  self.data.unwrap().length,
-//                  self.opcode)
-//         },
-//         InstructionType::RefSimple => {
-//             write!(f, "path:{:?}::reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
-//                  self.path.components,
-//                  self.ref_simple.unwrap(),
-//                  self.data.unwrap(),
-//                  self.data.unwrap().length,
-//                  self.opcode)
-//         }
+impl fmt::Display for Chunk<'_> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    match self.contents {
+        ChunkContents::Push { key } => {
+            write!(f, "push:{:?}::data:NA::size:{:?}::ins:{:x}", 
+                key,
+                key.len(),
+                self.opcode)
+        },
+        ChunkContents::SimpleData { data } => {
+            write!(f, "simple:NA::data:{:?}::size:{}::ins:{:x}",
+                data,
+                data.len(),
+                self.opcode)
+        }
+        ChunkContents::SimpleRef { key, data } => {
+            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+                key,
+                data,
+                data.len(),
+                self.opcode)
+        },
+        ChunkContents::LongRef { key, data } => {
+            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}",
+                key,
+                data,
+                data.len(),
+                self.opcode)
+        },
+        ChunkContents::Segment { index, data } => {
+            write!(f, "segment:{}::data:{:?}::size:{}::ins:{:x}",
+                index,
+                data,
+                data.len(),
+                self.opcode)
+        },
+        ChunkContents::Pop => {
+            write!(f, "pop:NA")
+        },
+        ChunkContents::Noop => {
+            write!(f, "noop:NA")
+        }
+    }
+    }
+}
 //         InstructionType::DataSimple => {
 //             write!(f, "path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
 //                  self.path.components,

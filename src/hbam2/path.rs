@@ -1,3 +1,4 @@
+use core::fmt;
 use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,18 @@ impl PartialOrd for HBAMPath {
         }
         Some(Ordering::Equal)
     }
+}
+
+impl fmt::Display for HBAMPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut result = String::new();
+        for c in &self.components {
+            result.push_str(format!("[{:?}].", c).as_str());
+        }
+        result.pop();
+        write!(f, "{}", result)
+    }
+
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::Table, util::encoding_util::{fm_string_decrypt, get_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DataType, Field, Table, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
 
-use super::{page_store::PageStore, path::HBAMPath, bplustree::{search_key, BPlusTreeErr}};
+use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
 use std::collections::hash_map::HashMap;
 
@@ -13,6 +13,11 @@ pub struct KeyValue {
     pub value: Vec<u8>,
 }
 
+pub fn emit_file(file: &str) {
+    let mut cache = PageStore::new();
+    bplustree::print_tree(&mut cache, file);
+}
+
 pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Table> {
     let view_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[16], &[5]]), cache, file)
         .expect("Unable to get table info from file.") {
@@ -22,13 +27,48 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
 
     let mut result = HashMap::new();
     for dir in view_option.get_dirs().unwrap() {
+        let path_id =  &dir.path.components[dir.path.components.len()-1];
         let id_ = get_path_int(&dir.path.components[dir.path.components.len()-1]);
+
+        let field_view = match get_view_from_key(&HBAMPath::new(vec![path_id.as_slice(), &[3], &[5]]), cache, file)
+            .expect("Unable to get fields for table.") {
+                Some(inner) => inner,
+                None => return HashMap::new()
+        };
+
+        let mut fields_ = HashMap::new();
+
+        for dir in field_view.get_dirs().unwrap() {
+            let path_id = dir.path.components.last().unwrap();
+            let id_ = get_path_int(&dir.path.components[dir.path.components.len()-1]);
+
+            fields_.insert(id_, Field {
+                id: id_,
+                name: fm_string_decrypt(dir.get_value(16).expect("Unable to get field name.")),
+                dtype: DataType::Text,
+                autoentry: AutoEntry { 
+                    nomodify: false, 
+                    definition: AutoEntryType::NA 
+                },
+                validation: Validation {
+                    trigger: ValidationTrigger::OnEntry,
+                    checks: vec![],
+                    user_override: true,
+                    message: String::from("Invalid data entered."),
+                },
+                global: false,
+                repetitions: 1,
+                created_by: fm_string_decrypt(dir.get_value(64513).expect("Unable to get created by for field.")),
+                modified_by: fm_string_decrypt(dir.get_value(64514).expect("Unable to get modified by for field."))
+            });
+        }
+
         result.insert(id_ as usize, Table {
             id: id_ as usize,
             name: fm_string_decrypt(dir.get_value(16).unwrap()),
             created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
             modified_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
-            fields: HashMap::new(),
+            fields: fields_,
         });
     }
     result
@@ -89,6 +129,9 @@ mod tests {
         assert_eq!(1, result.len());
         for (_, table) in result {
             println!("Table: {:?}", table);
+            for (_, field) in table.fields {
+               println!("field: {}", field.name);
+            }
         }
     }
 }

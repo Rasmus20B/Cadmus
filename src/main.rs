@@ -4,6 +4,7 @@ use clap::Parser;
 use cli::CommandLine;
 use diff::get_diffs;
 use hbam::{chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
+use hbam2::api;
 use schema::Schema;
 
 
@@ -64,7 +65,7 @@ fn main() -> Result<(), std::io::Error>{
         }
 
         if args.print_all_blocks {
-            base_file.inner.print_all_chunks();
+            api::emit_file(&args.fmp.as_ref().unwrap());
         }
 
         if args.print_root_block {
