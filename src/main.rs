@@ -51,26 +51,26 @@ fn main() -> Result<(), std::io::Error>{
     }
 
     if args.fmp.is_some() {
-        base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
-        let mut base_file = base_file.unwrap();
-        ctx.fmp = Schema::from(&mut base_file);
-
-        if args.print_directory.is_some() {
-            let dir = HBAMPath::from(args.print_directory.unwrap());
-            let (leaf, buffer) = base_file.inner.get_leaf_with_buffer(&dir);
-            for wrapper in leaf.chunks {
-                let chunk = Chunk::from(wrapper);
-                println!("{}", chunk.chunk_to_string(&buffer))
-            }
-        }
+        // base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
+        // let mut base_file = base_file.unwrap();
+        // ctx.fmp = Schema::from(&mut base_file);
+        //
+        // if args.print_directory.is_some() {
+        //     let dir = HBAMPath::from(args.print_directory.unwrap());
+        //     let (leaf, buffer) = base_file.inner.get_leaf_with_buffer(&dir);
+        //     for wrapper in leaf.chunks {
+        //         let chunk = Chunk::from(wrapper);
+        //         println!("{}", chunk.chunk_to_string(&buffer))
+        //     }
+        // }
 
         if args.print_all_blocks {
             api::emit_file(&args.fmp.as_ref().unwrap());
         }
 
-        if args.print_root_block {
-            base_file.inner.print_root_block();
-        }
+        // if args.print_root_block {
+        //     base_file.inner.print_root_block();
+        // }
 
         if args.json_out {
             let path_text = args.fmp.clone().unwrap();

@@ -245,15 +245,18 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
 }
 
 pub fn print_tree(cache: &mut PageStore, file: &str) {
-    let mut index = 1u32;
-    
+    let mut index = 2u32;
     let mut cursor = Cursor {
         key: vec![],
         offset: 20,
     };
     
-    while index > 0 {
+    let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
+    println!("Looking @ block {}", index);
+    index = current_page.header.next;
+    while index != 1 {
         let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
+        println!("Looking @ block {}", index);
         index = current_page.header.next;
 
         let mut path = HBAMPath::new(vec![]);
@@ -263,8 +266,12 @@ pub fn print_tree(cache: &mut PageStore, file: &str) {
             let unwrapped = match chunk {
                 Ok(inner) => inner,
                 Err(ParseErr::EndChunk) => {continue;}
-                Err(..) => return
+                Err(..) => {
+                    return
+                }
             };
+
+            println!("{}::{}", path, unwrapped);
 
             match unwrapped.contents {
                 ChunkContents::Push { key } => {

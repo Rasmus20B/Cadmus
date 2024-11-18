@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DataType, Field, Table, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataType, Field, Relation, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -53,8 +53,8 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
                 validation: Validation {
                     trigger: ValidationTrigger::OnEntry,
                     checks: vec![],
-                    user_override: true,
-                    message: String::from("Invalid data entered."),
+                    user_override: false,
+                    message: String::from("Error with validation."),
                 },
                 global: false,
                 repetitions: 1,
@@ -72,6 +72,46 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
         });
     }
     result
+}
+
+pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usize, TableOccurrence>, HashMap<usize, Relation>) {
+    let view_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[17], &[5]]), cache, file)
+        .expect("Unable to get table info from file.") {
+            Some(inner) => inner,
+            None => return (HashMap::new(), HashMap::new())
+        };
+    let mut relations = HashMap::<usize, Relation>::new();
+    let mut occurrences = HashMap::<usize, TableOccurrence>::new();
+
+    for dir in view_option.get_dirs().unwrap() {
+        let path_id = dir.path.components.last().unwrap();
+        let id_ = get_path_int(path_id);
+        println!("id: {}", id_);
+        let definition = dir.get_value(2).unwrap();
+        occurrences.insert(id_, TableOccurrence {
+            id: id_,
+            name: fm_string_decrypt(dir.get_value(16).unwrap()),
+            created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
+            modified_by: fm_string_decrypt(dir.get_value(64514).unwrap()),
+            base_table: DBObjectReference {
+                data_source: 0,
+                top_id: definition[6] as u16 + 128,
+                inner_id: 0,
+            }
+        });
+
+        let storage = match dir.get_dir_relative(HBAMPath::new(vec![&[208, 0, 1]])) {
+            Some(inner) => inner,
+            None => { continue; }
+        };
+
+        let relation_definitions = storage.get_simple_data().unwrap();
+        for def in relation_definitions {
+            println!("{:?}", def);
+        }
+    }
+
+    (occurrences, HashMap::new())
 }
 
 pub fn get_keyvalue<'a>(key: &HBAMPath, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
@@ -103,7 +143,7 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 mod tests {
 
     use super::{get_keyvalue, get_table_catalog, KeyValue, PageStore};
-    use crate::hbam2::path::HBAMPath;
+    use crate::{hbam2::{api::get_occurrence_catalog, path::HBAMPath}, schema::TableOccurrence};
     #[test]
     fn get_keyval_test() {
 
@@ -133,5 +173,25 @@ mod tests {
                println!("field: {}", field.name);
             }
         }
+    }
+
+    #[test]
+    fn get_table_occurrence_catalog_test() {
+        let mut cache = PageStore::new();
+        let (occurrences, relations) = get_occurrence_catalog(&mut cache, "test_data/input/relation.fmp12");
+        assert_eq!(2, occurrences.len());
+        println!("{:?}", occurrences);
+        assert_eq!(*occurrences.get(&129).unwrap(), TableOccurrence {
+            id: 129,
+            name: String::from("blank"),
+            base_table: crate::schema::DBObjectReference { 
+                data_source: 0, 
+                top_id: 129, 
+                inner_id: 0, 
+            },
+            created_by: String::from("admin"),
+            modified_by: String::from("Admin"),
+        });
+        assert_eq!(0, relations.len());
     }
 }

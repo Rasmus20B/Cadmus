@@ -353,7 +353,7 @@ impl<'a> Chunk<'a> {
         } else if chunk_code == 0x30 {
             *offset += 1;
             contents = ChunkContents::Push { 
-                key: &code[*offset..*offset+3] 
+                key: &code[*offset+1..*offset+3] 
             };
             *offset += 3;
         } else if chunk_code == 0x38 {

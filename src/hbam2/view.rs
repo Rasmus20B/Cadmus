@@ -1,4 +1,4 @@
-use super::{path::HBAMPath, chunk::{Chunk, LocalChunk, LocalChunkContents, ChunkContents}};
+use super::{chunk::{Chunk, ChunkContents, LocalChunk, LocalChunkContents}, path::HBAMPath};
 
 #[derive(Debug)]
 pub struct View {
@@ -39,6 +39,29 @@ impl<'a> SubView<'a> {
         None
     }
 
+    pub fn get_simple_data(&self) -> Option<Vec<&[u8]>> {
+        let mut result = vec![];
+        let mut depth = 0;
+        for chunk in &self.chunks {
+            match &chunk.contents {
+                LocalChunkContents::Push { .. } => {
+                    depth += 1;
+                }
+                LocalChunkContents::Pop => {
+                    depth -= 1;
+                }
+                LocalChunkContents::SimpleData { data } => {
+                    if depth == 0 {
+                        result.push(data.as_slice());
+                    }
+                }
+                _ => {}
+            }
+        }
+        if result.is_empty() { return None }
+        else { return Some(result) } 
+    }
+
     pub fn get_dirs(&self) -> Option<Vec<SubView>> {
         let mut depth = 0;
         let mut result = vec![];
@@ -77,6 +100,36 @@ impl<'a> SubView<'a> {
         else {
             return Some(result)
         }
+    }
+
+    pub fn get_dir_relative<'b>(&'a self, mut search: HBAMPath) -> Option<SubView<'b>> where 'a:'b {
+        let mut current_dir = self.path.clone();
+
+        let mut full_search = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
+        full_search.components.append(&mut search.components);
+
+        let mut result_chunks = vec![];
+        for chunk in &self.chunks {
+            match &chunk.contents {
+                LocalChunkContents::Push { key } => {
+                    current_dir.components.push(key.to_vec());
+                }
+                LocalChunkContents::Pop => {
+                    current_dir.components.pop();
+                }
+                _ => { }
+            }
+            if current_dir > search {
+                if result_chunks.is_empty() { return None }
+                else {
+                    return Some(SubView::new(search, result_chunks))
+                }
+            }
+            if current_dir == search {
+               result_chunks.push(chunk)
+            }
+        }
+        None
     }
 }
 
