@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataType, Field, Relation, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataType, Field, Relation, RelationComparison, RelationCriteria, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -86,7 +86,6 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
     for dir in view_option.get_dirs().unwrap() {
         let path_id = dir.path.components.last().unwrap();
         let id_ = get_path_int(path_id);
-        println!("id: {}", id_);
         let definition = dir.get_value(2).unwrap();
         occurrences.insert(id_, TableOccurrence {
             id: id_,
@@ -100,18 +99,70 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
             }
         });
 
-        let storage = match dir.get_dir_relative(HBAMPath::new(vec![&[208, 0, 1]])) {
+        let storage = match dir.get_dir_relative(&mut HBAMPath::new(vec![&[251]])) {
             Some(inner) => inner,
             None => { continue; }
         };
 
         let relation_definitions = storage.get_simple_data().unwrap();
         for def in relation_definitions {
-            println!("{:?}", def);
+            let mut tmp = Relation::new(def[4] as usize);
+            tmp.table1 = DBObjectReference { 
+                data_source: 0,
+                top_id: id_ as u16,
+                inner_id: 0,
+            };
+            tmp.table2 = DBObjectReference { 
+                data_source: 0,
+                top_id: def[2] as u16 + 128,
+                inner_id: 0,
+            };               
+
+            relations.insert(tmp.id, tmp);
         }
     }
 
-    (occurrences, HashMap::new())
+    let relation_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[251], &[5]]), cache, file).unwrap() {
+        Some(inner) => inner,
+        None => return (occurrences, relations)
+    };
+
+    for relation_dir in relation_option.get_dirs().unwrap() {
+
+        let criteria_dir = relation_dir.get_dir_relative(&mut HBAMPath::new(vec![&[3]])).unwrap();
+        let criterias = match criteria_dir.get_all_simple_keyvalues() {
+            Some(inner) => inner,
+            None => { break }
+        };
+
+        let id_ = relation_dir.path.components.last().unwrap();
+
+
+        for criteria in criterias {
+            let comparison_ = match criteria.1[0] {
+                0 => RelationComparison::Equal,
+                1 => RelationComparison::NotEqual,
+                2 => RelationComparison::Greater,
+                3 => RelationComparison::GreaterEqual,
+                4 => RelationComparison::Less,
+                5 => RelationComparison::LessEqual,
+                6 => RelationComparison::Cartesian,
+                _ => unreachable!()
+            };
+
+            let start1 = 2_usize;
+            let len1 = criteria.1[1] as usize;
+            let start2 = start1 + len1 + 1_usize;
+            let len2 = criteria.1[start1 + len1] as usize;
+            let n1 = get_path_int(&criteria.1[start1..start1 + len1]);
+            let n2 = get_path_int(&criteria.1[start2..start2 + len2]);
+            let field1_ = n1 as u16 - 128;
+            let field2_ = n2 as u16 - 128;
+            relations.get_mut(&get_path_int(id_)).unwrap()
+                .criterias.push(RelationCriteria::ById { field1: field1_, field2: field2_, comparison: comparison_ });
+        }
+    }
+    (occurrences, relations)
 }
 
 pub fn get_keyvalue<'a>(key: &HBAMPath, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
@@ -180,7 +231,6 @@ mod tests {
         let mut cache = PageStore::new();
         let (occurrences, relations) = get_occurrence_catalog(&mut cache, "test_data/input/relation.fmp12");
         assert_eq!(2, occurrences.len());
-        println!("{:?}", occurrences);
         assert_eq!(*occurrences.get(&129).unwrap(), TableOccurrence {
             id: 129,
             name: String::from("blank"),
@@ -192,6 +242,17 @@ mod tests {
             created_by: String::from("admin"),
             modified_by: String::from("Admin"),
         });
-        assert_eq!(0, relations.len());
+        assert_eq!(*occurrences.get(&130).unwrap(), TableOccurrence {
+            id: 130,
+            name: String::from("blank 2"),
+            base_table: crate::schema::DBObjectReference { 
+                data_source: 0, 
+                top_id: 129, 
+                inner_id: 0, 
+            },
+            created_by: String::from("admin"),
+            modified_by: String::from("Admin"),
+        });
+        assert_eq!(1, relations.len());
     }
 }

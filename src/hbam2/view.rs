@@ -9,7 +9,7 @@ pub struct View {
 #[derive(Debug)]
 pub struct SubView<'a> {
     pub path: HBAMPath,
-    chunks: Vec<&'a LocalChunk>,
+    pub chunks: Vec<&'a LocalChunk>,
 }
 
 pub enum KeyType {
@@ -42,7 +42,7 @@ impl<'a> SubView<'a> {
     pub fn get_simple_data(&self) -> Option<Vec<&[u8]>> {
         let mut result = vec![];
         let mut depth = 0;
-        for chunk in &self.chunks {
+        for chunk in self.chunks.iter().skip(1) {
             match &chunk.contents {
                 LocalChunkContents::Push { .. } => {
                     depth += 1;
@@ -53,6 +53,29 @@ impl<'a> SubView<'a> {
                 LocalChunkContents::SimpleData { data } => {
                     if depth == 0 {
                         result.push(data.as_slice());
+                    }
+                }
+                _ => {}
+            }
+        }
+        if result.is_empty() { return None }
+        else { return Some(result) } 
+    }
+
+    pub fn get_all_simple_keyvalues(&self) -> Option<Vec<(u16, &[u8])>> {
+        let mut result = vec![];
+        let mut depth = 0;
+        for chunk in self.chunks.iter().skip(1) {
+            match &chunk.contents {
+                LocalChunkContents::Push { .. } => {
+                    depth += 1;
+                }
+                LocalChunkContents::Pop => {
+                    depth -= 1;
+                }
+                LocalChunkContents::SimpleRef { key, ref data } => {
+                    if depth == 0 {
+                        result.push((*key, data.as_slice()));
                     }
                 }
                 _ => {}
@@ -102,34 +125,42 @@ impl<'a> SubView<'a> {
         }
     }
 
-    pub fn get_dir_relative<'b>(&'a self, mut search: HBAMPath) -> Option<SubView<'b>> where 'a:'b {
-        let mut current_dir = self.path.clone();
+    pub fn get_dir_relative(&self, search: &mut HBAMPath) -> Option<SubView> {
+        let mut depth = 0;
+        let mut current_collection = std::hint::black_box(vec![]);
+        let mut current_path = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
+        let mut search_path = current_path.clone();
 
-        let mut full_search = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
-        full_search.components.append(&mut search.components);
-
-        let mut result_chunks = vec![];
-        for chunk in &self.chunks {
+        search_path.components.append(&mut search.components);
+        for chunk in self.chunks.iter().skip(1) {
             match &chunk.contents {
                 LocalChunkContents::Push { key } => {
-                    current_dir.components.push(key.to_vec());
+                    current_collection.push(*chunk);
+                    current_path.components.push(key.to_vec());
+                    depth += 1;
                 }
                 LocalChunkContents::Pop => {
-                    current_dir.components.pop();
+                    current_collection.push(chunk);
+                    depth -= 1;
+                    if depth == 0 && current_path >= search_path {
+                        return Some(SubView::new(
+                                current_path.clone(),
+                                current_collection.clone(),
+                                )) ;
+                    }
+                    current_path.components.pop();
                 }
-                _ => { }
-            }
-            if current_dir > search {
-                if result_chunks.is_empty() { return None }
-                else {
-                    return Some(SubView::new(search, result_chunks))
+                _ => {
+                    if current_path.components.len() <= self.path.components.len() {
+                        continue;
+                    }
+                    if search_path.contains(&current_path) {
+                        current_collection.push(chunk);
+                    }
                 }
-            }
-            if current_dir == search {
-               result_chunks.push(chunk)
             }
         }
-        None
+        return None;
     }
 }
 
@@ -146,8 +177,7 @@ impl<'a> View {
         let mut result = vec![];
         let mut current_collection = std::hint::black_box(vec![]);
         let mut current_path = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
-        for chunk in &self.chunks {
-            //println!("{:?}", current_path);
+        for chunk in self.chunks.iter().skip(1) {
             match &chunk.contents {
                 LocalChunkContents::Push { key } => {
                     current_collection.push(chunk);
