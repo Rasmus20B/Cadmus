@@ -4,7 +4,7 @@ use clap::Parser;
 use cli::CommandLine;
 use diff::get_diffs;
 use hbam::{chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
-use hbam2::api;
+use hbam2::{api::{self, get_layout_catalog, get_occurrence_catalog, get_table_catalog}, page_store::PageStore};
 use schema::Schema;
 
 
@@ -51,6 +51,17 @@ fn main() -> Result<(), std::io::Error>{
     }
 
     if args.fmp.is_some() {
+
+        ctx.fmp = Schema::new();
+        let mut storage = PageStore::new();
+        // let tables = get_table_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
+        // let (occurrences, relations) = get_occurrence_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
+        // let layouts = get_layout_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
+        //
+        // ctx.fmp.tables = tables;
+        // ctx.fmp.table_occurrences = occurrences;
+        // ctx.fmp.relations = relations;
+        // ctx.fmp.layouts = layouts;
         // base_file = Some(HBAMInterface::new(Path::new(&args.fmp.as_ref().unwrap())));
         // let mut base_file = base_file.unwrap();
         // ctx.fmp = Schema::from(&mut base_file);
@@ -63,6 +74,7 @@ fn main() -> Result<(), std::io::Error>{
         //         println!("{}", chunk.chunk_to_string(&buffer))
         //     }
         // }
+
 
         if args.print_all_blocks {
             api::emit_file(&args.fmp.as_ref().unwrap());

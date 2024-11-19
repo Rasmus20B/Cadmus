@@ -3,7 +3,7 @@ mod kv_cache;
 mod bplustree;
 mod keyvalue;
 mod page;
-mod page_store;
+pub mod page_store;
 mod chunk;
 mod path;
 mod parser;

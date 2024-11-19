@@ -210,7 +210,7 @@ pub struct ValueList {
     pub modified_by: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Script {
     pub id: u16,
     pub name: String,
@@ -220,7 +220,7 @@ pub struct Script {
     pub modified_by: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Test {
     pub id: u16,
     pub name: String,
@@ -233,7 +233,7 @@ pub struct LayoutFMAttribute {
 
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct LayoutFM {
     pub id: usize,
     pub name: String,
@@ -241,7 +241,7 @@ pub struct LayoutFM {
     pub table_occurrence_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Schema {
     pub tables: HashMap<usize, Table>,
     pub fields: HashMap<usize, Field>,

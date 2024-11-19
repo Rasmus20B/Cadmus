@@ -1,8 +1,8 @@
-use std::{collections::{HashMap, HashSet}, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
+use std::{cmp::Ordering, collections::{HashMap, HashSet}, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
 
 use crate::util::encoding_util::{get_int, get_path_int}; 
 
-use super::{api::{Key, KeyValue}, view::View, path::HBAMPath, chunk::{Chunk, ChunkContents, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}};
+use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, LocalChunk, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}, path::HBAMPath, view::View};
 
 type Offset = usize;
 
@@ -96,16 +96,9 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
         if let Ok(chunk) = Chunk::from_bytes(&page.data, &mut(offset)) {
             match chunk.contents {
                 ChunkContents::Push { key } => {
-                    // FIXME: This is a total hack. a segment identifier seems to be known by a
-                    // 4byte timestamp. This code turns that timestamp into a 0 to help with
-                    // comparisons. This will NOT work when looking for 2 segments under the same
-                    // path. I.e. 6.5.1.14.1347307366 == 6.5.1.14.1347309432 == 6.5.1.14.0.
-                    if key.len() >= 4 {
-                        cur_path.components.push([0].to_vec());
-                    } else {
-                        cur_path.components.push(key.to_vec());
-                    }
-                    if key.len() == 1 && search_key < cur_path {
+                    cur_path.components.push(key.to_vec());
+                    if search_key < cur_path || (search_key == cur_path 
+                        && search_key.components.len() == cur_path.components.len()) {
                         return Ok(cur_index as u64);
                     }
                     if chunk.delayed {
@@ -114,6 +107,14 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
                 }
                 ChunkContents::Pop => {
                     cur_path.components.pop();
+                    if chunk.delayed {
+                        delayed_pops += 1;
+                    }
+                }
+                ChunkContents::SimpleData { .. } => {
+                    if chunk.delayed {
+                        delayed_pops += 1;
+                    }
                 }
                 ChunkContents::SimpleRef { key, data } => {
                     cur_index = get_int(data);
@@ -177,24 +178,37 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
     let mut current_path = HBAMPath::new(vec![]);
 
     let mut chunks = vec![];
+    let mut in_range = false;
 
+    /* FIXME: This should search for the starting chunk. 
+     * Then iterate until it reaches a chunk that is greater
+     * than the search criteria. Right now it does not account for 
+     * Views across multiple pages. */
+
+    /* for split pages, take a copy of where we were in first page,
+     * then skip pushes in next page until we reach the same path or 
+     * get to a path that is after in the order. */
+
+    let mut cached_path: HBAMPath;
+    let mut offset = PageHeader::SIZE as usize;
     loop {
-        let mut offset = 20usize;
         while offset < Page::SIZE as usize {
             let chunk = match Chunk::from_bytes(&current_page.data, &mut offset) {
                 Ok(inner) => inner,
-                Err(ParseErr::EndChunk) => {break;}
+                Err(ParseErr::EndChunk) => {
+                    break;
+                }
                 Err(e) => return Err(BPlusTreeErr::InvalidChunkComposition(e)),
             };
-
-
-            if key.contains(&current_path) {
-                chunks.push(chunk.copy_to_local())
-            } else if current_path > *key {
+            if current_path > *key {
                 if chunks.is_empty() { return Ok(None) }
                 else {
                     return Ok(Some(View::new(key.clone(), chunks)))
                 }
+            } else if current_path != *key && !chunks.is_empty() {
+                return Ok(Some(View::new(key.clone(), chunks)))
+            } else if current_path.components.len() >= key.components.len() && current_path == *key {
+                chunks.push(chunk.copy_to_local())
             }
 
             match chunk.contents {
@@ -208,9 +222,31 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
             }
         }
         if current_page.header.next == 0 { return Ok(None) }
+        cached_path = current_path.clone();
+        current_path.components.clear();
         current_page = get_page(current_page.header.next.into(), cache, file)?;
+        offset = PageHeader::SIZE as usize;
+        while offset < Page::SIZE as usize
+            && (current_path.components <= cached_path.components)
+            && (current_path <= cached_path) {
+            let chunk = match Chunk::from_bytes(&current_page.data, &mut offset) {
+                Ok(inner) => inner,
+                Err(ParseErr::EndChunk) => {
+                    break;
+                }
+                Err(e) => return Err(BPlusTreeErr::InvalidChunkComposition(e)),
+            };
+            match chunk.contents {
+                ChunkContents::Push { key } => {
+                    current_path.components.push(key.to_vec());
+                },
+                ChunkContents::Pop => {
+                    current_path.components.pop();
+                },
+                _ => {}
+            }
+        }
     }
-
 }
 
 pub fn search_key<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
@@ -245,16 +281,13 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
 }
 
 pub fn print_tree(cache: &mut PageStore, file: &str) {
-    let mut index = 2u32;
+    let mut index = 1u32;
     let mut cursor = Cursor {
         key: vec![],
         offset: 20,
     };
     
-    let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
-    println!("Looking @ block {}", index);
-    index = current_page.header.next;
-    while index != 1 {
+    while index > 0 {
         let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
         println!("Looking @ block {}", index);
         index = current_page.header.next;
@@ -382,7 +415,7 @@ mod tests {
         let page = Page::from_bytes(&buffer);
 
         let key = HBAMPath::new(vec![
-            &[6], &[5], &[1], &[14], &[0], &[1]
+            &[6], &[5], &[1], &[14], &[80, 78, 71, 102], &[1]
         ]);
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");
@@ -400,7 +433,7 @@ mod tests {
         let page = Page::from_bytes(&buffer);
 
         let key = HBAMPath::new(vec![
-            &[6], &[5], &[1], &[14], &[0], &[59]
+            &[6], &[5], &[1], &[14], &[80, 78, 71, 102], &[59]
         ]);
 
         let next_index = search_index_page(&key, page).expect("Unable to find next index from page.");

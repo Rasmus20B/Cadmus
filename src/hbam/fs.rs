@@ -52,7 +52,7 @@ impl HBAMInterface {
                 let name_ = fm_string_decrypt(&self.get_kv_value(16).expect("Unable to get keyvalue"));
                 let created_by_ = fm_string_decrypt(&self.get_kv_value(64513).expect("Unable to get keyvalue"));
                 let modified_by_ = fm_string_decrypt(&self.get_kv_value(64514).expect("Unable to get keyvalue"));
-                let mut tmp_occurrence = TableOccurrence {
+                let tmp_occurrence = TableOccurrence {
                     id: x,
                     name: name_,
                     created_by: created_by_,

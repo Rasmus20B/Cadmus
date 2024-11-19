@@ -2,8 +2,8 @@ use super::{chunk::{Chunk, ChunkContents, LocalChunk, LocalChunkContents}, path:
 
 #[derive(Debug)]
 pub struct View {
-    path: HBAMPath,
-    chunks: Vec<LocalChunk>,
+    pub path: HBAMPath,
+    pub chunks: Vec<LocalChunk>,
 }
 
 #[derive(Debug)]
@@ -173,21 +173,21 @@ impl<'a> View {
     }
 
     pub fn get_dirs(&self) -> Option<Vec<SubView>> {
-        let mut depth = 0;
+        let mut depth = self.path.components.len();
         let mut result = vec![];
         let mut current_collection = std::hint::black_box(vec![]);
         let mut current_path = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
         for chunk in self.chunks.iter().skip(1) {
             match &chunk.contents {
                 LocalChunkContents::Push { key } => {
-                    current_collection.push(chunk);
                     current_path.components.push(key.to_vec());
+                    current_collection.push(chunk);
                     depth += 1;
                 }
                 LocalChunkContents::Pop => {
                     current_collection.push(chunk);
                     depth -= 1;
-                    if depth == 0 {
+                    if depth == self.path.components.len() {
                         result.push( SubView::new(
                                 current_path.clone(),
                                 current_collection.clone(),

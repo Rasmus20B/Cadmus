@@ -387,22 +387,25 @@ impl fmt::Display for Chunk<'_> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self.contents {
         ChunkContents::Push { key } => {
-            write!(f, "push:{:?}::data:NA::size:{:?}::ins:{:x}", 
+            write!(f, "push:{:?}::data:NA::size:{:?}::delayed:{}::ins:{:x}", 
                 key,
                 key.len(),
+                self.delayed,
                 self.opcode)
         },
         ChunkContents::SimpleData { data } => {
-            write!(f, "simple:NA::data:{:?}::size:{}::ins:{:x}",
+            write!(f, "simple:NA::data:{:?}::size:{}::delayed:{}::ins:{:x}",
                 data,
                 data.len(),
+                self.delayed,
                 self.opcode)
         }
         ChunkContents::SimpleRef { key, data } => {
-            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}", 
+            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::delayed:{}::ins:{:x}", 
                 key,
                 data,
                 data.len(),
+                self.delayed,
                 self.opcode)
         },
         ChunkContents::LongRef { key, data } => {
@@ -420,7 +423,7 @@ impl fmt::Display for Chunk<'_> {
                 self.opcode)
         },
         ChunkContents::Pop => {
-            write!(f, "pop:NA")
+            write!(f, "pop:NA::delayed:{}", self.delayed)
         },
         ChunkContents::Noop => {
             write!(f, "noop:NA")

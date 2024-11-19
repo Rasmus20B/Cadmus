@@ -704,6 +704,8 @@ mod tests {
     use crate::cadlang::compiler::compile_to_schema;
     use crate::emulator::test::TestState;
     use crate::hbam::fs::HBAMInterface;
+    use crate::hbam2::api::{get_layout_catalog, get_occurrence_catalog, get_table_catalog};
+    use crate::hbam2::page_store::PageStore;
     use crate::schema::Schema;
     use super::TestEnvironment;
 
@@ -830,8 +832,16 @@ mod tests {
                 }
             }
         }";
-        let input = Path::new("test_data/input/mixed.fmp12");
-        let mut file = Schema::from(&mut HBAMInterface::new(&input));
+        let input = "test_data/input/mixed.fmp12";
+        // let file1 = Schema::from(&mut HBAMInterface::new(Path::new(&input)));
+        // println!("OLDOLD: {:?}", file1);
+        let mut file = Schema::new();
+        let mut storage = PageStore::new();
+        file.tables = get_table_catalog(&mut storage, input);
+        let (occurrences, relations) = get_occurrence_catalog(&mut storage, input);
+        file.table_occurrences = occurrences;
+        file.relations = relations;
+        file.layouts = get_layout_catalog(&mut storage, input);
         let tests = match compile_to_schema(code.to_string()) {
             Err(e) => panic!("{}", e),
             Ok(schema) => schema
