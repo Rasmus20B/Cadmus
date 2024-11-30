@@ -148,7 +148,7 @@ impl Stage {
                         StagedValidationType::NotEmpty => ValidationType::NotEmpty,
                         StagedValidationType::Unique => ValidationType::Unique,
                         StagedValidationType::Required => ValidationType::Required,
-                        StagedValidationType::Range { start, end } => ValidationType::Range { start: start.clone(), end: end.clone() },
+                        StagedValidationType::Range { start, end } => ValidationType::Range { start: *start, end: *end },
                         StagedValidationType::Calculation(calc) => ValidationType::Calculation(calc.clone()),
                         StagedValidationType::MaxChars(max) => ValidationType::MaxChars(*max),
                         StagedValidationType::MemberOf(value_list) => {
@@ -168,13 +168,13 @@ impl Stage {
                 let autoentrytype = match &field.1.autoentry.definition {
                     StagedAutoEntryType::NA => AutoEntryType::NA,
                     StagedAutoEntryType::Serial { next, increment, trigger }  => AutoEntryType::Serial {
-                        next: next.clone(), increment: increment.clone(), trigger: trigger.clone()
+                        next: *next, increment: *increment, trigger: trigger.clone()
                     },
                     StagedAutoEntryType::Data(data) => AutoEntryType::Data(data.to_string()),
                     StagedAutoEntryType::LastVisited => AutoEntryType::LastVisited,
                     StagedAutoEntryType::Creation(preset) => AutoEntryType::Creation(preset.clone()),
                     StagedAutoEntryType::Modification(preset) => AutoEntryType::Modification(preset.clone()),
-                    StagedAutoEntryType::Calculation { code, noreplace } => AutoEntryType::Calculation { code: code.clone(), noreplace: noreplace.clone() },
+                    StagedAutoEntryType::Calculation { code, noreplace } => AutoEntryType::Calculation { code: code.clone(), noreplace: *noreplace },
                     StagedAutoEntryType::Lookup { from, to } => {
 
                         let from_occ = match self.table_occurrences.iter().find(|occ| occ.1.name.value == from.value) {
@@ -343,7 +343,7 @@ impl Stage {
                 let mut field2: usize = 0;
                 let parts = crit.field2.value.split("::").collect::<Vec<_>>();
                 let occurrence = parts[0];
-                let mut field2_name = parts[1];
+                let field2_name = parts[1];
                 let mut table2 = String::new();
                 let mut occ2_id = 0;
 
@@ -432,7 +432,7 @@ impl Stage {
         if errs.is_empty() {
             Ok(result)
         } else {
-            return Err(errs)
+            Err(errs)
         }
 
     }

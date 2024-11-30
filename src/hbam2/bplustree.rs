@@ -1,8 +1,8 @@
-use std::{cmp::Ordering, collections::{HashMap, HashSet}, fs::File, io::{Read, Seek}, path::Path, sync::{Arc, RwLock}};
+use std::{collections::HashSet, fs::File, io::{Read, Seek}, path::Path, sync::Arc};
 
-use crate::util::encoding_util::{get_int, get_path_int}; 
+use crate::util::encoding_util::get_int; 
 
-use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, LocalChunk, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}, path::HBAMPath, view::View};
+use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}, path::HBAMPath, view::View};
 
 type Offset = usize;
 
@@ -71,7 +71,7 @@ fn search_key_in_page<'a>(key_: &HBAMPath, page_data: &[u8; 4096]) -> Result<Opt
     Ok(None)
 }
 
-fn get_page<'a>(index: PageIndex, cache: &'a mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> {  
+fn get_page(index: PageIndex, cache: &mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> {  
     match cache.get(file.to_string(), index) {
         Some(inner) => Ok(inner),
         None => {
@@ -79,7 +79,7 @@ fn get_page<'a>(index: PageIndex, cache: &'a mut PageStore, file: &str) -> Resul
                 cache.put(file.to_string(), index, &page);
                 Ok(cache.get(file.to_string(), index).unwrap())
             } else {
-                return Err(BPlusTreeErr::RootNotFound)
+                Err(BPlusTreeErr::RootNotFound)
             }
         }
     }
@@ -137,17 +137,17 @@ fn search_index_page(key_: &HBAMPath, page: Page) -> Result<PageIndex, BPlusTree
             return Ok(cur_index as u64)
         }
     }
-    return Err(BPlusTreeErr::KeyNotFound(key_.components.clone()));
+    Err(BPlusTreeErr::KeyNotFound(key_.components.clone()))
 }
 
-fn get_data_page<'a, 'b>(key: &HBAMPath, cache: &'b mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> { 
+fn get_data_page<'a>(key: &HBAMPath, cache: &mut PageStore, file: &str) -> Result<Arc<Page>, BPlusTreeErr> { 
     if key.components.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
     // Get the root page
     // Follow the links through the index nodes, and subsequent index nodes. 
     // Once we get to the data node, we can use the next ptrs on the blocks.
 
     let mut page_set = HashSet::new();
-    let root = get_page(1, cache, &file.to_string()).expect("Unable to get page from file.");
+    let root = get_page(1, cache, file).expect("Unable to get page from file.");
     let mut cur_page = root;
     loop {
         match cur_page.header.page_type {
@@ -155,7 +155,7 @@ fn get_data_page<'a, 'b>(key: &HBAMPath, cache: &'b mut PageStore, file: &str) -
                 return Ok(cur_page);
             },
             PageType::Index | PageType::Root => {
-                let next_index = match search_index_page(&key, *cur_page) {
+                let next_index = match search_index_page(key, *cur_page) {
                     Ok(inner) => inner,
                     Err(BPlusTreeErr::KeyNotFound(_)) => cur_page.header.next as u64,
                     Err(e) => return Err(e)
@@ -163,7 +163,7 @@ fn get_data_page<'a, 'b>(key: &HBAMPath, cache: &'b mut PageStore, file: &str) -
                 if page_set.contains(&next_index) {
                     return Err(BPlusTreeErr::PageCycle(next_index))
                 }
-                page_set.insert(next_index.clone());
+                page_set.insert(next_index);
                 cur_page = get_page(next_index, cache, file)?;
             }
         }
@@ -174,11 +174,11 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
     where 'a: 'b
 {
     if key.components.is_empty() { return Err(BPlusTreeErr::EmptyKey) }
-    let mut current_page = get_data_page(&key, cache, file)?;
+    let mut current_page = get_data_page(key, cache, file)?;
     let mut current_path = HBAMPath::new(vec![]);
 
     let mut chunks = vec![];
-    let mut in_range = false;
+    let in_range = false;
 
     /* FIXME: This should search for the starting chunk. 
      * Then iterate until it reaches a chunk that is greater
@@ -255,14 +255,14 @@ pub fn search_key<'a>(key: &HBAMPath, cache: &'a mut PageStore, file: &'a str) -
     // Follow the links through the index nodes, and subsequent index nodes. 
     // Once we get to the data node, we can use the next ptrs on the blocks.
 
-    let mut current_page = get_data_page(&key, cache, file)?;
+    let mut current_page = get_data_page(key, cache, file)?;
     loop {
-        match search_key_in_page(&key, &current_page.data)? {
+        match search_key_in_page(key, &current_page.data)? {
             Some(inner) => {
                 return Ok(Some(inner))
             },
             _ => {
-                current_page = get_page(current_page.header.next as u64, cache, &file)?;
+                current_page = get_page(current_page.header.next as u64, cache, file)?;
             }
         }
     }
@@ -281,15 +281,21 @@ pub fn load_page_from_disk(file: &Path, index: PageIndex) -> Result<Page, BPlusT
 }
 
 pub fn print_tree(cache: &mut PageStore, file: &str) {
-    let mut index = 1u32;
+    let mut index = 2u32;
     let mut cursor = Cursor {
         key: vec![],
         offset: 20,
     };
-    
-    while index > 0 {
+
+    let mut already_traversed = HashSet::new();
+    loop {
         let current_page = get_page(index as u64, cache, file).expect("Unable to get page");
         println!("Looking @ block {}", index);
+        already_traversed.insert(index);
+
+        if already_traversed.contains(&current_page.header.next) {
+            return;
+        }
         index = current_page.header.next;
 
         let mut path = HBAMPath::new(vec![]);

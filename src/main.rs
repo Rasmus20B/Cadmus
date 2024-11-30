@@ -3,8 +3,8 @@ use cadlang::compiler::compile_to_schema;
 use clap::Parser;
 use cli::CommandLine;
 use diff::get_diffs;
-use hbam::{chunk::Chunk, fs::HBAMInterface, path::HBAMPath};
-use hbam2::{api::{self, get_layout_catalog, get_occurrence_catalog, get_table_catalog}, page_store::PageStore};
+use hbam::fs::HBAMInterface;
+use hbam2::{api::{self}, page_store::PageStore};
 use schema::Schema;
 
 
@@ -53,7 +53,7 @@ fn main() -> Result<(), std::io::Error>{
     if args.fmp.is_some() {
 
         ctx.fmp = Schema::new();
-        let mut storage = PageStore::new();
+        let storage = PageStore::new();
         // let tables = get_table_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
         // let (occurrences, relations) = get_occurrence_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
         // let layouts = get_layout_catalog(&mut storage, args.fmp.as_ref().unwrap().as_str());
@@ -77,7 +77,7 @@ fn main() -> Result<(), std::io::Error>{
 
 
         if args.print_all_blocks {
-            api::emit_file(&args.fmp.as_ref().unwrap());
+            api::emit_file(args.fmp.as_ref().unwrap());
         }
 
         // if args.print_root_block {

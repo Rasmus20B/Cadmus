@@ -51,7 +51,7 @@ mod tests {
     fn encode_test() {
         let text = "hello";
         let encoded : Vec<(u8, u8)> = text.chars()
-            .map(|c| encode_char(c))
+            .map(encode_char)
             .collect();
 
         assert_eq!(

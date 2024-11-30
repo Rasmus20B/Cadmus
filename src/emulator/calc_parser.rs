@@ -480,13 +480,10 @@ mod tests {
         ];
         let mut parser = Parser::new(tokens);
         let ast = parser.parse().expect("Unable to parse tokens");
-        match *ast {
-            Node::Binary { ref left, ref operation, ref right } => {
-                assert_eq!(*left, Box::new(Node::Number(6.0)));
-                assert_eq!(*operation, TokenType::Plus);
-                assert_eq!(*right, Box::new(Node::Number(1.0)));
-            }
-            _ => {}
+        if let Node::Binary { ref left, ref operation, ref right } = *ast {
+            assert_eq!(*left, Box::new(Node::Number(6.0)));
+            assert_eq!(*operation, TokenType::Plus);
+            assert_eq!(*right, Box::new(Node::Number(1.0)));
         }
     }
 

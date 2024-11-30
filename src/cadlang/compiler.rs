@@ -1,6 +1,6 @@
 use crate::{cadlang::lexer::lex, schema::Schema};
 
-use super::{parser::parse, error::CompileErr, staging::Stage}; 
+use super::{parser::parse, error::CompileErr}; 
 
 pub fn compile_to_schema(code: String) -> Result<Schema, CompileErr> {
     let tokens = lex(&code).expect("Unable to lex cadmus code.");
@@ -19,5 +19,5 @@ pub fn compile_to_schema(code: String) -> Result<Schema, CompileErr> {
             }
         }
     }
-    return Ok(Schema::new());
+    Ok(Schema::new())
 }

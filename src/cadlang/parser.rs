@@ -1,7 +1,7 @@
 use core::fmt;
-use std::{collections::HashMap, io::ErrorKind};
+use std::collections::HashMap;
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{AutoEntry, AutoEntryType, DataType, DBObjectReference, Field, LayoutFM, LayoutFMAttribute, Relation, RelationComparison, RelationCriteria, Schema, Script, SerialTrigger, Table, TableOccurrence, Test, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
 
 use super::{staging::*, error::CompileErr};
 use super::token::{Token, TokenType};
@@ -50,8 +50,8 @@ fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseIn
 pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedField), CompileErr> {
     let mut checks_ = vec![];
     let validation_msg = String::from("Error with field validation.");
-    let mut validation_trigger = ValidationTrigger::OnEntry;
-    let mut user_override_ = true;
+    let validation_trigger = ValidationTrigger::OnEntry;
+    let user_override_ = true;
     let mut autoentry_ = StagedAutoEntry {
         definition: StagedAutoEntryType::NA,
         nomodify: false,
@@ -329,7 +329,7 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Scri
     script_[0].name = name_.clone();
     expect(tokens, &vec![TokenType::CloseBrace], info)?;
 
-    Ok((id_, script_.get(0).expect("").clone()))
+    Ok((id_, script_.first().expect("").clone()))
 }
 
 pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<(Option<Token>, StagedValueListSortBy), CompileErr> {
@@ -603,7 +603,7 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
     let mut criterias_ = vec![];
     let mut tables = [None; 2];
     if token.ttype == TokenType::OpenBrace {
-        while let Some(_) = tokens.get(info.cursor) {
+        while tokens.get(info.cursor).is_some() {
             // parse attribute
             let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
             let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
@@ -612,10 +612,10 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
                 tables[0] = Some(lhs_table);
                 tables[1] = Some(rhs_table);
             }
-            if !tables.iter().any(|search| search.unwrap().to_string() == lhs_table) {
+            if !tables.iter().any(|search| search.unwrap() == lhs_table) {
                 return Err(CompileErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
             }
-            if !tables.iter().any(|search| search.unwrap().to_string() == rhs_table) {
+            if !tables.iter().any(|search| search.unwrap() == rhs_table) {
                 return Err(CompileErr::RelationCriteria { token: tokens[info.cursor].clone() })
             }
 
@@ -645,7 +645,7 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
         let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
         let rhs_table = rhs.value.split("::").collect::<Vec<_>>()[0];
         criterias_.push(StagedRelationCriteria { field1: lhs.clone(), field2: rhs.clone(), comparison: comp });
-        return Ok((id_, StagedRelation {
+        Ok((id_, StagedRelation {
             id: id_,
             table1: lhs_table.to_string(),
             table2: rhs_table.to_string(),
@@ -669,7 +669,7 @@ pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result
             }
         }
     }
-    unreachable!()
+    Ok(vec![])
 }
 
 pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedLayout), CompileErr> {
@@ -746,14 +746,14 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
         }
         info.cursor += 1;
     };
-    Ok((result))
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{AutoEntry, DataType, AutoEntryType, DBObjectReference, Field, Relation, RelationComparison, RelationCriteria, SerialTrigger, Table, TableOccurrence, Validation, ValidationTrigger, ValidationType, ValueList, ValueListDefinition, ValueListSortBy}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
 
     use super::*;
 

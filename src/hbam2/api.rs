@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int, put_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -44,7 +44,7 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
 
         for field in field_view.get_dirs().unwrap() {
             let path_id = field.path.components.last().unwrap();
-            let id_ = get_path_int(&path_id);
+            let id_ = get_path_int(path_id);
 
             fields_.insert(id_, Field {
                 id: id_,
@@ -67,8 +67,8 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
             });
         }
 
-        result.insert(id_ as usize, Table {
-            id: id_ as usize,
+        result.insert(id_, Table {
+            id: id_,
             name: fm_string_decrypt(dir.get_value(16).unwrap()),
             created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
             modified_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
@@ -169,6 +169,14 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
     (occurrences, relations)
 }
 
+pub fn get_datasource_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, DataSource> {
+    unimplemented!()
+}
+
+pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, Script> {
+    unimplemented!()
+}
+
 pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, LayoutFM> {
     let mut result = HashMap::new();
     let layout_view = match get_view_from_key(&HBAMPath::new(vec![&[4], &[1], &[7]]), cache, file).expect("Unable to read layout catalog") {
@@ -197,10 +205,7 @@ pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
 
 pub fn get_keyvalue<'a>(key: &HBAMPath, store: &'a mut PageStore, file: &'a str) -> Result<Option<KeyValue>, BPlusTreeErr> {
     // Get KeyVal pair from HBAM in byte form.
-    match search_key(key, store, file) {
-        Ok(inner) => Ok(inner),
-        Err(e) => Err(e),
-    }
+    search_key(key, store, file)
 }
 
 

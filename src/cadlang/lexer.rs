@@ -171,7 +171,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                 }
                 if in_script {
                     let mut depth = 1;
-                    while let Some(c) = lex_iter.next() {
+                    for c in lex_iter.by_ref() {
                         match c {
                             '}' => {
                                 buffer.push(c);
@@ -294,7 +294,7 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                 }
                 let next = lex_iter.next();
                 if next == Some('/') {
-                    while let Some(c) = lex_iter.next() {
+                    for c in lex_iter.by_ref() {
                         if c == '\n' {
                             cursor.line += 1;
                             cursor.column = 0;
@@ -396,7 +396,7 @@ table %1 Person {
             Token::new(TokenType::CloseBrace, Location { line: 11, column: 1 }),
         ];
 
-        let lexed = lex(&code).expect("Unable to lex code.");
+        let lexed = lex(code).expect("Unable to lex code.");
 
         for pair in expected.iter().zip(lexed) {
             // println!("{:?} == {:?}", pair.0, pair.1);

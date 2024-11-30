@@ -116,7 +116,7 @@
 
 ### 8:
 - 64 = Don't automatically create index,
-- 128 = ALways index this field,
+- 128 = Always index this field,
 
 ### 9:
 - 0 = regular storage,

@@ -498,8 +498,8 @@ impl HBAMInterface {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, path::Path};
-    use crate::hbam::{btree::HBAMFile, path::HBAMPath};
+    use std::path::Path;
+    use crate::hbam::path::HBAMPath;
     use super::HBAMInterface;
 
     #[test]
@@ -580,19 +580,19 @@ mod tests {
         let buffer = file.inner.get_buffer_from_leaf(file.inner.cursor.block_index as u64);
 
         let key = &mut vec![18, 37, 19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0];
-        let kv = file.get_long_kv(&key).unwrap();
+        let kv = file.get_long_kv(key).unwrap();
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&buffer).unwrap(), vec![2, 128, 1]);
 
         file.set_long_kv(key, &[2, 128, 2]).expect("Unable to set keyvalue");
-        let kv = file.get_long_kv(&key).unwrap();
+        let kv = file.get_long_kv(key).unwrap();
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![2, 128, 2]);
         file.set_long_kv(key, &[2, 128, 1]).expect("Unable to set keyvalue");
-        let kv = file.get_long_kv(&key).unwrap();
+        let kv = file.get_long_kv(key).unwrap();
         assert_eq!(kv.chunk().data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![2, 128, 1]);
 
         let key = &mut vec![19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0];
         file.set_long_kv_by_data(key, &[2, 128, 1]).expect("Unable to set keyvalue.");
-        let kv = file.get_long_kv(&key).unwrap();
+        let kv = file.get_long_kv(key).unwrap();
         assert_eq!(kv.chunk().ref_data.unwrap().lookup_from_buffer(&file.staging_buffer.buffer).unwrap(), vec![19, 48, 18, 15, 19, 109, 19, 30, 0, 0, 0]);
     }
 }

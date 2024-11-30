@@ -242,6 +242,19 @@ pub struct LayoutFM {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum DataSourceType {
+    FileMaker,
+    ODBC,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct DataSource {
+    pub id: usize,
+    pub dstype: DataSourceType,
+    pub filename: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Schema {
     pub tables: HashMap<usize, Table>,
     pub fields: HashMap<usize, Field>,
@@ -251,6 +264,7 @@ pub struct Schema {
     pub layouts: HashMap<usize, LayoutFM>,
     pub scripts: HashMap<u16, Script>,
     pub tests: HashMap<u16, Test>,
+    pub data_sources: HashMap<u16, DataSource>,
 }
 
 impl Schema {
@@ -264,6 +278,7 @@ impl Schema {
             layouts: HashMap::new(),
             scripts: HashMap::new(),
             tests: HashMap::new(),
+            data_sources: HashMap::new(),
         }
     }
 }

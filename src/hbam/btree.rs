@@ -420,9 +420,9 @@ impl HBAMFile {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use super::{Chunk, ChunkType, InstructionType, Block, HBAMPath, DataStaging};
-    use super::HBAMFile;
+    
+    
+    
 
     #[test]
     fn emit_block_test() {

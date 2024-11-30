@@ -76,7 +76,7 @@ impl<'a> Chunk<'a> {
                     LocalChunkContents::SimpleData { data: data.to_vec() }
                 }
                 ChunkContents::SimpleRef { key, data } => {
-                    LocalChunkContents::SimpleRef { key: key.clone(), data: data.to_vec() }
+                    LocalChunkContents::SimpleRef { key, data: data.to_vec() }
                 }
                 ChunkContents::LongRef { key, data } => {
                     LocalChunkContents::LongRef { key: key.to_vec(), data: data.to_vec() }
@@ -276,7 +276,7 @@ impl<'a> Chunk<'a> {
             contents = ChunkContents::SimpleData { 
                 data: &code[*offset..*offset+len] 
             };
-            *offset += len as usize;
+            *offset += len;
         } else if chunk_code == 0x1E {
             *offset += 1;
             if *offset >= Page::SIZE as usize {

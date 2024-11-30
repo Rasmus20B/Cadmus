@@ -227,11 +227,7 @@ impl Database {
             }
         }
 
-        let related_set = match self.get_related_records(table) {
-            Ok(inner) => inner,
-            Err(..) => vec![],
-        };
-
+        let related_set = self.get_related_records(table).unwrap_or_default();
         let table_handle = match self.get_table(table) {
             Some(inner) =>inner,
             None => return ""
@@ -244,7 +240,7 @@ impl Database {
                 }
             }
         }
-        return "";
+        ""
     }
 
     pub fn get_occurrence(&self, occurrence_handle: usize) -> &TableOccurrence {

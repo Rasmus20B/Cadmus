@@ -20,9 +20,9 @@ impl<'a> fmt::Display for CompileErr {
         match self {
             Self::UnexpectedToken { token, expected } => {
                 let val1 = if token.ttype == TokenType::Identifier {
-                    format!("{}: \"{}\"", token.ttype.to_string(), token.value)
+                    format!("{}: \"{}\"", token.ttype, token.value)
                 } else {
-                    format!("\"{}\"", token.ttype.to_string())
+                    format!("\"{}\"", token.ttype)
                 };
                 if expected.len() > 1 {
                     write!(f, "Unexpected {} @ {},{}. Expected one of: {:?}", 

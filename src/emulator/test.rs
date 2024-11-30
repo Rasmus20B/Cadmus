@@ -613,11 +613,9 @@ impl<'a> TestEnvironment<'a> {
                             },
                             _ => { unimplemented!() }
                         };
-                        let records = match self.database.get_related_records(table) {
-                            Ok(inner) => inner,
-                            Err(e) => vec![],
-                        };
-                        Ok(records.len().to_string())
+                        Ok(self.database
+                            .get_related_records(table).unwrap_or_default()
+                            .len().to_string())
                     }
                     _ => { Err(EvaluateError::UnimplementedFunction { function: name }) }
                 }
@@ -700,10 +698,10 @@ impl<'a> TestEnvironment<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    
     use crate::cadlang::compiler::compile_to_schema;
     use crate::emulator::test::TestState;
-    use crate::hbam::fs::HBAMInterface;
+    
     use crate::hbam2::api::{get_layout_catalog, get_occurrence_catalog, get_table_catalog};
     use crate::hbam2::page_store::PageStore;
     use crate::schema::Schema;
