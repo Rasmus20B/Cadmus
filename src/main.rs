@@ -7,7 +7,6 @@ use hbam::fs::HBAMInterface;
 use hbam2::{api::{self}, page_store::PageStore};
 use schema::Schema;
 
-
 mod cadlang;
 mod util;
 mod staging_buffer;

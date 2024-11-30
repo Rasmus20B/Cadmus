@@ -132,6 +132,64 @@ pub struct Field {
     pub modified_by: String,
 }
 
+impl Field {
+
+    pub fn new(id_: usize, name_: String) -> Self {
+        Self {
+            id: id_,
+            name: name_,
+            created_by: String::from("admin"),
+            modified_by: String::from("admin"),
+            dtype: DataType::Text,
+            global: false,
+            repetitions: 1,
+            autoentry: AutoEntry {
+                definition: AutoEntryType::NA,
+                nomodify: false,
+            },
+            validation: Validation {
+                checks: vec![],
+                message: String::new(),
+                trigger: ValidationTrigger::OnEntry,
+                user_override: true,
+            },
+        }
+    }
+
+    pub fn datatype(mut self, dtype_: DataType) -> Self {
+        self.dtype = dtype_;
+        self
+    }
+
+    pub fn repetitions(mut self, repetitions_: usize) -> Self {
+        self.repetitions = repetitions_;
+        self
+    }
+
+    pub fn created_by(mut self, account: String) -> Self {
+        self.created_by = account;
+        self
+    }
+
+    pub fn modified_by(mut self, account: String) -> Self {
+        self.modified_by = account;
+        self
+    }
+
+    pub fn autoentry(mut self, definition_: AutoEntryType, nomodify_: bool) -> Self {
+        self.autoentry = AutoEntry {
+            definition: definition_,
+            nomodify: nomodify_,
+        };
+        self
+    }
+
+    pub fn validation(mut self, validation_: Validation) -> Self {
+        self.validation = validation_;
+        self
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TableOccurrence {
     pub id: usize,

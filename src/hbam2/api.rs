@@ -46,25 +46,11 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
             let path_id = field.path.components.last().unwrap();
             let id_ = get_path_int(path_id);
 
-            fields_.insert(id_, Field {
-                id: id_,
-                name: fm_string_decrypt(field.get_value(16).expect("Unable to get field name.")),
-                dtype: DataType::Text,
-                autoentry: AutoEntry { 
-                    nomodify: false, 
-                    definition: AutoEntryType::NA 
-                },
-                validation: Validation {
-                    trigger: ValidationTrigger::OnEntry,
-                    checks: vec![],
-                    user_override: false,
-                    message: String::from("Error with validation."),
-                },
-                global: false,
-                repetitions: 1,
-                created_by: fm_string_decrypt(field.get_value(64513).expect("Unable to get created by for field.")),
-                modified_by: fm_string_decrypt(field.get_value(64514).expect("Unable to get modified by for field."))
-            });
+            let field = Field::new(id_, fm_string_decrypt(field.get_value(16).expect("Unable to get field name.")))
+                .created_by(fm_string_decrypt(field.get_value(64513).expect("Unable to get created by for field.")))
+                .modified_by(fm_string_decrypt(field.get_value(64514).expect("Unable to get modified by for field.")));
+
+            fields_.insert(id_, field);
         }
 
         result.insert(id_, Table {
