@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(2, result.len());
 
         for (_, ds) in result {
-            println!("{} :: {:?}", ds.id, ds.filename);
+            println!("{} :: {:?}", ds.name, ds.filename);
         }
     }
 
