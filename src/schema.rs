@@ -225,21 +225,18 @@ pub struct Relation {
 }
 
 impl Relation {
-    pub fn new(id_: usize) -> Self {
+    pub fn new(id_: usize, table1_: DBObjectReference, table2_: DBObjectReference) -> Self {
         Self {
             id: id_,
-            table1: DBObjectReference {
-                data_source: 0,
-                top_id: 0,
-                inner_id: 0
-            },
-            table2: DBObjectReference {
-                data_source: 0,
-                top_id: 0,
-                inner_id: 0
-            },
+            table1: table1_,
+            table2: table2_,
             criterias: vec![],
         }
+    }
+
+    pub fn criteria(mut self, criteria: RelationCriteria) -> Self {
+        self.criterias.push(criteria);
+        self
     }
 }
 
@@ -308,6 +305,7 @@ pub enum DataSourceType {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DataSource {
     pub id: usize,
+    pub name: String,
     pub dstype: DataSourceType,
     pub filename: String,
 }

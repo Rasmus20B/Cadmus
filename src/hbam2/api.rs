@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -96,18 +96,18 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
 
         let relation_definitions = storage.get_simple_data().unwrap();
         for def in relation_definitions {
-            let mut tmp = Relation::new(def[4] as usize);
-            tmp.table1 = DBObjectReference { 
+            let table1 = DBObjectReference { 
                 data_source: 0,
                 top_id: id_ as u16,
                 inner_id: 0,
             };
-            tmp.table2 = DBObjectReference { 
+            let table2 = DBObjectReference { 
                 data_source: 0,
                 top_id: def[2] as u16 + 128,
                 inner_id: 0,
             };               
 
+            let tmp = Relation::new(def[4] as usize, table1, table2);
             relations.insert(tmp.id, tmp);
         }
     }
@@ -156,7 +156,40 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
 }
 
 pub fn get_datasource_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, DataSource> {
-    unimplemented!()
+    let mut result = HashMap::new();
+    let datasource_view = match get_view_from_key(&HBAMPath::new(vec![&[32], &[5]]), cache, file).expect("Unable to read data source view.") {
+        Some(inner) => inner,
+        None => { return result }
+    };
+
+    let id_list_view = match datasource_view.get_dirs() {
+        Some(inner) => inner,
+        None => { return result }
+    };
+
+    for source in id_list_view {
+        let name = source.get_value(16).unwrap();
+        let definition = source.get_value(130).unwrap();
+        let id_ = get_path_int(source.path.components.last().unwrap());
+
+        let source_type = &definition[0..=3];
+        let typename_size = definition[4] as usize;
+        let start = 5;
+        let end = start + typename_size;
+        let typename = &definition[start..=end];
+
+        let filename_size = definition[end + 1] as usize;
+        let start = end + 2;
+        let end = start + filename_size;
+        let filename = &definition[start..end];
+        result.insert(id_, DataSource {
+            id: id_,
+            name: fm_string_decrypt(name),
+            filename: fm_string_decrypt(filename),
+            dstype: DataSourceType::FileMaker
+        });
+    }
+    result
 }
 
 pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, Script> {
@@ -214,7 +247,7 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 #[cfg(test)]
 mod tests {
 
-    use super::{get_keyvalue, get_table_catalog, KeyValue, PageStore};
+    use super::{get_keyvalue, get_table_catalog, get_datasource_catalog, KeyValue, PageStore};
     use crate::{hbam2::{api::get_occurrence_catalog, path::HBAMPath}, schema::TableOccurrence};
     #[test]
     fn get_keyval_test() {
@@ -258,6 +291,18 @@ mod tests {
             for (_, field) in table.fields {
                println!("   field: {}", field.name);
             }
+        }
+    }
+
+    #[test]
+    fn get_data_source_catalog_test() {
+        let mut cache = PageStore::new();
+        let result = get_datasource_catalog(&mut cache, "test_data/input/mixed.fmp12");
+
+        assert_eq!(2, result.len());
+
+        for (_, ds) in result {
+            println!("{} :: {:?}", ds.id, ds.filename);
         }
     }
 

@@ -444,7 +444,7 @@ the file value to append to the path above.
 - Found @ [32]
 
 - [32].[1].[1] -> Variable length encoded strings of the Data Source names.
-- [32].[1].[3] -> 4 Byte integer IDs for each data source. Used for indexing into data directories.
+- [32].[1].[3] -> first 4 bytes indicate order number. size prefixed number after this indicate ID of data source used in data directory ([5]).
 - [32].[5].[ID]:
     - {16} -> name of data source
     - first {130} -> OS Path to data source, relative. Stored as an 'encrypted' string.

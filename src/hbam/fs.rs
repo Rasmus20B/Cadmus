@@ -70,18 +70,19 @@ impl HBAMInterface {
                     let relation_definitions = &self.get_simple_data().expect("Unable to get top-level relationship definition.");
                     if relation_definitions.is_empty() { continue; }
                     let relation_definition = relation_definitions[0].clone();
-                    let mut tmp = Relation::new(0);
                     let relation_index = relation_definition[4];
-                    tmp.table1 = DBObjectReference { 
+                    let table1 = DBObjectReference { 
                         data_source: 0,
                         top_id: x as u16,
                         inner_id: 0,
                     };
-                    tmp.table2 = DBObjectReference { 
+                    let table2 = DBObjectReference { 
                         data_source: 0,
                         top_id: relation_definition[2] as u16 + 128,
                         inner_id: 0,
-                    };                    tmp.id = relation_index as usize;
+                    };                    
+                    let id = relation_index as usize;
+                    let tmp = Relation::new(id, table1, table2);
                     schema.relations.insert(relation_index as usize, tmp);
                 }
                 table_storage_path.components.pop();
