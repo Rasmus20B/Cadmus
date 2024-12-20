@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}, fm_script_engine::fm_script_engine_instructions::*};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -209,11 +209,45 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
     for script_view in script_views {
         let id_ = get_path_int(script_view.path.components.last().unwrap());
         let name_ = fm_string_decrypt(script_view.get_value(16).unwrap());
-        println!("{}::{}", script_view.path, name_);
+        let code = script_view.get_value(4).unwrap();
+        println!("===============================");
+        //for chunk in &script_view.chunks {
+        //    println!("{}::{:?}", script_view.path, chunk);
+        //}
+
+        let steps = Vec::<ScriptStep>::new();
+
+        for step in code.chunks(28) {
+            let mut args = Vec::<String>::new();
+            let step_id = step[2];
+            let instruction = INSTRUCTIONMAP[step[21] as usize].expect("Unknown script step.");
+            println!("{} :: {:?}", step_id, instruction);
+            let step_storage = match script_view.get_dir_relative(&mut HBAMPath::new(vec![&[5], &[step_id]])) {
+                Some(inner) => inner,
+                None => continue
+            };
+
+            for step in step_storage.get_dirs().unwrap() {
+                let arg_views = match step.get_dirs() {
+                    Some(inner) => inner,
+                    None => continue
+                };
+                for arg in arg_views {
+                    println!("{}", arg.path);
+                    if let Some(arg_storage) = arg.get_dir_relative(&mut HBAMPath::new(vec![&[5]])) {
+                        if let Some(argument_bytecode) = arg_storage.get_value(5) {
+                            args.push(String::from("PLACEHOLDER ARGUMENT"));
+                        }
+                    }
+                }
+            }
+
+        }
+
         let script = Script {
             name: name_,
             id: id_ as u16,
-            instructions: vec![],
+            instructions: steps,
             created_by: String::new(),
             modified_by: String::new(),
             arguments: vec![],
