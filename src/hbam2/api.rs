@@ -244,12 +244,15 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
 
         }
 
+        let created_by_ = script_view.get_value(64513).unwrap();
+        let modified_by_ = script_view.get_value(64514).unwrap();
+
         let script = Script {
             name: name_,
             id: id_ as u16,
             instructions: steps,
-            created_by: String::new(),
-            modified_by: String::new(),
+            created_by: fm_string_decrypt(created_by_), 
+            modified_by: fm_string_decrypt(modified_by_),
             arguments: vec![],
         };
         result.insert(id_, script);
