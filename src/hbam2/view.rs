@@ -26,11 +26,16 @@ impl<'a> SubView<'a> {
     }
 
     pub fn get_value(&self, search: u16) -> Option<&[u8]> {
-        for chunk in &self.chunks {
+        let mut depth = 0;
+        for chunk in self.chunks.iter().skip(1) {
             if let LocalChunkContents::SimpleRef { ref key, data } = &chunk.contents {
-                if search == *key {
+                if search == *key && depth == 0 {
                     return Some(data)
                 }
+            } else if let LocalChunkContents::Push { .. } = &chunk.contents {
+                depth += 1;
+            } else if let LocalChunkContents::Pop = &chunk.contents {
+                depth -= 1;
             }
         }
         None

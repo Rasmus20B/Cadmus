@@ -193,7 +193,35 @@ pub fn get_datasource_catalog(cache: &mut PageStore, file: &str) -> HashMap::<us
 }
 
 pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, Script> {
-    unimplemented!()
+
+    let mut result = HashMap::new();
+
+    let script_catalog_view = match get_view_from_key(&HBAMPath::new(vec![&[17], &[5]]), cache, file).expect("Unable to read script catalog") {
+        Some(inner) => inner,
+        None => { return result }
+    };
+
+    let script_views = match script_catalog_view.get_dirs() {
+        Some(inner) => inner,
+        None => { return result }
+    };
+
+    for script_view in script_views {
+        let id_ = get_path_int(script_view.path.components.last().unwrap());
+        let name_ = fm_string_decrypt(script_view.get_value(16).unwrap());
+        println!("{}::{}", script_view.path, name_);
+        let script = Script {
+            name: name_,
+            id: id_ as u16,
+            instructions: vec![],
+            created_by: String::new(),
+            modified_by: String::new(),
+            arguments: vec![],
+        };
+        result.insert(id_, script);
+    }
+
+    result
 }
 
 pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, LayoutFM> {
@@ -247,7 +275,7 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 #[cfg(test)]
 mod tests {
 
-    use super::{get_keyvalue, get_table_catalog, get_datasource_catalog, KeyValue, PageStore};
+    use super::{get_keyvalue, get_table_catalog, get_script_catalog, get_datasource_catalog, KeyValue, PageStore};
     use crate::{hbam2::{api::get_occurrence_catalog, path::HBAMPath}, schema::TableOccurrence};
     #[test]
     fn get_keyval_test() {
@@ -304,6 +332,14 @@ mod tests {
         for (_, ds) in result {
             println!("{} :: {:?}", ds.name, ds.filename);
         }
+    }
+
+    #[test]
+    fn get_script_catalog_test() {
+        let mut cache = PageStore::new();
+        let result = get_script_catalog(&mut cache, "test_data/input/mixed.fmp12");
+
+        assert_eq!(2, result.len());
     }
 
     #[test]

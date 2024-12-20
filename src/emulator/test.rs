@@ -98,6 +98,7 @@ pub struct TestEnvironment<'a> {
     pub layout_mgr: LayoutMgr,
     pub find_criteria: Vec<(String, String)>,
 }
+
 impl<'a> TestEnvironment<'a> {
     pub fn new(file: &'a schema::Schema) -> Self {
         Self {
