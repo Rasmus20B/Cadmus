@@ -132,31 +132,33 @@ impl<'a> SubView<'a> {
         let mut current_collection = vec![];
         let mut current_path = HBAMPath::new(self.path.components.iter().map(|c| c.as_slice()).collect());
         let mut search_path = current_path.clone();
-
+        let mut inside = false;
         search_path.components.append(&mut search.components);
         for chunk in self.chunks.iter().skip(1) {
             match &chunk.contents {
                 LocalChunkContents::Push { key } => {
-                    current_collection.push(*chunk);
+                    if inside { 
+                        current_collection.push(*chunk);
+                    }
                     current_path.components.push(key.to_vec());
                     depth += 1;
                 }
                 LocalChunkContents::Pop => {
-                    current_collection.push(chunk);
+                    if inside { 
+                        current_collection.push(chunk);
+                    }
                     depth -= 1;
                     if depth == 0 && current_path >= search_path {
                         return Some(SubView::new(
-                                current_path.clone(),
+                                search_path.clone(),
                                 current_collection.clone(),
                                 )) ;
                     }
                     current_path.components.pop();
                 }
                 _ => {
-                    if current_path.components.len() <= self.path.components.len() {
-                        continue;
-                    }
                     if search_path.contains(&current_path) {
+                        inside = true;
                         current_collection.push(chunk);
                     }
                 }

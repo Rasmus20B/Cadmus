@@ -19,6 +19,7 @@ impl HBAMPath {
         if self.components.len() > contained.components.len() { return false }
         for (idx, _) in self.components.iter().enumerate() {
             if self.components[idx] != contained.components[idx] {
+                println!("{} != {}", self, contained);
                 return false
             }
         }

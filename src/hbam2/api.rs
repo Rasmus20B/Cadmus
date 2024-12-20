@@ -1,4 +1,4 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::encoding_util::{fm_string_decrypt, get_path_int}, fm_script_engine::fm_script_engine_instructions::*};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}, fm_script_engine::fm_script_engine_instructions::*};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -206,6 +206,10 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
         None => { return result }
     };
 
+    for chunk in &script_catalog_view.chunks {
+        println!("{:?}", chunk);
+    }
+
     for script_view in script_views {
         let id_ = get_path_int(script_view.path.components.last().unwrap());
         let name_ = fm_string_decrypt(script_view.get_value(16).unwrap());
@@ -221,27 +225,27 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
             let mut args = Vec::<String>::new();
             let step_id = step[2];
             let instruction = INSTRUCTIONMAP[step[21] as usize].expect("Unknown script step.");
-            println!("{} :: {:?}", step_id, instruction);
             let step_storage = match script_view.get_dir_relative(&mut HBAMPath::new(vec![&[5], &[step_id]])) {
                 Some(inner) => inner,
                 None => continue
             };
 
-            for step in step_storage.get_dirs().unwrap() {
-                let arg_views = match step.get_dirs() {
-                    Some(inner) => inner,
-                    None => continue
-                };
-                for arg in arg_views {
-                    println!("{}", arg.path);
-                    if let Some(arg_storage) = arg.get_dir_relative(&mut HBAMPath::new(vec![&[5]])) {
-                        if let Some(argument_bytecode) = arg_storage.get_value(5) {
-                            args.push(String::from("PLACEHOLDER ARGUMENT"));
-                        }
-                    }
-                }
-            }
 
+            match instruction {
+                Instruction::SetVariable => {
+                    let variable = step_storage
+                        .get_dir_relative(&mut HBAMPath::new(vec![&[0, 0]])).unwrap();
+                    let variable_name = fm_string_decrypt(variable.get_value(1).unwrap());
+
+                    let expr_storage = step_storage
+                        .get_dir_relative(&mut HBAMPath::new(vec![&[0, 1], &[5]])).unwrap();
+                    let expr = expr_storage.get_value(5).unwrap();
+                    let expr_decoded = decompile_calculation(expr);
+                    args.push(variable_name);
+                    args.push(expr_decoded);
+                },
+                _ => continue
+            }
         }
 
         let created_by_ = script_view.get_value(64513).unwrap();
