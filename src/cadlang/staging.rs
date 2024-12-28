@@ -286,7 +286,7 @@ impl Stage {
             }
         }
 
-        for (id_, relation) in &self.relations {
+        for (_, relation) in &self.relations {
             let mut tmp = Relation {
                 id: 0,
                 criterias: vec![],
@@ -309,7 +309,6 @@ impl Stage {
                         occ1_id = (*inner.0) as usize;
                     },
                     None => {
-                        println!("We were looking for {}", occurrence);
                         errs.push(CompileErr::UndefinedReference { construct: FMObjType::TableOccurrence, token: crit.field1.clone() });
                     }
                 }
@@ -319,7 +318,6 @@ impl Stage {
                         inner
                     },
                     None => {
-                        println!("We were loooking for {}", table1);
                         continue;
                     }
                 };
@@ -362,7 +360,6 @@ impl Stage {
                         inner
                     },
                     None => {
-                        println!("We were loooking for {}", table1);
                         continue;
                     }
                 };
@@ -419,14 +416,8 @@ impl Stage {
             });
         }
 
-        for relation in &result.relations {
-            println!("Relation {} of {:?} -> {:?}", relation.0, relation.1.table1, relation.1.table2);
-            for crit in &relation.1.criterias {
-                println!("  {:?}", crit);
-            }
-        }
-
         result.tests.extend(&mut self.tests.clone().into_iter());
+
         result.scripts.extend(&mut self.scripts.clone().into_iter());
 
         if errs.is_empty() {

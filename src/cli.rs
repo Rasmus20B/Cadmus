@@ -1,25 +1,40 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
-#[derive(Parser)]
-#[command(arg_required_else_help(true))]
+#[derive(Debug, Parser)]
 pub struct CommandLine {
-    #[clap(short = 'i')]
-    pub input: Option<String>,
-    #[clap(long = "fmp")]
-    pub fmp: Option<String>,
-    #[clap(long = "print-directory", requires("fmp"))]
-    pub print_directory: Option<String>,
-    #[clap(long = "print-root-block", action, requires("fmp"))]
-    pub print_root_block: bool,
-    #[clap(short = 's', requires("fmp"), requires("input"))]
-    pub sync: bool,
-    #[clap(short = 't', long = "test")]
-    pub test: bool,
-    #[clap(long = "test-file")]
-    pub test_file: Option<String>,
-    #[clap(long = "print-all-blocks", action, requires("fmp"))]
-    pub print_all_blocks: bool,
-    #[clap(long = "json-out", action, requires("fmp"))]
-    pub json_out: bool,
+    #[clap(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    Test {
+        #[clap(long)]
+        cadmus_file: Option<String>,
+        #[clap(long, conflicts_with = "cadmus_file")]
+        fmp_file: Option<String>,
+        #[clap(long)]
+        tests: Option<Vec<String>>,
+    },
+    Sync {
+        #[clap(long)]
+        cadmus_file: Option<String>,
+        #[clap(long)]
+        fmp_file: Option<String>,
+    },
+    Hbam {
+        #[clap(long, required = true)]
+        fmp_file: Option<String>,
+        #[clap(long = "print-directory", action)]
+        print_directory: Option<String>,
+        #[clap(long = "print-root-block", action)]
+        print_root_block: bool,
+        #[clap(long = "print-all-blocks", action)]
+        print_all_blocks: bool,
+        #[clap(long = "json-out", action)]
+        json_out: bool,
+        #[clap(long, action)]
+        page_check: bool,
+    }
 }
 

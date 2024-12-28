@@ -214,7 +214,6 @@ impl<'a> TestEnvironment<'a> {
                     if s.1.name == script_name {
                         self.instruction_ptr[n_stack].1 += 1;
                         self.instruction_ptr.push((script_name.clone(), 0));
-                        println!("calling {}", script_name);
                         break;
                     }
                 }
@@ -589,12 +588,13 @@ impl<'a> TestEnvironment<'a> {
                                 }
                             }).unwrap())
                     },
-                    "Get" => {
+                    "Get" | "get" => {
                         match args[0] {
-                            Node::Unary { ref value, child: _ } => {
+                            Node::Unary { ref value, child: _ } | Node::Variable(ref value) => {
                                 match value.as_str() {
                                     "AccountName" => Ok("\"Admin\"".to_string()),
                                     "CurrentTime" => Ok(Local::now().timestamp().to_string()),
+                                    "FoundCount" => Ok(self.database.get_current_occurrence().found_set.len().to_string()),
                                     _ => { Err(EvaluateError::InvalidArgument { function: name, argument: value.to_string() }) }
                                 }
                             }

@@ -130,7 +130,6 @@ impl Database {
             let fields_size = table.fields.keys().max().unwrap_or(&0);
             self.tables[*i].fields.resize(*fields_size + 1, Field::new());
             for (j, field) in &table.fields {
-                println!("pushing field: {:?}", field);
                 self.tables[*i].fields[*j] = Field {
                     id: *j,
                     name: field.name.to_string(),
@@ -407,11 +406,6 @@ impl Database {
             return Err("Record not found.");
         }
 
-        println!("table ptr: {}", table);
-        for field in &self.tables[table as usize].fields {
-            println!("field: {}", field.name);
-        }
-
         let field = self.tables[table as usize].fields
             .iter_mut()
             .enumerate()
@@ -480,7 +474,6 @@ impl Database {
                             RelationComparison::Cartesian => true,
                         };
                     }
-                    //println!("{} {:?} {} == {}", lhs, comparison_, rhs, related);
                     if !related { break }
                 }
                 if related {
