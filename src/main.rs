@@ -41,8 +41,9 @@ fn main() -> Result<(), std::io::Error>{
     let args = CommandLine::parse();
 
     match args.command {
-        cli::Command::Test { fmp_file, cadmus_file, tests } => {
-            if let Some(fmp_file_uw) = fmp_file {
+        cli::Command::Test { file, tests } => {
+
+            if let Some(fmp_file_uw) = file.fmp12_file {
                 ctx.fmp = Schema::new();
                 let mut storage = PageStore::new();
                 ctx.fmp.tables = api::get_table_catalog(&mut storage, &fmp_file_uw);
@@ -50,15 +51,13 @@ fn main() -> Result<(), std::io::Error>{
                 ctx.fmp.table_occurrences = occurrences;
                 ctx.fmp.relations = relations;
                 ctx.fmp.layouts = api::get_layout_catalog(&mut storage, &fmp_file_uw);
-            }
-
-            if let Some(cadmus_file_uw) = cadmus_file {
+            } else if let Some(cadmus_file_uw) = file.cadmus_file {
                 ctx.fmp = match compile_to_schema(read_to_string(Path::new(&cadmus_file_uw))?) {
                     Err(e) => panic!("{}", e),
                     Ok(schema) => schema
                 };
 
-            }
+            } 
 
             if let Some(test_list) = tests {
                 for test_file in test_list {
@@ -74,8 +73,7 @@ fn main() -> Result<(), std::io::Error>{
             te.generate_test_environment();
             te.run_tests();
         },
-        cli::Command::Sync { cadmus_file, fmp_file } => {
-        },
+        cli::Command::Sync { cadmus_file, fmp_file } => todo!(),
         cli::Command::Hbam { .. } => todo!()
     }
 

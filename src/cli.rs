@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 pub struct CommandLine {
@@ -6,13 +6,20 @@ pub struct CommandLine {
     pub command: Command,
 }
 
+#[derive(Args, Debug)]
+#[group(required = true ,multiple = false)]
+pub struct TestFile {
+    #[clap(long)]
+    pub cadmus_file: Option<String>,
+    #[clap(long)]
+    pub fmp12_file: Option<String>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Test {
-        #[clap(long)]
-        cadmus_file: Option<String>,
-        #[clap(long, conflicts_with = "cadmus_file")]
-        fmp_file: Option<String>,
+        #[clap(flatten)]
+        file: TestFile,
         #[clap(long)]
         tests: Option<Vec<String>>,
     },

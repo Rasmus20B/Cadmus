@@ -202,7 +202,6 @@ impl<'a> TestEnvironment<'a> {
         }
 
         let mut cur_instruction = &script_handle.instructions[ip_handle.1];
-        // println!("instr: {:?}", cur_instruction);
         match &cur_instruction.opcode {
             Instruction::PerformScript => {
                 let script_name = self.eval_calculation(&cur_instruction.switches[0])

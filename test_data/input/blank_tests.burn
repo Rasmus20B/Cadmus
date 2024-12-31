@@ -1,17 +1,13 @@
-test BasicTest:
-  script: [
+test %1 BasicTest = {
     define blank_test() {
-      set_variable(x, 1);
-      perform_script("testing");
+      set_variable($x, 1);
       loop {
         new_record_request();
         set_field(blank::PrimaryKey, "Kevin");
         assert(blank::PrimaryKey == "Kevin");
-        exit_loop_if(x == 10);
-        set_variable(x, x + 1);
+        exit_loop_if($x == 10);
+        set_variable($x, $x + 1);
       }
-      show_custom_dialog(x);
-      assert(x <= 10);
+      assert($x <= 10);
     }
-  ],
-end test;
+}
