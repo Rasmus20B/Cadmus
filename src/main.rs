@@ -56,7 +56,6 @@ fn main() -> Result<(), std::io::Error>{
                     Err(e) => panic!("{}", e),
                     Ok(schema) => schema
                 };
-
             } 
 
             if let Some(test_list) = tests {

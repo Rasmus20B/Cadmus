@@ -468,7 +468,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::emulator::calc_tokens::{Token, TokenType};
+    use super::{Token, TokenType};
     use super::{Node, Parser};
 
     #[test]
