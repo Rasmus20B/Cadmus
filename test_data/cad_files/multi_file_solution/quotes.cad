@@ -1,5 +1,5 @@
 
-extern %1 "customers.cad" as Customers
+extern %1 Customers : "customers.cad" 
 
 table %1 Quotes = {
   field %1 id = {

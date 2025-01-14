@@ -296,13 +296,13 @@ pub struct LayoutFM {
     pub table_occurrence_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum DataSourceType {
     FileMaker,
     ODBC,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct DataSource {
     pub id: usize,
     pub name: String,

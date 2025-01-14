@@ -1,6 +1,14 @@
 use std::collections::hash_map::HashMap;
 use super::{token::Token, error::CompileErr, parser::FMObjType};
-use crate::schema::{DBObjectReference, RelationCriteria, Relation, RelationComparison, Schema, Table, Field, LayoutFM, AutoEntry, AutoEntryType, Validation, ValidationType, ValidationTrigger, TableOccurrence, DataType, AutoEntryDataPresets, SerialTrigger, Test, Script};
+use crate::schema::{DBObjectReference, DataSource, DataSourceType, RelationCriteria, Relation, RelationComparison, Schema, Table, Field, LayoutFM, AutoEntry, AutoEntryType, Validation, ValidationType, ValidationTrigger, TableOccurrence, DataType, AutoEntryDataPresets, SerialTrigger, Test, Script};
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct StagedDataSource {
+    pub id: usize,
+    pub name: String,
+    pub dstype: DataSourceType,
+    pub filename: String,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StagedTable {
@@ -118,6 +126,7 @@ pub struct Stage {
     pub layouts: HashMap<u16, StagedLayout>,
     pub scripts: HashMap<u16, Script>,
     pub tests: HashMap<u16, Test>,
+    pub data_sources: HashMap<u16, DataSource>,
 }
 
 impl Stage {
@@ -130,6 +139,7 @@ impl Stage {
             layouts: HashMap::new(),
             scripts: HashMap::new(),
             tests: HashMap::new(),
+            data_sources: HashMap::new(),
         }
     }
 

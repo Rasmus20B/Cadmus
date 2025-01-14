@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DataSource, DataSourceType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
 
 use super::{staging::*, error::CompileErr};
 use super::token::{Token, TokenType};
@@ -285,6 +285,23 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Stage
         id: id_,
         name: name_.clone(),
         fields: fields_,
+    }))
+}
+
+pub fn parse_extern(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, DataSource), CompileErr> {
+    let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<u16>()
+        .expect("Unable to parse extern object id.");
+
+    let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
+    expect(tokens, &vec![TokenType::Colon], info)?;
+
+    let filename_ = expect(tokens, &vec![TokenType::String], info)?;
+
+    Ok((id_, DataSource {
+        id: id_ as usize,
+        name: name_.value.clone(),
+        filename: filename_.value.clone(),
+        dstype: DataSourceType::FileMaker,
     }))
 }
 
@@ -729,6 +746,10 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
                 let (id, test) = parse_test(tokens, &mut info)?;
                 result.tests.insert(id, test);
             },
+            TokenType::Extern => {
+                let (id, datasource) = parse_extern(tokens, &mut info)?;
+                result.data_sources.insert(id, datasource);
+            }
             TokenType::EOF => {
                 break;
             }
@@ -753,7 +774,7 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
 mod tests {
     use std::{collections::HashMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataSource, DataSourceType, DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
 
     use super::*;
 
@@ -1197,7 +1218,7 @@ mod tests {
         };
         assert_eq!(expected, schema.relations[&1])
     }
-
+    
     #[test]
     fn relation_invalid_criteria_test() {
         let code = "
@@ -1215,6 +1236,24 @@ mod tests {
                        String::from("Salary_occ::value"),
                        ) };
         assert!(schema.is_err_and(|e| e ==  expected));
+    }
+
+    #[test]
+    fn extern_basic() {
+        let code = "
+        extern %1 Quotes : \"quotes.cad\"
+        ";
+        let tokens = lex(code).expect("Tokenisation failed.");
+        let schema = parse(&tokens).unwrap();
+
+        let expected = DataSource {
+            id: 1,
+            name: String::from("Quotes"),
+            filename: String::from("quotes.cad"),
+            dstype: DataSourceType::FileMaker,
+        };
+        assert_eq!(expected, schema.data_sources[&1]);
+
     }
 
     #[test]
