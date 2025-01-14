@@ -11,6 +11,7 @@ pub enum TokenType {
     Layout,
     Script,
     Test,
+    Extern,
     // Second level objects
     Field,
     // thid level objects

@@ -1,0 +1,29 @@
+
+extern %1 "customers.cad" as Customers
+
+table %1 Quotes = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    }
+    unique = true,
+    required = true,
+  },
+  field %2 customer_id = {
+    datatype = Text,
+  },
+  field %3 price = {
+    datatype = Number,
+  }
+}
+
+table_occurrence %1 Quotes : Quotes
+table_occurrence %2 Customers : Customers::Customers
+
+layout %1 Quotes : Quotes = {
+}
+
+relation %1 = Quotes::customer_id == Customers::id

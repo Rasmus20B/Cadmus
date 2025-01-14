@@ -17,6 +17,7 @@ mod hbam2;
 mod schema;
 mod fm_script_engine;
 mod emulator;
+mod emulator2;
 mod cli;
 mod diff;
 
@@ -35,11 +36,8 @@ impl InputContext {
 }
 
 fn main() -> Result<(), std::io::Error>{
-    let base_file: Option<HBAMInterface>;
     let mut ctx = InputContext::new();
-
     let args = CommandLine::parse();
-
     match args.command {
         cli::Command::Test { file, tests } => {
 

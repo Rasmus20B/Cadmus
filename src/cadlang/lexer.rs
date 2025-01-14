@@ -29,7 +29,10 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
         }
         "do_not_replace" => {
             Token::new(TokenType::DoNotReplace, start)
-       }
+        }
+        "extern" => {
+            Token::new(TokenType::Extern, start)
+        }
         "false" => {
             Token::new(TokenType::False, start) 
         }
