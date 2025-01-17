@@ -75,7 +75,7 @@ pub enum TokenType {
     Number,
     Text,
     Date,
-    FieldReference,
+    ScopeResolution,
     ScriptContent,
 
     True,
@@ -109,7 +109,7 @@ impl fmt::Display for TokenType {
             Self::CloseBrace => write!(f, "}}"),
             Self::OpenParen => write!(f, "("),
             Self::CloseParen => write!(f, ")"),
-            Self::FieldReference => write!(f, "Field Reference"),
+            Self::ScopeResolution => write!(f, "Field Reference"),
             _ => write!(f, "{:?}", self)
         }
     }

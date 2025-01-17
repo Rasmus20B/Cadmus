@@ -321,16 +321,29 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
     expect(tokens, &vec![TokenType::Colon], info)?;
-    let tok = expect(tokens, &vec![TokenType::Identifier], info)?;
-    let base_table_ = tok;
-    //info.unmapped.push((tok, DBobjectReference, FMobjType::Table, ));
+    let mut table_or_source = expect(tokens, &vec![TokenType::Identifier], info)?;
 
 
-    Ok((id_, StagedOccurrence {
-        id: id_,
-        name: name_.clone(),
-        base_table: base_table_.clone(),
-    }))
+    if expect(tokens, &vec![TokenType::ScopeResolution], info).is_ok() {
+        let table = expect(tokens, &vec![TokenType::Identifier], info)?;
+        return Ok((id_,
+                StagedOccurrence {
+                    id: id_ as usize,
+                    name: name_.clone(),
+                    data_source: Some(table_or_source.clone()),
+                    base_table: table.clone(),
+                }))
+    } else {
+        info.cursor -= 1;
+        let table = table_or_source.clone(); 
+        Ok((id_, StagedOccurrence {
+            id: id_ as usize,
+            name: name_.clone(),
+            data_source: None,
+            base_table: table.clone(),
+        }))
+    }
+
 }
 
 pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Script), CompileErr> {
@@ -427,7 +440,9 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
         == TokenType::Colon {
             let mut sort_ = StagedValueListSortBy::FirstField;
             let mut from_: Option<Token> = None;
-            let first_field = expect(tokens, &vec![TokenType::FieldReference], info)?;
+            let occurrence_ = expect(tokens, &vec![TokenType::Identifier], info)?;
+            expect(tokens, &vec![TokenType::ScopeResolution], info)?;
+            let first_field = expect(tokens, &vec![TokenType::Identifier], info)?;
             info.cursor += 1;
             let token = &tokens[info.cursor];
 
@@ -441,6 +456,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
                             id: id_,
                             name: name_.clone(),
                             definition: StagedValueListDefinition::FromField { 
+                                occurrence: occurrence_.clone(),
                                 field1: first_field.clone(), 
                                 field2: None, 
                                 from: None, 
@@ -449,7 +465,9 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
                         }))
                 },
                 TokenType::Comma => {
-                    let second_field = expect(tokens, &vec![TokenType::FieldReference], info)?;
+                    let second_table = expect(tokens, &vec![TokenType::Identifier], info)?;
+                    expect(tokens, &vec![TokenType::ScopeResolution], info)?;
+                    let second_field = expect(tokens, &vec![TokenType::Identifier], info)?;
                     info.cursor += 1;
                     let token = &tokens[info.cursor];
 
@@ -463,6 +481,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
                                     id: id_,
                                     name: name_.clone(),
                                     definition: StagedValueListDefinition::FromField { 
+                                        occurrence: occurrence_.clone(),
                                         field1: first_field.clone(), 
                                         field2: Some(second_field.clone()), 
                                         from: from_, 
@@ -477,6 +496,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
                                 id: id_,
                                 name: name_.clone(),
                                 definition: StagedValueListDefinition::FromField { 
+                                    occurrence: occurrence_.clone(),
                                     field1: first_field.clone(), 
                                     field2: Some(second_field.clone()), 
                                     from: from_, 
@@ -503,6 +523,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
                         id: id_,
                         name: name_.clone(),
                         definition: StagedValueListDefinition::FromField { 
+                            occurrence: occurrence_.clone(),
                             field1: first_field.clone(), 
                             field2: None, 
                             from: from_, 
@@ -590,8 +611,10 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Test),
     }))
 }
 
-pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<(&'a Token, &'a Token, RelationComparison), CompileErr> {
-    let lhs = expect(tokens, &vec![TokenType::FieldReference], info)?;
+pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<StagedRelationCriteria, CompileErr> {
+    let lhs_occ = expect(tokens, &vec![TokenType::Identifier], info)?;
+    expect(tokens, &vec![TokenType::ScopeResolution], info)?;
+    let lhs_field = expect(tokens, &vec![TokenType::Identifier], info)?;
     info.cursor += 1;
     let comparison_ = match tokens[info.cursor].ttype {
         TokenType::Eq => RelationComparison::Equal,
@@ -607,36 +630,41 @@ pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) ->
             TokenType::Gte, TokenType::Lt, TokenType::Lte, TokenType::Cartesian] 
         })
     };
-    let rhs = expect(tokens, &vec![TokenType::FieldReference], info)?;
-    Ok((lhs, rhs, comparison_ ))
+    let rhs_occ = expect(tokens, &vec![TokenType::Identifier], info)?;
+    expect(tokens, &vec![TokenType::ScopeResolution], info)?;
+    let rhs_field = expect(tokens, &vec![TokenType::Identifier], info)?;
+    Ok(StagedRelationCriteria {
+        occurrence1: lhs_occ.clone(),
+        field1: lhs_field.clone(),
+        occurrence2: rhs_occ.clone(),
+        field2: rhs_field.clone(),
+        comparison: comparison_,
+    })
 }
 
 pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedRelation), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<u16>().expect("Unable to parse object id.");
     expect(tokens, &vec![TokenType::Assignment], info)?;
-    let token = expect(tokens, &vec![TokenType::OpenBrace, TokenType::FieldReference], info)?;
+    let token = expect(tokens, &vec![TokenType::OpenBrace, TokenType::Identifier], info)?;
 
     let mut criterias_ = vec![];
-    let mut tables = [None; 2];
     if token.ttype == TokenType::OpenBrace {
         while tokens.get(info.cursor).is_some() {
             // parse attribute
-            let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
-            let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
-            let rhs_table = rhs.value.split("::").collect::<Vec<_>>()[0];
-            if tables.iter().any(|t| t.is_none()) {
-                tables[0] = Some(lhs_table);
-                tables[1] = Some(rhs_table);
-            }
-            if !tables.iter().any(|search| search.unwrap() == lhs_table) {
-                return Err(CompileErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
-            }
-            if !tables.iter().any(|search| search.unwrap() == rhs_table) {
-                return Err(CompileErr::RelationCriteria { token: tokens[info.cursor].clone() })
-            }
+            let criteria = parse_relation_criteria(tokens, info)?;
+            //if tables.iter().any(|t| t.is_none()) {
+            //    tables[0] = Some(lhs_table);
+            //    tables[1] = Some(rhs_table);
+            //}
+            //if !tables.iter().any(|search| search.unwrap() == lhs_table) {
+            //    return Err(CompileErr::RelationCriteria { token: tokens[info.cursor - 2].clone() })
+            //}
+            //if !tables.iter().any(|search| search.unwrap() == rhs_table) {
+            //    return Err(CompileErr::RelationCriteria { token: tokens[info.cursor].clone() })
+            //}
 
-            criterias_.push(StagedRelationCriteria { field1: lhs.clone(), field2: rhs.clone(), comparison: comp});
+            criterias_.push(criteria.clone());
             let mut token = expect(tokens, &vec![TokenType::Comma, TokenType::CloseBrace], info)?;
             if token.ttype == TokenType::Comma {
                 if let Some(end) = tokens.get(info.cursor + 1) {
@@ -649,8 +677,8 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
             if token.ttype == TokenType::CloseBrace {
                 return Ok((id_, StagedRelation {
                     id: id_,
-                    table1: lhs_table.to_string(),
-                    table2: rhs_table.to_string(),
+                    table1: criteria.occurrence1.value.to_string(),
+                    table2: criteria.occurrence2.value.to_string(),
                     criterias: criterias_,
                 }))
             }
@@ -658,14 +686,13 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
         unreachable!()
     } else {
         info.cursor -= 1;
-        let (lhs, rhs, comp) = parse_relation_criteria(tokens, info)?;
-        let lhs_table = lhs.value.split("::").collect::<Vec<_>>()[0];
-        let rhs_table = rhs.value.split("::").collect::<Vec<_>>()[0];
-        criterias_.push(StagedRelationCriteria { field1: lhs.clone(), field2: rhs.clone(), comparison: comp });
+        println!("CUR_TOKEN: {:?}", tokens[info.cursor]);
+        let criteria = parse_relation_criteria(tokens, info)?;
+        criterias_.push(criteria.clone());
         Ok((id_, StagedRelation {
             id: id_,
-            table1: lhs_table.to_string(),
-            table2: rhs_table.to_string(),
+            table1: criteria.occurrence1.value.to_string(),
+            table2: criteria.occurrence2.value.to_string(),
             criterias: criterias_,
         }))
     }
@@ -678,6 +705,7 @@ pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result
             TokenType::CloseBrace => {
                 return Ok(attributes);
             }
+
             _ => {
                 return Err(CompileErr::UnimplementedLanguageFeauture { 
                     feature: String::from("Layout Attributes"),
@@ -910,15 +938,20 @@ mod tests {
                 Location { line: 2, column: 23 },
                 "basic".to_string()),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 31 },
-                            "Person_occ::name".to_string()
+                            TokenType::Identifier,
+                            Location { line: 2, column: 43 },
+                            "name".to_string()
                             ),
                 field2: Some(Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 47 },
-                            "Person_occ::id".to_string()
+                            TokenType::Identifier,
+                            Location { line: 2, column: 61 },
+                            "id".to_string()
                             )),
                 from: None, 
                 sort: StagedValueListSortBy::FirstField, 
@@ -943,10 +976,15 @@ mod tests {
                 Location { line: 2, column: 23 },
                 "basic".to_string()),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 31 },
-                            "Person_occ::name".to_string()
+                            TokenType::Identifier,
+                            Location { line: 2, column: 43 },
+                            "name".to_string()
                             ),
                 field2: None,
                 from: None, 
@@ -966,6 +1004,9 @@ mod tests {
         }
         ";
         let tokens = lex(code).expect("Tokenisation failed.");
+        for t in &tokens {
+            println!("{:?}", t);
+        }
         let schema = parse(&tokens).expect("Parsing failed.");
 
         let expected = StagedValueList {
@@ -975,10 +1016,15 @@ mod tests {
                 Location { line: 2, column: 23 },
                 "basic".to_string()),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 31 },
-                            "Person_occ::name".to_string()
+                            TokenType::Identifier,
+                            Location { line: 2, column: 43 },
+                            "name".to_string()
                             ),
                 field2: None,
                 from: Some(Token::with_value(
@@ -1009,10 +1055,15 @@ mod tests {
                 Location { line: 2, column: 23 },
                 String::from("basic")),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column:  31 },
-                            String::from("Person_occ::name"),
+                            TokenType::Identifier,
+                            Location { line: 2, column:  43 },
+                            String::from("name"),
                         ),
                 field2: None,
                 from: Some(Token::with_value(
@@ -1043,10 +1094,15 @@ mod tests {
                 Location { line: 2, column: 23 },
                 String::from("basic")),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 31 },
-                            String::from("Person_occ::name"),
+                            TokenType::Identifier,
+                            Location { line: 2, column: 43 },
+                            String::from("name"),
                         ),
                 field2: None,
                 from: None,
@@ -1074,10 +1130,15 @@ mod tests {
                 Location { line: 2, column: 23 },
                 String::from("basic")),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column:  31 },
-                            String::from("Person_occ::name"),
+                            TokenType::Identifier,
+                            Location { line: 2, column:  43 },
+                            String::from("name"),
                         ),
                 field2: None,
                 from: None,
@@ -1105,15 +1166,20 @@ mod tests {
                 Location { line: 2, column: 23 },
                 String::from("basic")),
             definition: StagedValueListDefinition::FromField { 
+                occurrence: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 2, column: 31 },
+                                String::from("Person_occ")
+                            ),
                 field1: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column:  31 },
-                            String::from("Person_occ::name"),
+                            TokenType::Identifier,
+                            Location { line: 2, column:  43 },
+                            String::from("name"),
                         ),
                 field2: Some(Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column:  47 },
-                            String::from("Person_occ::id"),
+                            TokenType::Identifier,
+                            Location { line: 2, column:  61 },
+                            String::from("id"),
                         )),
                 from: Some(Token::with_value(
                     TokenType::Identifier,
@@ -1139,6 +1205,7 @@ mod tests {
 
         let expected = StagedOccurrence {
             id: 1,
+            data_source: None,
             name: Token::with_value(
                 TokenType::Identifier,
                 Location { line: 4, column: 33 },
@@ -1163,15 +1230,23 @@ mod tests {
             table1: String::from("Person_occ"),
             table2: String::from("Job_occ"),
             criterias: vec![StagedRelationCriteria {
-                field1: Token::with_value(
-                            TokenType::FieldReference,
+                occurrence1: Token::with_value(
+                            TokenType::Identifier,
                             Location { line: 2, column: 23 },
-                            String::from("Person_occ::job_id")),
+                            String::from("Person_occ")),
+                field1: Token::with_value(
+                            TokenType::Identifier,
+                            Location { line: 2, column: 35 },
+                            String::from("job_id")),
                 comparison: RelationComparison::Equal,
+                occurrence2: Token::with_value(
+                            TokenType::Identifier,
+                            Location { line: 2, column: 44 },
+                            String::from("Job_occ")),
                 field2: Token::with_value(
-                            TokenType::FieldReference,
-                            Location { line: 2, column: 42 },
-                            String::from("Job_occ::id")),
+                            TokenType::Identifier,
+                            Location { line: 2, column: 53 },
+                            String::from("id")),
             }]
         };
         assert_eq!(expected, schema.relations[&1])
@@ -1193,51 +1268,48 @@ mod tests {
             table2: String::from("Job_occ"),
             criterias: vec![
                 StagedRelationCriteria {
-                    field1: Token::with_value(
-                                TokenType::FieldReference,
+                    occurrence1: Token::with_value(
+                                TokenType::Identifier,
                                 Location { line: 3, column: 13 },
-                                String::from("Person_occ::job_id")),
+                                String::from("Person_occ")),
+                    field1: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 3, column: 25 },
+                                String::from("job_id")),
                     comparison: RelationComparison::Equal,
+                    occurrence2: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 3, column: 34 },
+                                String::from("Job_occ")),
                     field2: Token::with_value(
-                                TokenType::FieldReference,
-                                Location { line: 3, column: 32 },
-                                String::from("Job_occ::id")),
+                                TokenType::Identifier,
+                                Location { line: 3, column: 43 },
+                                String::from("id")),
                 },
                 StagedRelationCriteria {
-                    field1: Token::with_value(
-                                TokenType::FieldReference,
+                    occurrence1: Token::with_value(
+                                TokenType::Identifier,
                                 Location { line: 4, column: 13 },
-                                String::from("Person_occ::first_name")),
+                                String::from("Person_occ")),
+                    field1: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 4, column: 25 },
+                                String::from("first_name")),
                     comparison: RelationComparison::NotEqual,
+                    occurrence2: Token::with_value(
+                                TokenType::Identifier,
+                                Location { line: 4, column: 38 },
+                                String::from("Job_occ")),
                     field2: Token::with_value(
-                                TokenType::FieldReference,
-                                Location { line: 4, column: 36 },
-                                String::from("Job_occ::name")),
+                                TokenType::Identifier,
+                                Location { line: 4, column: 47 },
+                                String::from("name")),
                 }
             ]
         };
         assert_eq!(expected, schema.relations[&1])
     }
     
-    #[test]
-    fn relation_invalid_criteria_test() {
-        let code = "
-        relation %1 = {
-            Person_occ::job_id == Job_occ::id,
-            Person_occ::first_name != Salary_occ::value,
-        }
-        ";
-        let tokens = lex(code).expect("Tokenisation failed.");
-        let schema = parse(&tokens);
-        let expected = CompileErr::RelationCriteria { 
-            token: Token::with_value(
-                       TokenType::FieldReference, 
-                       Location { line: 4, column: 36 }, 
-                       String::from("Salary_occ::value"),
-                       ) };
-        assert!(schema.is_err_and(|e| e ==  expected));
-    }
-
     #[test]
     fn extern_basic() {
         let code = "

@@ -1,6 +1,7 @@
 
 mod database;
 mod database_mgr;
+mod data_source;
 pub mod emulator;
 mod find;
 mod layout;

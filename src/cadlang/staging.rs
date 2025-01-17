@@ -67,7 +67,9 @@ pub struct StagedField {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StagedRelationCriteria {
+    pub occurrence1: Token,
     pub field1: Token,
+    pub occurrence2: Token,
     pub field2: Token,
     pub comparison: RelationComparison,
 }
@@ -82,8 +84,9 @@ pub struct StagedRelation {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StagedOccurrence {
-    pub id: u16,
+    pub id: usize,
     pub name: Token,
+    pub data_source: Option<Token>,
     pub base_table: Token,
 }
 
@@ -96,7 +99,9 @@ pub enum StagedValueListSortBy {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StagedValueListDefinition {
     CustomValues(Vec<String>),
-    FromField { field1: Token, 
+    FromField { 
+        occurrence: Token,
+        field1: Token, 
         field2: Option<Token>, 
         from: Option<Token>, 
         sort: StagedValueListSortBy, 
@@ -146,6 +151,8 @@ impl Stage {
     pub fn to_schema(&self) -> Result<Schema, Vec<CompileErr>> {
         let mut result = Schema::new();
         let mut errs = Vec::<CompileErr>::new();
+
+        result.data_sources.extend(self.data_sources.clone());
 
         for (id_, table) in &self.tables {
             let name_ = table.name.value.clone();
@@ -307,13 +314,13 @@ impl Stage {
             for crit in &relation.criterias {
                 let mut field1: usize = 0;
                 let comparison = RelationComparison::Equal;
-                let parts = crit.field1.value.split("::").collect::<Vec<_>>();
-                let occurrence = parts[0];
-                let field1_name = parts[1];
+                let parts = vec![crit.occurrence1.value.clone(), crit.field1.value.clone()];
+                let occurrence = &parts[0];
+                let field1_name = &parts[1];
                 let mut table1 = String::new();
                 let mut occ1_id = 0;
 
-                match self.table_occurrences.iter().find(|occ| occ.1.name.value == occurrence) {
+                match self.table_occurrences.iter().find(|occ| occ.1.name.value == *occurrence) {
                     Some(inner) => {
                         table1 = inner.1.base_table.value.clone();
                         occ1_id = (*inner.0) as usize;
@@ -332,7 +339,7 @@ impl Stage {
                     }
                 };
 
-                match table_handle.1.fields.iter().find(|field| field.1.name.value == field1_name) {
+                match table_handle.1.fields.iter().find(|field| field.1.name.value == *field1_name) {
                     Some(inner) => {
                         field1 = (*inner.0) as usize;
                     },
@@ -349,13 +356,13 @@ impl Stage {
 
 
                 let mut field2: usize = 0;
-                let parts = crit.field2.value.split("::").collect::<Vec<_>>();
-                let occurrence = parts[0];
-                let field2_name = parts[1];
+                let parts = vec![crit.occurrence2.value.clone(), crit.field2.value.clone()];
+                let occurrence = &parts[0];
+                let field2_name = &parts[1];
                 let mut table2 = String::new();
                 let mut occ2_id = 0;
 
-                match self.table_occurrences.iter().find(|occ| occ.1.name.value == occurrence) {
+                match self.table_occurrences.iter().find(|occ| occ.1.name.value == *occurrence) {
                     Some(inner) => {
                         table2 = inner.1.base_table.value.clone();
                         occ2_id = (*inner.0) as usize;
@@ -374,7 +381,7 @@ impl Stage {
                     }
                 };
 
-                match table_handle.1.fields.iter().find(|field| field.1.name.value == field2_name) {
+                match table_handle.1.fields.iter().find(|field| field.1.name.value == *field2_name) {
                     Some(inner) => {
                         field2 = (*inner.0) as usize;
                     },
@@ -420,7 +427,7 @@ impl Stage {
                 table_occurrence_name: occ_name,
                 table_occurrence: DBObjectReference {
                     data_source: 0,
-                    top_id: id,
+                    top_id: id as u16,
                     inner_id: 0,
                 },
             });

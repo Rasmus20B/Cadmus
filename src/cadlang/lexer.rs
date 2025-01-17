@@ -17,7 +17,7 @@ fn decode_buffer(buffer: &str, start: Location) -> Token {
     }
 
     if buffer.split("::").collect::<Vec<_>>().len() == 2 {
-        return Token::with_value(TokenType::FieldReference, start, buffer.to_string());
+        return Token::with_value(TokenType::ScopeResolution, start, buffer.to_string());
     }
 
     match buffer {
@@ -265,18 +265,20 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                 }
             }
             ':' => {
-                if let Some(c) = lex_iter.peek() {
-                    if *c == ':' {
-                        buffer.push(':');
-                        buffer.push(lex_iter.next().unwrap());
-                        continue;
-                    }
-                }
                 if !buffer.is_empty() {
                     tokens.push(decode_buffer(&buffer, token_start));
                     buffer.clear();
                 }
-                tokens.push(Token::new(TokenType::Colon, cursor));
+                if let Some(c) = lex_iter.peek() {
+                    if *c == ':' {
+                        lex_iter.next();
+                        tokens.push(Token::new(TokenType::ScopeResolution, cursor));
+                        cursor.column += 2;
+                        continue;
+                    } else {
+                        tokens.push(Token::new(TokenType::Colon, cursor));
+                    }
+                }
             }
             '!' => {
                 if !buffer.is_empty() {
