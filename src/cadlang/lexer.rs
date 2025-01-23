@@ -197,10 +197,10 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     }
                     // Pop the script close brace at the end.
                     buffer.pop();
-                tokens.push(Token::new(TokenType::OpenBrace, cursor));
-                tokens.push(Token::with_value(TokenType::ScriptContent, cursor, buffer.clone()));
-                tokens.push(Token::new(TokenType::CloseBrace, cursor));
-                buffer.clear();
+                    tokens.push(Token::new(TokenType::OpenBrace, cursor));
+                    tokens.push(Token::with_value(TokenType::ScriptContent, cursor, buffer.clone()));
+                    tokens.push(Token::new(TokenType::CloseBrace, cursor));
+                    buffer.clear();
                 } else {
                     tokens.push(Token::new(TokenType::OpenBrace, cursor));
                 }
@@ -231,22 +231,6 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     buffer.clear();
                 }
                 tokens.push(Token::new(TokenType::Comma, cursor));
-            }
-            '[' => {
-                if !buffer.is_empty() {
-                    tokens.push(decode_buffer(&buffer, token_start));
-                    buffer.clear();
-                }
-                for c in lex_iter.by_ref() {
-                    if c == ']' {
-                        tokens.push(Token::with_value(TokenType::Calculation, cursor, buffer.clone()));
-                        cursor.column += buffer.len() as u32;
-                        buffer.clear();
-                        break;
-                    } else {
-                        buffer.push(c);
-                    }
-                }
             }
             '"' => {
                 if !buffer.is_empty() {
@@ -290,6 +274,34 @@ pub fn lex(code: &str) -> Result<Vec<Token>, LexErr> {
                     tokens.push(Token::new(TokenType::Neq, cursor));
                 } else {
                     tokens.push(Token::new(TokenType::Exclamation, cursor));
+                }
+            }
+            '|' => {
+                let mut escaped = false;
+                let mut in_string = false;
+                while let Some(c) = &lex_iter.next() {
+                    if *c == '|' {
+                        if !in_string {
+                            tokens.push(Token::with_value(TokenType::Calculation, cursor, buffer.clone()));
+                            cursor.column += buffer.len() as u32;
+                            buffer.clear();
+                            break;
+                        } else {
+                            buffer.push(*c);
+                        }
+                    } else if *c == '\\' && in_string {
+                        escaped = true;
+                    } else if *c == '"' {
+                        if escaped {
+                            buffer.push(*c);
+                            escaped = false;
+                        } else {
+                            in_string ^= in_string;
+                            buffer.push(*c);
+                        }
+                    } else {
+                        buffer.push(*c)
+                    }
                 }
             }
             '/' => {
@@ -347,7 +359,7 @@ mod tests {
     use super::lex;
 
     #[test]
-    fn lex_test() {
+    fn table_test() {
         let code = "
 table %1 Person {
     field %1 id = {
@@ -355,7 +367,7 @@ table %1 Person {
         // This is a comment
         required =true, // This is also a comment
         unique= true,
-        calculated_val = [get(uuid)],
+        calculated_val = |get(uuid)|,
         validation_message = \"Invalid ID chosen.\",
     }
 }
@@ -404,11 +416,10 @@ table %1 Person {
         let lexed = lex(code).expect("Unable to lex code.");
 
         for pair in expected.iter().zip(lexed) {
-            // println!("{:?} == {:?}", pair.0, pair.1);
+             println!("{:?} == {:?}", pair.0, pair.1);
             assert_eq!(*pair.0, pair.1);
         }
     }
-
 }
 
 

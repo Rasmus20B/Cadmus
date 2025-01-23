@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 #[derive(Clone, Debug)]
 pub struct Record {
-    id: usize,
+    pub id: usize,
     fields: RefCell<HashMap<String, String>>
 }
 

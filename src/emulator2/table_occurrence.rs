@@ -1,16 +1,17 @@
 
 use std::rc::Rc;
-use super::{table::Table, record::Record};
+use std::cell::RefCell;
+use super::{table::Table, record_store::RecordStore, record::Record, data_source::DataSource};
 
 pub struct TableOccurrence {
-    id: usize,
+    pub id: usize,
     pub name: String,
-    data_source: String,
-    table: Rc<Table>
+    pub data_source: usize,
+    pub table: Rc<Table>
 }
 
 impl TableOccurrence {
-    pub fn new(id_: usize, name_: String, data_source_: String, table_: Rc<Table>) -> Self {
+    pub fn new(id_: usize, name_: String, data_source_: usize, table_: Rc<Table>) -> Self {
         Self {
             id: id_,
             name: name_,

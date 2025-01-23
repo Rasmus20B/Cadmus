@@ -5,15 +5,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::dbobjects::calculation::Calculation;
 
+use crate::dbobjects::reference::FieldReference;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum Selection {
-    ByName(String),
+pub enum FieldSelection {
+    FromList(FieldReference),
     ByCalculation(Calculation)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[repr(u8)] pub enum Instruction {
-	PerformScript { script: Selection, args: Calculation } = 1,
+pub enum ScriptSelection {
+    FromList(FieldReference),
+    ByCalculation(Calculation)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[repr(u16)] pub enum Instruction {
+	PerformScript { script: ScriptSelection, args: Calculation } = 1,
 	SaveACopyAsXml = 3,
 	GoToNextField = 4,
 	GoToPreviousField = 5,
@@ -491,15 +499,15 @@ pub enum Selection {
 //    Some(Instruction::Assert),
 //];
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct ScriptStep {
-    pub opcode: Instruction,
-    pub index: usize,
-    pub switches: Vec<String>,
-}
+impl Instruction {
+    pub fn new(name: &str, args: &Vec<(Option<String>, String)>) -> Self {
+        todo!()
+    }
 
-pub struct Script {
-    pub script_name: String,
-    pub instructions: Vec<Instruction>,
+    pub fn get_opcode(&self) -> u32 {
+        match self {
+            Instruction::PerformScript { .. } => 1,
+            _ => 0,
+        }
+    }
 }
-

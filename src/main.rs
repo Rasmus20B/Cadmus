@@ -1,9 +1,7 @@
-use std::{fs::{read_to_string, File, OpenOptions}, io::{BufReader, BufWriter}, path::Path};
+use std::{fs::read_to_string, path::Path};
 use cadlang::compiler::compile_to_schema;
 use clap::Parser;
 use cli::CommandLine;
-use diff::get_diffs;
-use hbam::fs::HBAMInterface;
 use hbam2::{api::{self}, page_store::PageStore};
 use schema::Schema;
 use emulator::test::TestEnvironment;
@@ -16,6 +14,7 @@ mod hbam;
 mod hbam2;
 mod schema;
 mod fm_script_engine;
+mod dbobjects;
 mod emulator;
 mod emulator2;
 mod cli;
@@ -40,7 +39,6 @@ fn main() -> Result<(), std::io::Error>{
     let args = CommandLine::parse();
     match args.command {
         cli::Command::Test { file, tests } => {
-
             if let Some(fmp_file_uw) = file.fmp12_file {
                 ctx.fmp = Schema::new();
                 let mut storage = PageStore::new();

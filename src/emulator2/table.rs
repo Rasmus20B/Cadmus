@@ -25,6 +25,6 @@ impl Table {
     }
 
     pub fn new_record(&mut self) {
-        let tmp = Record::new(self.records.len(), &self.field_names);
+        self.records.push(Record::new(self.records.iter().max_by_key(|record| record.id).map(|r| r.id).unwrap_or(1), &self.field_names));
     }
 }

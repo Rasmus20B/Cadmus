@@ -3,23 +3,30 @@ use super::{
     table::Table,
     table_occurrence::TableOccurrence,
     data_source::{DataSource, DataSourceType},
+    layout::Layout,
 };
-
 use std::rc::Rc;
-
-use crate::schema::Schema;
+use crate::schema::{Schema, Script};
 
 pub struct Database {
+    pub filename: String,
+    pub name: String,
     pub tables: Vec<Table>,
     pub table_occurrences: Vec<TableOccurrence>,
+    pub layouts: Vec<Rc<Layout>>,
+    pub scripts: Vec<Script>,
     pub external_sources: Vec<DataSource>,
 }
 
 impl Database {
     pub fn new() -> Self {
         Self {
+            filename: String::new(),
+            name: String::new(),
             tables: vec![],
             table_occurrences: vec![],
+            layouts: vec![],
+            scripts: vec![],
             external_sources: vec![],
         }
     }
@@ -33,7 +40,7 @@ impl Database {
                 .iter()
                 .map(|field| field.1.name.clone())
                 .collect();
-            tmp_db.tables.push(tmp_table)
+            tmp_db.tables.push(tmp_table);
         }
 
         for (i, source) in &schema.data_sources {
@@ -50,16 +57,20 @@ impl Database {
                 .find(|t| t.id == occurrence.base_table.top_id as usize)
                 .unwrap().clone());
 
-            let source = if occurrence.base_table.data_source != 0 {
-                schema.data_sources[&occurrence.base_table.data_source].name.clone()
-            } else {
-                String::new()
-            };
-
-            println!("OCC name: {}", occurrence.name);
-
-            tmp_db.table_occurrences.push(TableOccurrence::new(occurrence.id, occurrence.name.clone(), source, table));
+            tmp_db.table_occurrences.push(TableOccurrence::new(
+                    occurrence.id,
+                    occurrence.name.clone(),
+                    occurrence.base_table.data_source as usize,
+                    table)
+                );
         }
+
+        for (i, layout) in &schema.layouts {
+            let tmp_layout = Layout::new(*i, layout.name.clone(), layout.table_occurrence.top_id as usize);
+            tmp_db.layouts.push(tmp_layout.into());
+        }
+
+        tmp_db.scripts.extend(schema.scripts.iter().map(|x| x.1.clone()).collect::<Vec<Script>>());
         tmp_db
     }
 }

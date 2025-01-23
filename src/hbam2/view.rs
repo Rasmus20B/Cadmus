@@ -260,7 +260,7 @@ impl<'a> View {
 mod tests {
     use super::HBAMPath;
     use std::io::{Read, Seek};
-    use crate::{BufReader, File};
+    use std::{io::BufReader, fs::File};
     use crate::hbam2::{bplustree::get_view_from_key, page::Page, page_store::PageStore};
 
     #[test]

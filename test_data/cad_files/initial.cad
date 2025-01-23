@@ -23,7 +23,7 @@ table %1 Person = {
 table %2 Job = {
   field %1 id = {
     datatype = Number,
-    calculated_val = [get(uuid)],
+    calculated_val = |get(uuid)|,
     unique = true,
     required = true,
     validation_message = "Invalid ID chosen.",
@@ -33,7 +33,7 @@ table %2 Job = {
   }
   field %3 salary = {
     datatype = Number,
-    validation_calc = [this >= 0],
+    validation_calc = |this >= 0|,
   }
 }
 
@@ -48,7 +48,7 @@ table %3 SalaryLevel = {
     unique = true,
     required = true,
     validation_message = "Invalid ID chosen.",
-    auto_entry = [get(uuid)],
+    auto_entry = |get(uuid)|,
   }
   field %2 title = {
     dataType = Text,
@@ -107,20 +107,20 @@ layout %3 Salary : Salary_occ = {
 
 script %1 make_10_people = {
   define make_10_people() {
-    set_variable($x, 0);
+    set_variable($x, |0|);
     go_to_layout("Person");
     loop {
-      exit_loop_if($x == 10);
+      exit_loop_if(|$x == 10|);
       new_record_request();
       if($x == 7) {
-          set_field(Person_occ::first_name, "Kevin");
+          set_field(Person_occ::first_name, |"Kevin"|);
       } elif($x == 1) {
-          set_field(Person_occ::first_name, "alvin" & " Presley");
+          set_field(Person_occ::first_name, |"alvin" & " Presley"|);
       } else {
-          set_field(Person_occ::first_name, "Jeff");
-          set_field(Person_occ::surname, "Keighly");
+          set_field(Person_occ::first_name, |"Jeff"|);
+          set_field(Person_occ::surname, |"Keighly"|);
       }
-      set_variable($x, $x + 1);
+      set_variable($x, |$x + 1|);
     }
   }
 }

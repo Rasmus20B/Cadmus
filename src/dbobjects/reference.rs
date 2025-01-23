@@ -22,3 +22,9 @@ pub struct TableReference {
     data_source: u32,
     table_id: u32,
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct ScriptReference {
+    data_source: u32,
+    script_id: u32,
+}

@@ -283,23 +283,37 @@ impl Stage {
         for (id_, occurrence) in &self.table_occurrences {
             let name_ = occurrence.name.value.clone();
             let base_table_ = occurrence.base_table.clone();
-            match self.tables.iter().find(|table| table.1.name.value == base_table_.value) {
-                Some(inner) => {
-                    result.table_occurrences.insert((*id_) as usize, TableOccurrence {
-                        id: (*id_) as usize,
-                        name: name_,
-                        base_table: DBObjectReference {
-                            data_source: 0,
-                            top_id: inner.1.id,
-                            inner_id: 0,
-                        },
-                        created_by: String::from("admin"),
-                        modified_by: String::from("admin"),
-                    });
+            if occurrence.data_source == None {
+                match self.tables.iter().find(|table| table.1.name.value == base_table_.value) {
+                    Some(inner) => {
+                        result.table_occurrences.insert((*id_) as usize, TableOccurrence {
+                            id: (*id_) as usize,
+                            name: name_,
+                            base_table: DBObjectReference {
+                                data_source: 0,
+                                top_id: inner.1.id,
+                                inner_id: 0,
+                            },
+                            created_by: String::from("admin"),
+                            modified_by: String::from("admin"),
+                        });
+                    }
+                    None => {
+                        errs.push(CompileErr::UndefinedReference { construct: FMObjType::Table, token: base_table_ });
+                    }
                 }
-                None => {
-                    errs.push(CompileErr::UndefinedReference { construct: FMObjType::Table, token: base_table_ });
-                }
+            } else {
+               result.table_occurrences.insert((*id_) as usize, TableOccurrence {
+                   id: (*id_) as usize,
+                   name: name_,
+                   base_table: DBObjectReference {
+                       data_source: 0,
+                       top_id: 0,
+                       inner_id: 0,
+                   },
+                   created_by: String::new(),
+                   modified_by: String::new(),
+               });
             }
         }
 

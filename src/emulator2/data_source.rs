@@ -1,6 +1,7 @@
 
 pub enum DataSourceType {
     FileMaker,
+    Cadmus,
     ODBC,
 }
 

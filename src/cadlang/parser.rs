@@ -686,7 +686,6 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
         unreachable!()
     } else {
         info.cursor -= 1;
-        println!("CUR_TOKEN: {:?}", tokens[info.cursor]);
         let criteria = parse_relation_criteria(tokens, info)?;
         criterias_.push(criteria.clone());
         Ok((id_, StagedRelation {
@@ -743,7 +742,7 @@ pub fn parse_layout(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Stag
 pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
     let mut result = Stage::new();
     let mut info =  ParseInfo { cursor: 0 };
-    
+
     loop {
         match &tokens[info.cursor].ttype {
             TokenType::Table => {
@@ -814,7 +813,7 @@ mod tests {
                     datatype = Number,
                     required =true,
                     unique= true,
-                    calculated_val = [get(uuid)],
+                    calculated_val = |get(uuid)|,
                     validation_message = \"Invalid ID chosen.\",
                 },
                 field %2 counter = {
@@ -829,6 +828,10 @@ mod tests {
             ";
 
         let tokens = lex(code).expect("Tokenisation failed.");
+
+        for token in &tokens {
+            println!("{:?}", token);
+        }
         let schema = parse(&tokens).expect("Parsing failed.");
         let mut expected_fields = HashMap::new();
         expected_fields.insert(1, StagedField {

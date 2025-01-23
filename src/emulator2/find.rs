@@ -16,6 +16,7 @@ pub struct FoundSet {
 }
 
 impl FoundSet {
+
     pub fn current_record(&self) -> Option<&Record> {
         if self.records.is_empty() {
             return None

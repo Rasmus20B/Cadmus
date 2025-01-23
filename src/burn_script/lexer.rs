@@ -78,6 +78,7 @@ impl Lexer {
                                 buffer.push(*c);
                             }
                             ')' => {
+                                    println!("Pushing: {}", buffer);
                                 if stack == 0 {
                                     ret.push(Token::with_value(TokenType::Argument, &buffer));
                                     buffer.clear();
@@ -90,6 +91,32 @@ impl Lexer {
                             '(' => {
                                 stack += 1;
                                 buffer.push(*c);
+                            }
+                            '|' => {
+                                let mut escaped = false;
+                                let mut in_string = false;
+                                while let Some(c) = &lex_iter.next() {
+                                    if *c == '|' {
+                                        if !in_string {
+                                            break;
+                                        } else {
+                                            buffer.push(*c);
+                                        }
+                                    } else if *c == '\\' && in_string {
+                                        buffer.push(*c);
+                                        escaped = true;
+                                    } else if *c == '"' {
+                                        if escaped {
+                                            buffer.push(*c);
+                                            escaped = false;
+                                        } else {
+                                            in_string ^= in_string;
+                                            buffer.push(*c);
+                                        }
+                                    } else {
+                                        buffer.push(*c);
+                                    }
+                                }
                             }
                             ',' => {
                                 if stack == 0 {
@@ -299,46 +326,46 @@ mod tests {
     #[test]
     fn lex_test_basic() {
         let code = "
-        define test_func(x, y) {
-            set_variable(i, x);
+        define test_func($x, $y) {
+            set_variable($i, |$x|);
             loop {
-                exit_loop_if(i == y);
-                set_variable(i, i + 1);
+                exit_loop_if(|$i == $y|);
+                set_variable($i, |$i + 1|);
             }
-            set_variable(x, min(3, 3));
-            assert(i == y);
-            exit_script(i);
+            set_variable($x, |min(3, 3)|);
+            assert(|$i == $y|);
+            exit_script(|$i|);
         }";
 
         let tokens_expected: Vec<Token> = vec![
             Token::new(TokenType::Define),
             Token::with_value(TokenType::Identifier, "test_func"),
-            Token::with_value(TokenType::Argument, "x"),
-            Token::with_value(TokenType::Argument, "y"),
+            Token::with_value(TokenType::Argument, "$x"),
+            Token::with_value(TokenType::Argument, "$y"),
             Token::new(TokenType::OpenBracket),
             Token::with_value(TokenType::Identifier, "set_variable"),
-            Token::with_value(TokenType::Argument, "i"),
-            Token::with_value(TokenType::Argument, "x"),
+            Token::with_value(TokenType::Argument, "$i"),
+            Token::with_value(TokenType::Argument, "$x"),
             Token::new(TokenType::SemiColon),
             Token::new(TokenType::Loop),
             Token::new(TokenType::OpenBracket),
             Token::with_value(TokenType::Identifier, "exit_loop_if"),
-            Token::with_value(TokenType::Argument, "i == y"),
+            Token::with_value(TokenType::Argument, "$i == $y"),
             Token::new(TokenType::SemiColon),
             Token::with_value(TokenType::Identifier, "set_variable"),
-            Token::with_value(TokenType::Argument, "i"),
-            Token::with_value(TokenType::Argument, "i + 1"),
+            Token::with_value(TokenType::Argument, "$i"),
+            Token::with_value(TokenType::Argument, "$i + 1"),
             Token::new(TokenType::SemiColon),
             Token::new(TokenType::CloseBracket),
             Token::with_value(TokenType::Identifier, "set_variable"),
-            Token::with_value(TokenType::Argument, "x"),
+            Token::with_value(TokenType::Argument, "$x"),
             Token::with_value(TokenType::Argument, "min(3, 3)"),
             Token::new(TokenType::SemiColon),
             Token::with_value(TokenType::Identifier, "assert"),
-            Token::with_value(TokenType::Argument, "i == y"),
+            Token::with_value(TokenType::Argument, "$i == $y"),
             Token::new(TokenType::SemiColon),
             Token::with_value(TokenType::Identifier, "exit_script"),
-            Token::with_value(TokenType::Argument, "i"),
+            Token::with_value(TokenType::Argument, "$i"),
             Token::new(TokenType::SemiColon),
             Token::new(TokenType::CloseBracket)
         ];
