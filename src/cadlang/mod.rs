@@ -4,6 +4,6 @@ mod lexer;
 mod parser;
 mod token;
 mod error;
-mod resolve;
+mod backend;
 mod staging;
 //mod scripting;

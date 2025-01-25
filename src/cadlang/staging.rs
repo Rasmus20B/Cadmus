@@ -234,8 +234,6 @@ impl Stage {
                                 }
                             };
 
-
-
                         AutoEntryType::Lookup { 
                             from: DBObjectReference {
                                 data_source: 0,

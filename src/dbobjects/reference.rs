@@ -12,19 +12,19 @@ pub trait Resolvable {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct FieldReference {
-    data_source: u32,
-    table_occurrence_id: u32,
-    field_id: u32,
+    pub data_source: u32,
+    pub table_occurrence_id: u32,
+    pub field_id: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TableReference {
-    data_source: u32,
-    table_id: u32,
+    pub data_source: u32,
+    pub table_id: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ScriptReference {
-    data_source: u32,
-    script_id: u32,
+    pub data_source: u32,
+    pub script_id: u32,
 }

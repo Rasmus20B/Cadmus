@@ -1,5 +1,6 @@
 
-extern %1 Customers : "customers.cad" 
+extern %1 Customers : "test_data/cad_files/multi_file_solution/customers.cad" 
+extern %2 Materials : "test_data/cad_files/multi_file_solution/materials.cad"
 
 table %1 Quotes = {
   field %1 id = {
@@ -20,10 +21,24 @@ table %1 Quotes = {
   }
 }
 
+table %2 MaterialJoin = {
+  field %1 quote_id = {
+    datatype = Number
+  },
+  field %2 material_id = {
+    datatype = Number
+  }
+}
+
 table_occurrence %1 Quotes : Quotes
 table_occurrence %2 Customers : Customers::Customers
+table_occurrence %3 backup : Customers::Customers_BACKUP
+table_occurrence %4 Materials : Materials::Materials
+table_occurrence %5 MaterialJoin : MaterialJoin
 
 layout %1 Quotes : Quotes = {
 }
 
 relation %1 = Quotes::customer_id == Customers::id
+relation %2 = Quotes::id == MaterialJoin::quote_id
+relation %3 = MaterialJoin::material_id == Materials::id

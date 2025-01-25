@@ -15,12 +15,13 @@ pub enum RelationComparison {
 }
 
 pub struct RelationCriteria {
-    field_self: u32,
-    field_other: u32,
-    comparison: RelationComparison,
+    pub field_self: u32,
+    pub field_other: u32,
+    pub comparison: RelationComparison,
 }
 
 pub struct Relation {
-    table_occurrence_id: u32,
-    criteria: Vec<RelationCriteria>,
+    pub id: u32,
+    pub other_occurrence: u32,
+    pub criteria: Vec<RelationCriteria>,
 }

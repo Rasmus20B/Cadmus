@@ -1,0 +1,16 @@
+
+table %1 Materials = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    }
+    unique = true,
+    required = true,
+  },
+  field %2 name = {
+    datatype = Text,
+  }
+}
