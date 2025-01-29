@@ -14,12 +14,14 @@ pub enum RelationComparison {
     Cartesian
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub struct RelationCriteria {
     pub field_self: u32,
     pub field_other: u32,
     pub comparison: RelationComparison,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Relation {
     pub id: u32,
     pub other_occurrence: u32,

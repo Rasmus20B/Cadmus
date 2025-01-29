@@ -1,7 +1,7 @@
 
 
 
-use crate::dbobjects::{reference::TableReference, schema::{Schema, relationgraph::{relation::Relation, table_occurrence::TableOccurrence}}};
+use crate::dbobjects::{reference::TableReference, schema::{Schema, relationgraph::{relation::{Relation, RelationCriteria, RelationComparison}, table_occurrence::TableOccurrence}}};
 use super::staging::Stage;
 
 use std::collections::{HashSet, HashMap};
@@ -56,7 +56,7 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
 
             println!("extern: {} == {}", occurrence.data_source.as_ref().unwrap().value, extern_id.id);
             println!("Tables in {}: ", extern_id.name);
-            for (i, table) in &externs.get(&extern_id.id).unwrap().tables {
+            for (_, table) in &externs.get(&extern_id.id).unwrap().tables {
                 if table.name.value == occurrence.base_table.value {
                     let tmp = TableOccurrence {
                         id: (*i) as u32,
@@ -79,9 +79,7 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
     result
 }
 
-pub fn generate_relation_refs(schema: &Stage, live_occurrences: &Vec<TableOccurrence>, externs: &HashMap<usize, Stage>) -> Vec<Relation> {
-    let result = vec![];
-
+pub fn generate_relation_refs(schema: &Stage, live_occurrences: &mut Vec<TableOccurrence>, externs: &HashMap<usize, Stage>) {
     for (i, relation) in &schema.relations {
         let mut tmp1 = Relation {
             id: (*i) as u32,
@@ -94,6 +92,9 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &Vec<TableOccurr
             criteria: vec![],
         };
 
+        let mut occ1_id = 0;
+        let mut occ2_id = 0;
+
         for criteria in &relation.criterias {
             let occurrence1 = live_occurrences.iter()
                 .find(|occ| occ.name == criteria.occurrence1.value)
@@ -101,6 +102,12 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &Vec<TableOccurr
             let occurrence2 = live_occurrences.iter()
                 .find(|occ| occ.name == criteria.occurrence2.value)
                 .unwrap();
+
+            occ1_id = occurrence1.id;
+            occ2_id = occurrence2.id;
+
+            tmp1.other_occurrence = occ2_id;
+            tmp2.other_occurrence = occ1_id;
 
             let table1 = if occurrence1.base.data_source == 0 {
                 schema.tables.iter()
@@ -149,18 +156,48 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &Vec<TableOccurr
                 field2,
                 );
 
-        }
-    }
+            let comp = match criteria.comparison {
+                crate::schema::RelationComparison::Equal => RelationComparison::Equal,
+                crate::schema::RelationComparison::NotEqual => RelationComparison::NotEqual,
+                crate::schema::RelationComparison::Less => RelationComparison::Less,
+                crate::schema::RelationComparison::LessEqual => RelationComparison::LessEqual,
+                crate::schema::RelationComparison::Greater => RelationComparison::Greater,
+                crate::schema::RelationComparison::GreaterEqual => RelationComparison::GreaterEqual,
+                crate::schema::RelationComparison::Cartesian => RelationComparison::Cartesian,
+            };
 
-    result
+            let crit1 = RelationCriteria {
+                field_self: (*field1) as u32,
+                field_other: (*field2) as u32,
+                comparison: comp,
+            };
+            let crit2 = RelationCriteria {
+                field_self: (*field2) as u32,
+                field_other: (*field1) as u32,
+                comparison: comp,
+            };
+
+            tmp1.criteria.push(crit1);
+            tmp2.criteria.push(crit2);
+        }
+        live_occurrences.iter_mut().find(|occ| occ.id == occ1_id).unwrap().relations.push(tmp1);
+        live_occurrences.iter_mut().find(|occ| occ.id == occ2_id).unwrap().relations.push(tmp2);
+    }
 }
 
-pub fn generate_external_refs(schema: &Stage) -> (HashMap::<usize,Stage>, Vec<TableOccurrence>, Vec<Relation>) {
+pub fn generate_external_refs(schema: &Stage) -> (HashMap::<usize,Stage>, Vec<TableOccurrence>) {
     let externs = compile_external_cad_data_sources(schema);
-    let live_occurrences = generate_table_occurrence_refs(schema, &externs);
-    let relations = generate_relation_refs(schema, &live_occurrences, &externs);
+    let mut live_occurrences = generate_table_occurrence_refs(schema, &externs);
+    generate_relation_refs(schema, &mut live_occurrences, &externs);
 
-    (externs, live_occurrences, relations)
+    //for occ in &live_occurrences {
+    //    println!("{}. {}", occ.id, occ.name);
+    //    for rel in &occ.relations {
+    //        println!("{:?}", rel);
+    //    }
+    //}
+
+    (externs, live_occurrences)
 }
 
 
@@ -175,3 +212,7 @@ mod tests {
         generate_external_refs(&mut stage);
     }
 }
+
+
+
+
