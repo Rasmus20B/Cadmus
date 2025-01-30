@@ -35,7 +35,7 @@ impl HBAMPath {
                 c if c.is_numeric() => {
                     buf.push(c);
                 }
-                ',' => {
+                ',' | ' ' => {
                     if !buf.is_empty() {
                         let n = buf.parse::<u32>().unwrap();
                         buf.clear();

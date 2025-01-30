@@ -4,7 +4,7 @@ pub(crate) mod bplustree;
 mod keyvalue;
 mod page;
 pub mod page_store;
-mod chunk;
+pub(crate) mod chunk;
 pub mod path;
 mod parser;
 mod view;

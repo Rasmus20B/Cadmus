@@ -431,6 +431,54 @@ impl fmt::Display for Chunk<'_> {
     }
     }
 }
+impl fmt::Display for LocalChunk {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    match &self.contents {
+        LocalChunkContents::Push { key } => {
+            write!(f, "push:{:?}::data:NA::size:{:?}::delayed:{}::ins:{:x}", 
+                key,
+                key.len(),
+                self.delayed,
+                self.opcode)
+        },
+        LocalChunkContents::SimpleData { data } => {
+            write!(f, "simple:NA::data:{:?}::size:{}::delayed:{}::ins:{:x}",
+                data,
+                data.len(),
+                self.delayed,
+                self.opcode)
+        }
+        LocalChunkContents::SimpleRef { key, data } => {
+            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::delayed:{}::ins:{:x}", 
+                key,
+                data,
+                data.len(),
+                self.delayed,
+                self.opcode)
+        },
+        LocalChunkContents::LongRef { key, data } => {
+            write!(f, "reference:{:?}::ref_data:{:?}::size:{}::ins:{:x}",
+                key,
+                data,
+                data.len(),
+                self.opcode)
+        },
+        LocalChunkContents::Segment { index, data } => {
+            write!(f, "segment:{}::data:{:?}::size:{}::ins:{:x}",
+                index,
+                data,
+                data.len(),
+                self.opcode)
+        },
+        LocalChunkContents::Pop => {
+            write!(f, "pop:NA::delayed:{}", self.delayed)
+        },
+        LocalChunkContents::Noop => {
+            write!(f, "noop:NA")
+        }
+    }
+    }
+}
 //         InstructionType::DataSimple => {
 //             write!(f, "path:{:?}::reference:na::simple_data:{:?}::size:{}::ins:{:x}", 
 //                  self.path.components,
