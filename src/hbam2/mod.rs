@@ -1,10 +1,10 @@
 pub mod api;
 mod kv_cache;
-mod bplustree;
+pub(crate) mod bplustree;
 mod keyvalue;
 mod page;
 pub mod page_store;
 mod chunk;
-mod path;
+pub mod path;
 mod parser;
 mod view;

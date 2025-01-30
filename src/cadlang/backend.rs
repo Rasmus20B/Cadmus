@@ -54,8 +54,6 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
                 .map(|occ| occ.1)
                 .unwrap();
 
-            println!("extern: {} == {}", occurrence.data_source.as_ref().unwrap().value, extern_id.id);
-            println!("Tables in {}: ", extern_id.name);
             for (_, table) in &externs.get(&extern_id.id).unwrap().tables {
                 if table.name.value == occurrence.base_table.value {
                     let tmp = TableOccurrence {
@@ -71,10 +69,6 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
                 }
             }
         }
-    }
-
-    for occ in &result {
-        println!("external reference for {}:: {:?}", occ.name, occ.base);
     }
     result
 }
@@ -142,20 +136,6 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &mut Vec<TableOc
                 .map(|field| field.0)
                 .unwrap();
 
-            println!("{}::{}({}, {}, {}) <- {:?} -> {}::{}({}, {}, {})", 
-                criteria.occurrence1.value,
-                criteria.field1.value,
-                occurrence1.base.data_source,
-                table1.1.id,
-                field1,
-                criteria.comparison,
-                criteria.occurrence2.value,
-                criteria.field2.value,
-                occurrence2.base.data_source,
-                table2.1.id,
-                field2,
-                );
-
             let comp = match criteria.comparison {
                 crate::schema::RelationComparison::Equal => RelationComparison::Equal,
                 crate::schema::RelationComparison::NotEqual => RelationComparison::NotEqual,
@@ -190,16 +170,14 @@ pub fn generate_external_refs(schema: &Stage) -> (HashMap::<usize,Stage>, Vec<Ta
     let mut live_occurrences = generate_table_occurrence_refs(schema, &externs);
     generate_relation_refs(schema, &mut live_occurrences, &externs);
 
-    //for occ in &live_occurrences {
-    //    println!("{}. {}", occ.id, occ.name);
-    //    for rel in &occ.relations {
-    //        println!("{:?}", rel);
-    //    }
-    //}
-
+    for occ in &live_occurrences {
+        println!("{}. {}", occ.id, occ.name);
+        for rel in &occ.relations {
+            println!("{:?}", rel);
+        }
+    }
     (externs, live_occurrences)
 }
-
 
 #[cfg(test)]
 mod tests {

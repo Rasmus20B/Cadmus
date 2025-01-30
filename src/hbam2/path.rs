@@ -25,6 +25,44 @@ impl HBAMPath {
         }
         true
     }
+
+    pub fn from_csv(csv: &str) -> Result<Self, ()> {
+        let mut buf = String::new();
+        let mut elems = vec![];
+
+        for c in csv.chars() {
+            match c {
+                c if c.is_numeric() => {
+                    buf.push(c);
+                }
+                ',' => {
+                    if !buf.is_empty() {
+                        let n = buf.parse::<u32>().unwrap();
+                        buf.clear();
+                        let encoded = crate::util::encoding_util::put_path_int(n);
+
+                        elems.push(encoded)
+                    }
+                    continue
+                }
+                // TODO: Get a proper error going on
+                _ => return Err(())
+            }
+        }
+
+        if !buf.is_empty() {
+            let n = buf.parse::<u32>().unwrap();
+            buf.clear();
+            let encoded = crate::util::encoding_util::put_path_int(n);
+
+            elems.push(encoded)
+        }
+
+        // TODO: Account for empty path
+        Ok(HBAMPath {
+            components: (elems)
+        })
+    }
 }
 
 impl PartialOrd for HBAMPath {

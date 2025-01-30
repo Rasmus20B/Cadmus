@@ -38,6 +38,8 @@ pub enum Command {
         print_root_block: bool,
         #[clap(long = "print-all-blocks", action)]
         print_all_blocks: bool,
+        #[clap(long = "print-dir", action)]
+        print_dir: Option<String>,
         #[clap(long = "json-out", action)]
         json_out: bool,
         #[clap(long, action)]
