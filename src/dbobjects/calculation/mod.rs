@@ -136,8 +136,12 @@ impl Calculation {
 
 
     pub fn from_text(code: &str) -> Self {
+        let tokens = lex(code);
 
-        todo!()
+        Calculation(tokens.iter()
+            .map(|token| token.encode())
+            .flatten()
+            .collect())
     }
 
     pub fn eval() -> String {
@@ -155,13 +159,21 @@ pub fn lex(code: &str) -> Vec<Token> {
             '$' => {
                 // Clear buffer first
                 buffer.push(ch);
-                let mut name_char = iter.next().unwrap();
-                while name_char.is_alphanumeric() {
-                    buffer.push(name_char);
-                    name_char = iter.next().unwrap();
+                while let Some(c) = iter.peek() {
+                    match c {
+                        c if c.is_alphanumeric() => {
+                            buffer.push(*c);
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
+                    iter.next();
                 }
-                result.push(Token::Variable(buffer.clone()));
-                buffer.clear();
+
+                if !buffer.is_empty() {
+                    result.push(Token::Variable(buffer.clone()));
+                } 
             }
             '"' => {
                 while let Some(c) = iter.next() {
@@ -256,6 +268,9 @@ pub fn lex(code: &str) -> Vec<Token> {
                     result.push(Token::Identifier(buffer.clone()));
                 }
             }
+            ' ' => {
+                result.push(Token::Space)
+            }
             _ => {
 
             }
@@ -268,13 +283,28 @@ pub fn lex(code: &str) -> Vec<Token> {
 #[cfg(test)]
 mod tests {
     use super::token::Token;
+    use super::Calculation;
     use super::lex;
+    #[test]
+    fn calc_encoding_test() {
+        let calculation = "$x + 10";
+        let expected = Calculation(vec![26, 2, 126, 34, // $x
+            12, 19, 1, 122, 0, // space
+            37, // +
+            12, 19, 1, 122, 0, // space
+            16, 2, 0, 1, 0, 16, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32 // 10
+        ]); 
+        let calc = Calculation::from_text(calculation);
+        assert_eq!(calc, expected);
+    }
     #[test]
     fn lex_test() {
         let code = "$x == 10";
         let expected = vec![
             Token::Variable(String::from("$x")),
+            Token::Space,
             Token::Equal,
+            Token::Space,
             Token::Number(10.0)
         ];
         assert_eq!(lex(code), expected);
@@ -284,7 +314,9 @@ mod tests {
             Token::Negate,
             Token::OpenParen,
             Token::Variable(String::from("$x")),
+            Token::Space,
             Token::NotEqual,
+            Token::Space,
             Token::Number(10.0),
             Token::CloseParen,
         ];
@@ -295,7 +327,9 @@ mod tests {
             Token::Negate,
             Token::OpenParen,
             Token::FieldReference(String::from("Person"), String::from("FirstName")),
+            Token::Space,
             Token::NotEqual,
+            Token::Space,
             Token::String(String::from("Kevin")),
             Token::CloseParen,
         ];
@@ -309,9 +343,12 @@ mod tests {
             Token::OpenParen,
             Token::FieldReference(String::from("Person"), String::from("FirstName")),
             Token::SemiColon,
+            Token::Space,
             Token::Number(4.0),
             Token::CloseParen,
+            Token::Space,
             Token::NotEqual,
+            Token::Space,
             Token::String(String::from("Kevin")),
             Token::CloseParen,
         ];

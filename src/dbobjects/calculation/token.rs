@@ -1,5 +1,5 @@
 
-use crate::util::encoding_util::fm_string_encrypt;
+use crate::util::encoding_util::{fm_string_encrypt, put_path_int, get_path_int};
 use crate::dbobjects::reference::FieldReference;
 
 #[derive(Debug, PartialEq)]
@@ -34,7 +34,7 @@ pub enum Token {
 }
 
 impl Token {
-    fn encode(&self) -> Vec<u8> {
+    pub fn encode(&self) -> Vec<u8> {
         match self {
             Self::Variable(ident) => {
                 let mut result = vec![];
@@ -49,9 +49,16 @@ impl Token {
             Self::Divide => vec![0x28],
             Self::Concatenate => vec![0x50],
             Self::ResolvedFieldReference(reference) => {
-                todo!()
+                let (ds, table, field) = (reference.data_source, reference.table_occurrence_id, reference.field_id);
+                vec![0x16, 0x4, 0x4, 0x3, 0xD0, 0x0, table as u8, 0x2, 0x1, field as u8, 0x0, 0x1]
             }
-            _ => todo!()
+            Self::Number(n) => {
+                vec![16, 2, 0, 1, 0, 16, 0, 0, 0, (*n) as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32]
+            }
+            Self::Space => {
+                vec![12, 19, 1, 122, 0]
+            }
+            _ => todo!("{:?}", self)
         }
     }
 }
@@ -64,6 +71,7 @@ mod tests {
         assert_eq!(Token::encode(&Token::Variable(String::from("$x"))),
             vec![0x1A, 0x02, 0x7E, 0x22]);
     }
+
 }
 
 

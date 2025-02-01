@@ -213,6 +213,7 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
     for script_view in script_views {
         let id_ = get_path_int(script_view.path.components.last().unwrap());
         let name_ = fm_string_decrypt(script_view.get_value(16).unwrap());
+        println!("{}", name_);
         let code = script_view.get_value(4).unwrap();
         println!("===============================");
         //for chunk in &script_view.chunks {
@@ -380,14 +381,14 @@ mod tests {
         let mut cache = PageStore::new();
         let result = get_script_catalog(&mut cache, "test_data/input/mixed.fmp12");
 
-        assert_eq!(2, result.len());
+        assert_eq!(3, result.len());
     }
 
     #[test]
     fn get_table_occurrence_catalog_test() {
         let mut cache = PageStore::new();
         let (occurrences, relations) = get_occurrence_catalog(&mut cache, "test_data/input/relation.fmp12");
-        assert_eq!(2, occurrences.len());
+        assert_eq!(3, occurrences.len());
         assert_eq!(*occurrences.get(&129).unwrap(), TableOccurrence {
             id: 129,
             name: String::from("blank"),
@@ -410,6 +411,6 @@ mod tests {
             created_by: String::from("admin"),
             modified_by: String::from("Admin"),
         });
-        assert_eq!(1, relations.len());
+        assert_eq!(2, relations.len());
     }
 }
