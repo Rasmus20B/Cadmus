@@ -1,5 +1,6 @@
 
 pub mod compiler;
+mod cadscript;
 mod lexer;
 mod parser;
 mod token;

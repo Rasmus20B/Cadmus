@@ -7,6 +7,15 @@ use super::schema::relationgraph::graph::RelationGraph;
 use super::schema::table::Table;
 
 pub struct Schema {
-    tables: Vec<Table>,
-    relation_graph: RelationGraph,
+    pub tables: Vec<Table>,
+    pub relation_graph: RelationGraph,
+}
+
+impl Schema {
+    pub fn new() -> Self {
+        Self {
+            tables: vec![],
+            relation_graph: RelationGraph::new(),
+        }
+    }
 }

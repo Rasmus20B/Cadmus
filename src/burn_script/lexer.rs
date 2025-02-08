@@ -80,7 +80,11 @@ impl Lexer {
                             ')' => {
                                     println!("Pushing: {}", buffer);
                                 if stack == 0 {
-                                    ret.push(Token::with_value(TokenType::Argument, &buffer));
+                                    if buffer.starts_with("|") && buffer.ends_with("|") {
+                                        ret.push(Token::with_value(TokenType::CalcArgument, &buffer));
+                                    } else {
+                                        ret.push(Token::with_value(TokenType::Argument, &buffer));
+                                    }
                                     buffer.clear();
                                     break;
                                 } else {

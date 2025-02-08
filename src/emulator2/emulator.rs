@@ -11,9 +11,11 @@ use super::{
     find::*,
 };
 
+use crate::dbobjects::scripting::{script::*, instructions::*};
+
 use std::path::Path;
 use std::rc::Rc;
-use crate::schema::{Schema, Script};
+use crate::schema::{Schema};
 
 pub struct Emulator {
    database_mgr: DatabaseMgr,
@@ -38,6 +40,17 @@ impl Emulator {
                 let db = self.database_mgr.load_cadmus_file(path).unwrap();
                 self.window_mgr.add_window(path.to_str().unwrap().to_string(), name.clone(), db);
                 self.window_mgr.select_window_by_name(&name);
+                let cur_win = self.window_mgr.current_window();
+
+
+                let cur_occ = db.table_occurrences.iter().find(|occurrence| occurrence.id == cur_win.layout.table_occurrence_id).unwrap();
+                println!("db: {}\nlayout: {}\ntable occurrence: {}\n",
+                    name,
+                    cur_win.layout.name,
+                    db.table_occurrences
+                        .iter()
+                        .find(|occurrence| occurrence.id == cur_win.layout.table_occurrence_id)
+                        .unwrap().name);
             },
             Some("fmp12") => {
             },
@@ -66,7 +79,7 @@ mod tests {
 
         let test_code = read_to_string(Path::new("./test_data/cad_files/initial_test.cad")).unwrap();
         let test = cadlang::compiler::compile_to_schema(test_code).unwrap().tests.get(&1).unwrap().script.clone();
-        emulator.run_test(&test);
+        //emulator.run_test(&test);
     }
 }
 

@@ -144,7 +144,7 @@ impl Calculation {
             .collect())
     }
 
-    pub fn eval() -> String {
+    pub fn eval(&self) -> String {
         todo!()
     }
 }

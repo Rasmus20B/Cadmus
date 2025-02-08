@@ -25,4 +25,9 @@ impl Table {
             modified_by: String::new(),
         }
     }
+
+    pub fn name(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
 }

@@ -1,8 +1,9 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DataSource, DataSourceType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
 
+use crate::dbobjects::data_source::*;
 use super::{staging::*, error::CompileErr};
 use super::token::{Token, TokenType};
 
@@ -298,9 +299,9 @@ pub fn parse_extern(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Data
     let filename_ = expect(tokens, &vec![TokenType::String], info)?;
 
     Ok((id_, DataSource {
-        id: id_ as usize,
+        id: id_ as u32,
         name: name_.value.clone(),
-        filename: filename_.value.clone(),
+        paths: vec![filename_.value.clone()],
         dstype: DataSourceType::FileMaker,
     }))
 }
@@ -801,7 +802,9 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
 mod tests {
     use std::{collections::HashMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataSource, DataSourceType, DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
+
+    use crate::dbobjects::{data_source::*};
 
     use super::*;
 
@@ -1324,7 +1327,7 @@ mod tests {
         let expected = DataSource {
             id: 1,
             name: String::from("Quotes"),
-            filename: String::from("quotes.cad"),
+            paths: vec![String::from("quotes.cad")],
             dstype: DataSourceType::FileMaker,
         };
         assert_eq!(expected, schema.data_sources[&1]);

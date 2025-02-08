@@ -29,6 +29,7 @@ pub enum TokenType {
     NumericLiteral,
     String,
     Argument,
+    CalcArgument,
 }
 
 #[derive(PartialEq, Debug)]

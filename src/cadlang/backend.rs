@@ -1,7 +1,20 @@
 
-
-
-use crate::dbobjects::{reference::TableReference, schema::{Schema, relationgraph::{relation::{Relation, RelationCriteria, RelationComparison}, table_occurrence::TableOccurrence}}};
+use crate::dbobjects::{
+    file::*,
+    layout::Layout, 
+    reference::{TableReference, TableOccurrenceReference}, 
+    schema::{
+        Schema,
+        relationgraph::{
+            relation::{
+                Relation,
+                RelationCriteria,
+                RelationComparison
+            },
+            table_occurrence::TableOccurrence
+        }
+    }
+};
 use super::staging::Stage;
 
 use std::collections::{HashSet, HashMap};
@@ -11,29 +24,31 @@ use super::{lexer::*, parser::*};
 use std::path::Path;
 use std::fs::read_to_string;
 
-pub fn compile_external_cad_data_sources(schema: &Stage) -> HashMap<usize, Stage> {
+pub fn compile_external_cad_data_sources(stage: &Stage) -> HashMap<u32, Stage> {
     let mut result = HashMap::new();
 
     let mut set = HashSet::<String>::new();
 
-    for (i, source) in &schema.data_sources {
-        if !set.contains(&source.filename) {
-            set.insert(source.filename.clone());
-            let stage = parse(&lex(&read_to_string(&Path::new(&source.filename)).unwrap()).unwrap()).unwrap();
-            result.insert(*(i) as usize, stage);
+    for (i, source) in &stage.data_sources {
+        for path in &source.paths {
+            if !set.contains(path) {
+                set.insert(path.clone());
+                let stage = parse(&lex(&read_to_string(&Path::new(&path)).unwrap()).unwrap()).unwrap();
+                result.insert(*(i) as u32, stage);
+            }
         }
     }
     result
 }
 
-pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, Stage>) -> Vec<TableOccurrence> {
+pub fn generate_table_occurrence_refs(stage: &Stage, externs: &HashMap<u32, Stage>) -> Vec<TableOccurrence> {
     
     let mut result = Vec::<TableOccurrence>::new();
-    for (i, occurrence) in &schema.table_occurrences {
+    for (i, occurrence) in &stage.table_occurrences {
         println!("{}", occurrence.base_table.value);
         if occurrence.data_source.is_none() {
             // look in the current file's schema for the correct object
-            let table = schema.tables.iter()
+            let table = stage.tables.iter()
                 .find(|table| table.1.name.value == occurrence.name.value)
                 .map(|table| table.1)
                 .unwrap();
@@ -49,12 +64,12 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
             };
             result.push(tmp);
         } else {
-            let extern_id = schema.data_sources.iter()
+            let extern_id = stage.data_sources.iter()
                 .find(|occ| occ.1.name == occurrence.data_source.as_ref().unwrap().value)
                 .map(|occ| occ.1)
                 .unwrap();
 
-            for (_, table) in &externs.get(&extern_id.id).unwrap().tables {
+            for (_, table) in &externs.get(&(extern_id.id)).unwrap().tables {
                 if table.name.value == occurrence.base_table.value {
                     let tmp = TableOccurrence {
                         id: (*i) as u32,
@@ -73,8 +88,8 @@ pub fn generate_table_occurrence_refs(schema: &Stage, externs: &HashMap<usize, S
     result
 }
 
-pub fn generate_relation_refs(schema: &Stage, live_occurrences: &mut Vec<TableOccurrence>, externs: &HashMap<usize, Stage>) {
-    for (i, relation) in &schema.relations {
+pub fn generate_relation_refs(stage: &Stage, live_occurrences: &mut Vec<TableOccurrence>, externs: &HashMap<u32, Stage>) {
+    for (i, relation) in &stage.relations {
         let mut tmp1 = Relation {
             id: (*i) as u32,
             other_occurrence: 0,
@@ -104,22 +119,22 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &mut Vec<TableOc
             tmp2.other_occurrence = occ1_id;
 
             let table1 = if occurrence1.base.data_source == 0 {
-                schema.tables.iter()
+                stage.tables.iter()
                     .find(|table| table.1.id as u32 == occurrence1.base.table_id)
                     .unwrap()
             } else {
-                let source = externs.get(&(occurrence1.base.data_source as usize)).unwrap();
+                let source = externs.get(&(occurrence1.base.data_source)).unwrap();
                 source.tables.iter()
                     .find(|table| table.1.id as u32 == occurrence1.base.table_id)
                     .unwrap()
             };
 
             let table2 = if occurrence2.base.data_source == 0 {
-                schema.tables.iter()
+                stage.tables.iter()
                     .find(|table| table.1.id as u32 == occurrence2.base.table_id)
                     .unwrap()
             } else {
-                let source = externs.get(&(occurrence2.base.data_source as usize)).unwrap();
+                let source = externs.get(&(occurrence2.base.data_source)).unwrap();
                 source.tables.iter()
                     .find(|table| table.1.id as u32 == occurrence2.base.table_id)
                     .unwrap()
@@ -165,10 +180,9 @@ pub fn generate_relation_refs(schema: &Stage, live_occurrences: &mut Vec<TableOc
     }
 }
 
-pub fn generate_external_refs(schema: &Stage) -> (HashMap::<usize,Stage>, Vec<TableOccurrence>) {
-    let externs = compile_external_cad_data_sources(schema);
-    let mut live_occurrences = generate_table_occurrence_refs(schema, &externs);
-    generate_relation_refs(schema, &mut live_occurrences, &externs);
+pub fn generate_table_occurrences(stage: &Stage, externs: &HashMap<u32, Stage> ) -> Vec<TableOccurrence> {
+    let mut live_occurrences = generate_table_occurrence_refs(stage, externs);
+    generate_relation_refs(stage, &mut live_occurrences, &externs);
 
     for occ in &live_occurrences {
         println!("{}. {}", occ.id, occ.name);
@@ -176,7 +190,49 @@ pub fn generate_external_refs(schema: &Stage) -> (HashMap::<usize,Stage>, Vec<Ta
             println!("{:?}", rel);
         }
     }
-    (externs, live_occurrences)
+    live_occurrences
+}
+
+pub fn load_externs(stage: &Stage) -> HashMap::<u32, Stage> {
+    compile_external_cad_data_sources(stage)
+}
+
+pub fn encode_calculations(schema: &Stage) {
+    todo!()
+}
+
+pub fn build_schema(stage: &Stage) -> Schema {
+    let mut result = Schema::new();
+    let externs = load_externs(stage);
+
+    result.relation_graph.nodes = generate_table_occurrences(stage, &externs);
+    result
+}
+
+pub fn build_file(stage: &Stage) -> File {
+    let schema_ = build_schema(&stage);
+    let mut layouts_ = vec![];
+
+    for (i, layout) in &stage.layouts {
+        let occurrence_id = schema_.relation_graph.nodes.iter().find(|l| l.name == layout.base_occurrence.value).unwrap().id;
+        let tmp = Layout {
+            id: (*i) as u32,
+            name: layout.name.value.clone(),
+            occurrence: TableOccurrenceReference {
+                data_source: 0,
+                table_occurrence_id: occurrence_id,
+            }
+        };
+        layouts_.push(tmp);
+    }
+
+    File {
+        name: String::new(),
+        schema: schema_,
+        data_sources: stage.data_sources.iter().map(|ds| ds.1.clone()).collect(),
+        layouts: layouts_,
+        scripts: vec![],
+    }
 }
 
 #[cfg(test)]
@@ -187,7 +243,7 @@ mod tests {
     fn basic_multi_file() {
         let file = read_to_string("./test_data/cad_files/multi_file_solution/quotes.cad").unwrap();
         let mut stage = parse(&lex(&file).unwrap()).unwrap();
-        generate_external_refs(&mut stage);
+        let file = build_file(&mut stage);
     }
 }
 

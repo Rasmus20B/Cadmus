@@ -5,9 +5,7 @@ use super::{
     window_mgr::WindowMgr,
 };
 
-use crate::schema::Script;
-use crate::fm_script_engine::fm_script_engine_instructions::{ScriptStep, Instruction};
-use std::rc::Rc;
+use crate::dbobjects::{reference::*, calculation::Calculation, scripting::{instructions::*, arguments::*, script::*}};
 
 pub enum StepResult {
     EndOfExecution
@@ -18,7 +16,7 @@ pub struct ScriptEngine {
     variables: Vec<Vec<String>>,
 }
 
-impl  ScriptEngine {
+impl ScriptEngine {
     pub fn new() -> Self {
         Self {
             instr_ptrs: vec![],
@@ -41,14 +39,14 @@ impl  ScriptEngine {
         let step = step.unwrap();
 
         let cur_window = window_mgr.current_window();
-        match step.opcode {
+        match step {
             Instruction::NewRecordRequest => {
                 let table = dbs.databases.get_mut(&cur_window.file).unwrap().table_occurrences[cur_window.layout.table_occurrence_id].table.id;
                 dbs.add_record(cur_window.file.clone(), table);
             }
             Instruction::GoToLayout => {
             }
-            Instruction::SetField => {
+            Instruction::SetField { field, value } => {
                 let cur_record = match cur_window.get_current_record_ref() {
                     Some(inner) => inner,
                     None => {
@@ -64,19 +62,24 @@ impl  ScriptEngine {
                 // We then resolve occurrence through relationship graph
                 // we then get a ref to the the first record in that occurrence. 
                 // Then we call set like: vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-                cur_record.set_field(&step.switches[0], &step.switches[1]);
+                //cur_record.set_field(field, &step.switches[1]);
             },
-            Instruction::PerformScript => {
+            Instruction::PerformScript { script, args } => {
                 let db = dbs.databases.get(&window_mgr.current_window().file).unwrap();
-                let n = step.switches[0].len();
-                let script_name = &step.switches[0][1..n-1];
-                let script = db.scripts.iter().find(|s| s.name == script_name).unwrap();
+                let script_ref = match script {
+                    ScriptSelection::FromList(name) => name,
+                    ScriptSelection::ByCalculation(calc) => {
+                        let name = calc.eval();
+                        ScriptReference { 
+                            data_source: 0,
+                            script_id: db.scripts.iter().find(|script| script.name == name).unwrap().id as u32
+                        }
+                    }
+                };
+                let script = db.scripts.iter().find(|s| s.id == script_ref.script_id).unwrap();
 
-                self.instr_ptrs.push((script.clone(), 1));
+                //self.instr_ptrs.push((script.clone(), 1));
                 return Ok(())
-            }
-            Instruction::SelectWindow => {
-                window_mgr.select_window_by_name(&step.switches[0]);
             }
             _ => {
                 eprintln!("Unknown Opcode.");
@@ -94,18 +97,19 @@ impl  ScriptEngine {
         }
     }
 
-    fn next_instruction(&self) -> Option<ScriptStep> {
-        let ip = match self.instr_ptrs.last() {
-            Some(inner) => inner,
-            None => return None
-        };
-
-        let script = match self.instr_ptrs.last() {
-            Some(inner) => inner.0.clone(),
-            None => return None,
-        };
-
-        script.instructions.get(ip.1 as usize).cloned()
-        
+    fn next_instruction(&self) -> Option<Instruction> {
+        todo!()
+        //let ip = match self.instr_ptrs.last() {
+        //    Some(inner) => inner,
+        //    None => return None
+        //};
+        //
+        //let script = match self.instr_ptrs.last() {
+        //    Some(inner) => inner.0.clone(),
+        //    None => return None,
+        //};
+        //
+        //script.instructions.get(ip.1 as usize).cloned()
+        //
     }
 }

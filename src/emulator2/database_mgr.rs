@@ -8,14 +8,14 @@ use super::{data_source::*, record::*};
 use crate::{hbam2, cadlang};
 
 pub struct DatabaseMgr {
-    pub databases: HashMap<String, Database>
+    pub databases: HashMap<String, Database>,
 }
 
 impl DatabaseMgr {
 
     pub fn new() -> Self {
         Self {
-            databases: HashMap::new()
+            databases: HashMap::new(),
         }
     }
 
@@ -23,7 +23,7 @@ impl DatabaseMgr {
         let filename = path.to_str().unwrap().to_string();
         let code = read_to_string(path).unwrap();
         let schema = cadlang::compiler::compile_to_schema(code).expect("Unable to compile cadmus file.");
-        self.databases.insert(filename.clone(), Database::from_schema(&schema));
+        //self.databases.insert(filename.clone(), Database::from_schema(&schema));
         Some(self.databases.get(&filename).unwrap())
     }
 

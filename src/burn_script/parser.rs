@@ -1,10 +1,9 @@
-use std::{str::FromStr};
-
-
-use crate::{schema::Script, fm_script_engine::fm_script_engine_instructions::{Instruction, ScriptStep}};
+use std::str::FromStr;
+use crate::{dbobjects::metadata::Metadata, schema::Script, fm_script_engine::fm_script_engine_instructions::{Instruction, ScriptStep}};
 
 use super::tokens::{Token, TokenType};
 
+use std::iter::Peekable;
 
 #[derive(Debug, PartialEq)]
 pub struct Parser {
