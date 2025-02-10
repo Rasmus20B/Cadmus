@@ -1,6 +1,6 @@
 
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use super::field::Field;
 
@@ -9,7 +9,7 @@ pub struct Table {
     pub id: usize,
     pub name: String,
     pub comment: String,
-    pub fields: HashMap<usize, Field>,
+    pub fields: BTreeMap<usize, Field>,
     pub created_by: String,
     pub modified_by: String,
 }
@@ -20,7 +20,7 @@ impl Table {
             id: id_,
             name: String::new(),
             comment: String::new(),
-            fields: HashMap::new(),
+            fields: BTreeMap::new(),
             created_by: String::new(),
             modified_by: String::new(),
         }

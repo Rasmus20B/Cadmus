@@ -39,3 +39,10 @@ pub struct ScriptReference {
 pub struct LayoutReference {
     pub layout_id: u32,
 }
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct ValueListReference {
+    pub data_source: u32,
+    pub value_list_id: u32,
+}
+

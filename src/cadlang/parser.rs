@@ -1,9 +1,9 @@
 use core::fmt;
 use std::collections::BTreeMap;
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
+use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DBObjectReference, LayoutFMAttribute, RelationComparison, Script, TableOccurrence, Test}};
 
-use crate::dbobjects::data_source::*;
+use crate::dbobjects::{schema::field::{DataType, SerialTrigger, ValidationTrigger}, data_source::*};
 use super::{staging::*, error::CompileErr};
 use super::token::{Token, TokenType};
 
@@ -50,7 +50,7 @@ fn expect<'a>(tokens: &'a [Token], expected: &Vec<TokenType>, info: &mut ParseIn
 
 pub fn parse_field(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedField), CompileErr> {
     let mut checks_ = vec![];
-    let validation_msg = String::from("Error with field validation.");
+    let validation_msg = String::new();
     let validation_trigger = ValidationTrigger::OnEntry;
     let user_override_ = true;
     let mut autoentry_ = StagedAutoEntry {
@@ -334,8 +334,7 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?;
 
     expect(tokens, &vec![TokenType::Colon], info)?;
-    let mut table_or_source = expect(tokens, &vec![TokenType::Identifier], info)?;
-
+    let table_or_source = expect(tokens, &vec![TokenType::Identifier], info)?;
 
     if expect(tokens, &vec![TokenType::ScopeResolution], info).is_ok() {
         let table = expect(tokens, &vec![TokenType::Identifier], info)?;
@@ -814,9 +813,9 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
 mod tests {
     use std::{collections::BTreeMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
+    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::RelationComparison};
 
-    use crate::dbobjects::{data_source::*};
+    use crate::dbobjects::{schema::field::{DataType, SerialTrigger, ValidationTrigger}, data_source::*};
 
     use super::*;
 
@@ -871,7 +870,7 @@ mod tests {
                             StagedValidationType::Required,
                             StagedValidationType::Unique
                         ],
-                        message: String::from("Error with field validation."),
+                        message: String::new(),
                         trigger: ValidationTrigger::OnEntry,
                         user_override: true,
                     }
@@ -897,7 +896,7 @@ mod tests {
                     validation: StagedValidation {
                         checks: vec![
                         ],
-                        message: String::from("Error with field validation."),
+                        message: String::new(),
                         trigger: ValidationTrigger::OnEntry,
                         user_override: true,
                     }

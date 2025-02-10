@@ -36,7 +36,7 @@ pub enum AutoEntryType {
     Modification(AutoEntryDataPresets),
     LastVisited,
     Data(String),
-    Calculation{code: String, noreplace: bool},
+    Calculation{code: Calculation, noreplace: bool},
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -84,7 +84,6 @@ pub struct Field {
 }
 
 impl Field {
-
     pub fn new(id_: usize, name_: String) -> Self {
         Self {
             id: id_,
@@ -140,3 +139,4 @@ impl Field {
         self
     }
 }
+

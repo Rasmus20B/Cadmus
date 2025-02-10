@@ -8,7 +8,6 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Calculation(Vec<u8>);
-pub struct CalcString(Vec<u8>);
 
 impl Calculation {
     //fn decompile_calculation(bytecode: &[u8]) -> String {
@@ -134,6 +133,12 @@ impl Calculation {
     //    return result;
     //}
 
+    pub fn from_tokens(tokens: &Vec<Token>) -> Self {
+        Calculation(tokens.iter()
+            .map(|token| token.encode())
+            .flatten()
+            .collect())
+    }
 
     pub fn from_text(code: &str) -> Self {
         let tokens = lex(code);
@@ -285,6 +290,8 @@ mod tests {
     use super::token::Token;
     use super::Calculation;
     use super::lex;
+
+    use crate::dbobjects::schema::Schema;
     #[test]
     fn calc_encoding_test() {
         let calculation = "$x + 10";
