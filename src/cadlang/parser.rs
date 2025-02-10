@@ -1,5 +1,5 @@
 use core::fmt;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DataType, DBObjectReference, LayoutFMAttribute, RelationComparison, Script, SerialTrigger, TableOccurrence, Test, ValidationTrigger}};
 
@@ -260,7 +260,7 @@ pub fn parse_table(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Stage
     expect(tokens, &vec![TokenType::Assignment], info)?;
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
     info.cursor += 1;
-    let mut fields_ = HashMap::new();
+    let mut fields_ = BTreeMap::new();
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
             TokenType::Field => {
@@ -298,12 +298,24 @@ pub fn parse_extern(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Data
 
     let filename_ = expect(tokens, &vec![TokenType::String], info)?;
 
-    Ok((id_, DataSource {
-        id: id_ as u32,
-        name: name_.value.clone(),
-        paths: vec![filename_.value.clone()],
-        dstype: DataSourceType::FileMaker,
-    }))
+    if filename_.value.ends_with(".cad") {
+        return Ok((id_, DataSource {
+            id: id_ as u32,
+            name: name_.value.clone(),
+            paths: vec![filename_.value.clone()],
+            dstype: DataSourceType::Cadmus,
+        }))
+    } else if filename_.value.ends_with(".fmp12") {
+        return Ok((id_, DataSource {
+            id: id_ as u32,
+            name: name_.value.clone(),
+            paths: vec![filename_.value.clone()],
+            dstype: DataSourceType::FileMaker,
+        }))
+    } else {
+        return Err(CompileErr::UnknownFileType { filename: name_.clone() })
+    }
+
 }
 
 pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedOccurrence), CompileErr> {
@@ -800,7 +812,7 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, fs::read_to_string};
+    use std::{collections::BTreeMap, fs::read_to_string};
 
     use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::{DataType, RelationComparison, SerialTrigger, ValidationTrigger}};
 
@@ -836,7 +848,7 @@ mod tests {
             println!("{:?}", token);
         }
         let schema = parse(&tokens).expect("Parsing failed.");
-        let mut expected_fields = HashMap::new();
+        let mut expected_fields = BTreeMap::new();
         expected_fields.insert(1, StagedField {
                     id: 1,
                     name: Token::with_value(
@@ -1328,7 +1340,7 @@ mod tests {
             id: 1,
             name: String::from("Quotes"),
             paths: vec![String::from("quotes.cad")],
-            dstype: DataSourceType::FileMaker,
+            dstype: DataSourceType::Cadmus,
         };
         assert_eq!(expected, schema.data_sources[&1]);
 

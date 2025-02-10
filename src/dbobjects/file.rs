@@ -4,6 +4,7 @@ use super::scripting::script::Script;
 use super::layout::Layout;
 use super::data_source::*;
 
+#[derive(Debug, PartialEq)]
 pub struct File {
     pub name: String,
     pub schema: Schema,

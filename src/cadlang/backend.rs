@@ -238,12 +238,170 @@ pub fn build_file(stage: &Stage) -> File {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dbobjects::{schema::{relationgraph::graph::*}, data_source::*};
     use std::fs::read_to_string;
     #[test]
     fn basic_multi_file() {
         let file = read_to_string("./test_data/cad_files/multi_file_solution/quotes.cad").unwrap();
         let mut stage = parse(&lex(&file).unwrap()).unwrap();
         let file = build_file(&mut stage);
+
+        let expected = File {
+            name: String::new(),
+            data_sources: vec![
+                DataSource {
+                    id: 1,
+                    name: String::from("Customers"),
+                    dstype: DataSourceType::Cadmus,
+                    paths: vec![
+                        String::from("test_data/cad_files/multi_file_solution/customers.cad")
+                    ],
+                },
+                DataSource {
+                    id: 2,
+                    name: String::from("Materials"),
+                    dstype: DataSourceType::Cadmus,
+                    paths: vec![
+                        String::from("test_data/cad_files/multi_file_solution/materials.cad")
+                    ],
+                },
+            ],
+            layouts: vec![
+                Layout {
+                    id: 1,
+                    name: String::from("Quotes"),
+                    occurrence: TableOccurrenceReference {
+                        data_source: 0,
+                        table_occurrence_id: 1,
+                    },
+                },
+            ],
+            schema: Schema {
+                tables: vec![],
+                relation_graph: RelationGraph {
+                    nodes: vec![
+                        TableOccurrence {
+                            id: 1,
+                            name: String::from("Quotes"),
+                            base: TableReference {
+                                data_source: 0,
+                                table_id: 1,
+                            },
+                            relations: vec![
+                                Relation {
+                                    id: 1,
+                                    other_occurrence: 2,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 2,
+                                            field_other: 1,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                },
+                                Relation {
+                                    id: 2,
+                                    other_occurrence: 5,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 1,
+                                            field_other: 1,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                        TableOccurrence {
+                            id: 2,
+                            name: String::from("Customers"),
+                            base: TableReference {
+                                data_source: 1,
+                                table_id: 1,
+                            },
+                            relations: vec![
+                                Relation {
+                                    id: 1,
+                                    other_occurrence: 1,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 1,
+                                            field_other: 2,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                        TableOccurrence {
+                            id: 3,
+                            name: String::from("backup"),
+                            base: TableReference {
+                                data_source: 1,
+                                table_id: 2,
+                            },
+                            relations: vec![],
+                        },
+                        TableOccurrence {
+                            id: 4,
+                            name: String::from("Materials"),
+                            base: TableReference {
+                                data_source: 2,
+                                table_id: 1,
+                            },
+                            relations: vec![
+                                Relation {
+                                    id: 3,
+                                    other_occurrence: 5,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 1,
+                                            field_other: 2,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                },
+                            ],
+                        },
+                        TableOccurrence {
+                            id: 5,
+                            name: String::from("MaterialJoin"),
+                            base: TableReference {
+                                data_source: 0,
+                                table_id: 2,
+                            },
+                            relations: vec![
+                                Relation {
+                                    id: 2,
+                                    other_occurrence: 1,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 1,
+                                            field_other: 1,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                },
+                                Relation {
+                                    id: 3,
+                                    other_occurrence: 4,
+                                    criteria: vec![
+                                        RelationCriteria {
+                                            field_self: 2,
+                                            field_other: 1,
+                                            comparison: RelationComparison::Equal,
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                    ],
+                },
+            },
+            scripts: vec![],
+        };
+
+        assert_eq!(expected, file);
     }
 }
 

@@ -12,6 +12,7 @@ pub enum CompileErr {
     MissingAttribute { base_object: String, construct: String, specifier: String },
     UnimplementedLanguageFeauture { feature: String, token: Token },
     UndefinedReference { construct: FMObjType, token: Token },
+    UnknownFileType { filename: Token },
     UnexpectedEOF,
 }
 

@@ -1,4 +1,4 @@
-use std::collections::hash_map::HashMap;
+use std::collections::btree_map::BTreeMap;
 use super::{token::Token, error::CompileErr, parser::FMObjType};
 use crate::schema::{DBObjectReference, RelationCriteria, Relation, RelationComparison, Schema, Table, Field, LayoutFM, AutoEntry, AutoEntryType, Validation, ValidationType, ValidationTrigger, TableOccurrence, DataType, AutoEntryDataPresets, SerialTrigger, Test, Script};
 
@@ -8,7 +8,7 @@ use crate::dbobjects::data_source::*;
 pub struct StagedTable {
     pub id: u16,
     pub name: Token,
-    pub fields: HashMap<u16, StagedField>,
+    pub fields: BTreeMap<u16, StagedField>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -118,27 +118,27 @@ pub struct StagedLayout {
 
 #[derive(Debug, Clone)]
 pub struct Stage {
-    pub tables: HashMap<u16, StagedTable>,
-    pub table_occurrences: HashMap<u16, StagedOccurrence>,
-    pub relations: HashMap<u16, StagedRelation>,
-    pub value_lists: HashMap<u16, StagedValueList>,
-    pub layouts: HashMap<u16, StagedLayout>,
-    pub scripts: HashMap<u16, Script>,
-    pub tests: HashMap<u16, Test>,
-    pub data_sources: HashMap<u16, DataSource>,
+    pub tables: BTreeMap<u16, StagedTable>,
+    pub table_occurrences: BTreeMap<u16, StagedOccurrence>,
+    pub relations: BTreeMap<u16, StagedRelation>,
+    pub value_lists: BTreeMap<u16, StagedValueList>,
+    pub layouts: BTreeMap<u16, StagedLayout>,
+    pub scripts: BTreeMap<u16, Script>,
+    pub tests: BTreeMap<u16, Test>,
+    pub data_sources: BTreeMap<u16, DataSource>,
 }
 
 impl Stage {
     pub fn new() -> Self {
         Self {
-            tables: HashMap::new(),
-            table_occurrences: HashMap::new(),
-            relations: HashMap::new(),
-            value_lists: HashMap::new(),
-            layouts: HashMap::new(),
-            scripts: HashMap::new(),
-            tests: HashMap::new(),
-            data_sources: HashMap::new(),
+            tables: BTreeMap::new(),
+            table_occurrences: BTreeMap::new(),
+            relations: BTreeMap::new(),
+            value_lists: BTreeMap::new(),
+            layouts: BTreeMap::new(),
+            scripts: BTreeMap::new(),
+            tests: BTreeMap::new(),
+            data_sources: BTreeMap::new(),
         }
     }
 
