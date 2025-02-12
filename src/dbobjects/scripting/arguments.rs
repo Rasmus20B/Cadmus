@@ -14,13 +14,21 @@ pub enum FieldSelection {
 pub enum ScriptSelection {
     FromList(ScriptReference),
     ByCalculation(Calculation),
+    UnresolvedName(String),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LayoutSelection {
     Current,
     FromList(LayoutReference),
     NameByCalculation(Calculation),
     NumberByCalculation(Calculation),
+    UnresolvedName(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LayoutAnimation {
+    None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

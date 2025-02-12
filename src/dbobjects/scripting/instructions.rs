@@ -12,7 +12,7 @@ use super::arguments::*;
 	SaveACopyAsXml,
 	GoToNextField,
 	GoToPreviousField,
-	GoToLayout,
+	GoToLayout { layout: LayoutSelection, animation: LayoutAnimation },
 	NewRecordRequest,
         DuplicateRecordRequest,
 	DeleteRecordRequest,

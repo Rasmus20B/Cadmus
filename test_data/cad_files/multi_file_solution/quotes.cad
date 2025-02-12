@@ -42,3 +42,8 @@ layout %1 Quotes : Quotes = {
 relation %1 = Quotes::customer_id == Customers::id
 relation %2 = Quotes::id == MaterialJoin::quote_id
 relation %3 = MaterialJoin::material_id == Materials::id
+
+script %1 show_customer = {
+  set_variable($name, |Customers::name|)
+  print(|$name|)
+}

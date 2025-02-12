@@ -1,5 +1,5 @@
 use std::collections::btree_map::BTreeMap;
-use super::{token::Token, error::CompileErr, parser::FMObjType};
+use super::{token::Token, cadscript::proto_script::ProtoScript, error::CompileErr, parser::FMObjType};
 use crate::schema::{DBObjectReference, RelationCriteria, Relation, RelationComparison, Schema, Table, Field, LayoutFM, AutoEntry, AutoEntryType, Validation, ValidationType, TableOccurrence, Test, Script};
 
 use crate::dbobjects::{schema::field::{AutoEntryDataPresets, DataType, SerialTrigger, ValidationTrigger}, data_source::*};
@@ -123,7 +123,7 @@ pub struct Stage {
     pub relations: BTreeMap<u16, StagedRelation>,
     pub value_lists: BTreeMap<u16, StagedValueList>,
     pub layouts: BTreeMap<u16, StagedLayout>,
-    pub scripts: BTreeMap<u16, Script>,
+    pub scripts: BTreeMap<u16, ProtoScript>,
     pub tests: BTreeMap<u16, Test>,
     pub data_sources: BTreeMap<u16, DataSource>,
 }

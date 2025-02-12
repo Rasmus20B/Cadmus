@@ -7,7 +7,10 @@ use std::str::Chars;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Calculation(Vec<u8>);
+pub struct Calculation(pub Vec<u8>);
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct CalculationString(pub String);
 
 impl Calculation {
     //fn decompile_calculation(bytecode: &[u8]) -> String {

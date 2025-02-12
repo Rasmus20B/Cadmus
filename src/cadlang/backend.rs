@@ -2,6 +2,7 @@
 use crate::dbobjects::{
     file::*,
     layout::Layout, 
+    scripting::{script::*, instructions::*, arguments::*},
     reference::{TableReference, TableOccurrenceReference, FieldReference},
     calculation::Calculation,
     schema::{
@@ -20,6 +21,7 @@ use crate::dbobjects::{
     }
 };
 use super::staging::*;
+use super::cadscript::proto_instruction::ProtoInstruction;
 
 use std::collections::{HashSet, HashMap, BTreeMap};
 
@@ -49,11 +51,14 @@ pub fn generate_table_occurrence_refs(stage: &Stage, externs: &HashMap<u32, Stag
     
     let mut result = Vec::<TableOccurrence>::new();
     for (i, occurrence) in &stage.table_occurrences {
-        println!("{}", occurrence.base_table.value);
+        println!("looking @ {}", occurrence.base_table.value);
         if occurrence.data_source.is_none() {
             // look in the current file's schema for the correct object
+            for table in &stage.tables {
+                println!("TABLE: {}", table.1.name.value);
+            }
             let table = stage.tables.iter()
-                .find(|table| table.1.name.value == occurrence.name.value)
+                .find(|table| table.1.name.value == occurrence.base_table.value)
                 .map(|table| table.1)
                 .unwrap();
 
@@ -317,6 +322,38 @@ pub fn build_schema(stage: &Stage) -> Schema {
     result.relation_graph.nodes = generate_table_occurrences(stage, &externs);
     result.tables = generate_tables(stage, &externs, &result.relation_graph);
     result
+}
+
+fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Vec<Script> {
+    let mut finished_scripts = vec![];
+    for (i, script) in &stage.scripts {
+        let mut tmp = Script {
+            id: (*i) as u32,
+            name: script.name.clone(),
+            args: vec![],
+            instructions: vec![],
+            metadata: crate::dbobjects::metadata::Metadata {
+                created_by: String::new(),
+                modified_by: String::new(),
+            }
+        };
+
+        let instructions = vec![];
+        for instruction in script.instructions.iter().enumerate() {
+            let finalized = match instruction.1 {
+                ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
+                    name: name.to_string(),
+                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
+                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph)
+                },
+                _ => Instruction::Print,
+            };
+        }
+        tmp.instructions = instructions;
+
+        finished_scripts.push(tmp);
+    }
+    finished_scripts
 }
 
 pub fn build_file(stage: &Stage) -> File {

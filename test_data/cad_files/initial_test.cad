@@ -1,6 +1,4 @@
 test %1 basic_test = {
-  define basic_test() {
-    perform_script("make_10_people");
-    assert(get(FoundCount) == 10);
-  }
+  perform_script("make_10_people");
+  assert(get(FoundCount) == 10);
 }

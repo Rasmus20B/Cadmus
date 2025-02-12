@@ -5,7 +5,7 @@ use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DBObjectReferenc
 
 use crate::dbobjects::{schema::field::{DataType, SerialTrigger, ValidationTrigger}, data_source::*};
 use super::{staging::*, error::CompileErr};
-use super::token::{Token, TokenType};
+use super::{cadscript::{compile_cadscript, proto_script::*}, token::{Token, TokenType}};
 
 
 #[derive(PartialEq, Eq, Debug)]
@@ -358,7 +358,7 @@ pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<
 
 }
 
-pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Script), CompileErr> {
+pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, ProtoScript), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<u16>().expect("Unable to parse object number.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?.value.clone();
@@ -367,11 +367,12 @@ pub fn parse_script(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Scri
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
     let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
-    let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
-    script_[0].name = name_.clone();
+    //let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
+    let mut script_ = compile_cadscript(code.value.as_str());
+    script_.name = name_.clone();
     expect(tokens, &vec![TokenType::CloseBrace], info)?;
 
-    Ok((id_, script_.first().expect("").clone()))
+    Ok((id_, script_))
 }
 
 pub fn parse_value_list_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<(Option<Token>, StagedValueListSortBy), CompileErr> {

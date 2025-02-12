@@ -44,8 +44,6 @@ impl ScriptEngine {
                 let table = dbs.databases.get_mut(&cur_window.file).unwrap().table_occurrences[cur_window.layout.table_occurrence_id].table.id;
                 dbs.add_record(cur_window.file.clone(), table);
             }
-            Instruction::GoToLayout => {
-            }
             Instruction::SetField { field, value } => {
                 let cur_record = match cur_window.get_current_record_ref() {
                     Some(inner) => inner,
@@ -75,6 +73,7 @@ impl ScriptEngine {
                             script_id: db.scripts.iter().find(|script| script.name == name).unwrap().id as u32
                         }
                     }
+                    _ => unreachable!(),
                 };
                 let script = db.scripts.iter().find(|s| s.id == script_ref.script_id).unwrap();
 

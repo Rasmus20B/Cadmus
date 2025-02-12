@@ -22,8 +22,8 @@ impl DatabaseMgr {
     pub fn load_cadmus_file(&mut self, path: &Path) -> Option<&Database> {
         let filename = path.to_str().unwrap().to_string();
         let code = read_to_string(path).unwrap();
-        let schema = cadlang::compiler::compile_to_schema(code).expect("Unable to compile cadmus file.");
-        //self.databases.insert(filename.clone(), Database::from_schema(&schema));
+        let schema = cadlang::compiler::compile_to_file(code).expect("Unable to compile cadmus file.");
+        self.databases.insert(filename.clone(), Database::from_schema(&schema));
         Some(self.databases.get(&filename).unwrap())
     }
 
