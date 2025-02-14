@@ -23,6 +23,7 @@ impl DatabaseMgr {
         let filename = path.to_str().unwrap().to_string();
         let code = read_to_string(path).unwrap();
         let schema = cadlang::compiler::compile_to_file(code).expect("Unable to compile cadmus file.");
+        println!("layouts from schema: {}", schema.layouts.len());
         self.databases.insert(filename.clone(), Database::from_schema(&schema));
         Some(self.databases.get(&filename).unwrap())
     }

@@ -1,4 +1,5 @@
 
+#[derive(Debug)]
 pub struct Layout {
     pub id: usize,
     pub name: String,

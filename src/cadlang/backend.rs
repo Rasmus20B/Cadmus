@@ -253,7 +253,7 @@ fn generate_tables(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &Relatio
 
     for (i, table) in &stage.tables {
         let mut tmp = Table {
-            id: table.id as usize,
+            id: table.id as u32,
             name: table.name.value.clone(),
             created_by: String::from("admin"),
             modified_by: String::from("admin"),
@@ -289,8 +289,8 @@ fn generate_tables(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &Relatio
                 }
             };
 
-            tmp.fields.insert((*j) as usize, Field {
-                id: (*j) as usize,
+            tmp.fields.insert((*j) as u32, Field {
+                id: (*j) as u32,
                 name: field.name.value.clone(),
                 repetitions: field.repetitions as u8,
                 dtype: field.dtype.clone(),

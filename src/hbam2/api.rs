@@ -1,8 +1,11 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, Field, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Table, TableOccurrence, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}, fm_script_engine::fm_script_engine_instructions::*};
+use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, TableOccurrence, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}, fm_script_engine::fm_script_engine_instructions::*};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
-use std::collections::hash_map::HashMap;
+use crate::dbobjects::schema::{table::Table, field::Field};
+
+use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub type Key = Vec<String>;
 pub type Value = String;
@@ -40,24 +43,25 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
                     continue
                 }
         };
-        let mut fields_ = HashMap::new();
+        let mut fields_ = BTreeMap::new();
 
         for field in field_view.get_dirs().unwrap() {
             let path_id = field.path.components.last().unwrap();
             let id_ = get_path_int(path_id);
 
-            let field = Field::new(id_, fm_string_decrypt(field.get_value(16).expect("Unable to get field name.")))
+            let field = Field::new(id_ as u32, fm_string_decrypt(field.get_value(16).expect("Unable to get field name.")))
                 .created_by(fm_string_decrypt(field.get_value(64513).expect("Unable to get created by for field.")))
                 .modified_by(fm_string_decrypt(field.get_value(64514).expect("Unable to get modified by for field.")));
 
-            fields_.insert(id_, field);
+            fields_.insert(id_ as u32, field);
         }
 
         result.insert(id_, Table {
-            id: id_,
+            id: id_ as u32,
             name: fm_string_decrypt(dir.get_value(16).unwrap()),
             created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
             modified_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
+            comment: String::new(),
             fields: fields_,
         });
     }

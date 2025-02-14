@@ -37,6 +37,7 @@ pub struct ScriptReference {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct LayoutReference {
+    pub file_name: String,
     pub layout_id: u32,
 }
 

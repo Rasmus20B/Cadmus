@@ -37,7 +37,7 @@ impl Database {
         let mut tmp_db = Database::new();
         let schema = &file.schema;
         for table in &schema.tables {
-            let mut tmp_table = Table::new(table.id)
+            let mut tmp_table = Table::new(table.id as usize)
                 .name(&table.name);
             tmp_table.field_names = table.fields
                 .iter()

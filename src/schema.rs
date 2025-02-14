@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
-use crate::{fm_script_engine::fm_script_engine_instructions::ScriptStep, hbam::fs::HBAMInterface};
+use crate::fm_script_engine::fm_script_engine_instructions::ScriptStep;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum DBObjectKind {
@@ -336,16 +336,5 @@ impl Schema {
             tests: HashMap::new(),
             data_sources: HashMap::new(),
         }
-    }
-}
-
-impl From<&mut HBAMInterface> for Schema {
-    fn from(hbam: &mut HBAMInterface) -> Schema {
-        let mut result = Schema::new();
-        result.tables.extend(hbam.get_tables());
-        hbam.get_table_occurrences(&mut result);
-        hbam.get_fields(&mut result).expect("Unable to get fields from hbam file.");
-        hbam.get_layouts(&mut result).expect("Unable to get fields from hbam file.");
-        result
     }
 }

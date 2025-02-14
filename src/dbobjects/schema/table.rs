@@ -6,16 +6,16 @@ use super::field::Field;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Table {
-    pub id: usize,
+    pub id: u32,
     pub name: String,
     pub comment: String,
-    pub fields: BTreeMap<usize, Field>,
+    pub fields: BTreeMap<u32, Field>,
     pub created_by: String,
     pub modified_by: String,
 }
 
 impl Table {
-    pub fn new(id_: usize) -> Self {
+    pub fn new(id_: u32) -> Self {
         Self {
             id: id_,
             name: String::new(),

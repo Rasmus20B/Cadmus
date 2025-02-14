@@ -72,7 +72,7 @@ pub struct Validation {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Field {
-    pub id: usize,
+    pub id: u32,
     pub name: String,
     pub dtype: DataType,
     pub validation: Validation,
@@ -84,7 +84,7 @@ pub struct Field {
 }
 
 impl Field {
-    pub fn new(id_: usize, name_: String) -> Self {
+    pub fn new(id_: u32, name_: String) -> Self {
         Self {
             id: id_,
             name: name_,
