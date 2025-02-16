@@ -315,9 +315,8 @@ fn generate_tables(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &Relatio
     tables
 }
 
-pub fn build_schema(stage: &Stage) -> Schema {
+pub fn build_schema(stage: &Stage, externs: &HashMap<u32, Stage>) -> Schema {
     let mut result = Schema::new();
-    let externs = load_externs(stage);
 
     result.relation_graph.nodes = generate_table_occurrences(stage, &externs);
     result.tables = generate_tables(stage, &externs, &result.relation_graph);
@@ -356,9 +355,42 @@ fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationG
     finished_scripts
 }
 
+fn build_tests(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Vec<Script> {
+    let mut finished_scripts = vec![];
+    for (i, script) in &stage.scripts {
+        let mut tmp = Script {
+            id: (*i) as u32,
+            name: script.name.clone(),
+            args: vec![],
+            instructions: vec![],
+            metadata: crate::dbobjects::metadata::Metadata {
+                created_by: String::new(),
+                modified_by: String::new(),
+            }
+        };
+
+        let instructions = vec![];
+        for instruction in script.instructions.iter().enumerate() {
+            let finalized = match instruction.1 {
+                ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
+                    name: name.to_string(),
+                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
+                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph)
+                },
+                _ => Instruction::Print,
+            };
+        }
+        tmp.instructions = instructions;
+
+        finished_scripts.push(tmp);
+    }
+    finished_scripts
+}
+
 pub fn build_file(stage: &Stage) -> File {
-    let schema_ = build_schema(&stage);
     let mut layouts_ = vec![];
+    let externs = load_externs(stage);
+    let schema_ = build_schema(&stage, &externs);
 
     for (i, layout) in &stage.layouts {
         let occurrence_id = schema_.relation_graph.nodes
@@ -376,12 +408,16 @@ pub fn build_file(stage: &Stage) -> File {
         layouts_.push(tmp);
     }
 
+    let scripts_ = build_scripts(stage, &externs, &schema_.relation_graph );
+    let tests_ = build_tests(stage, &externs, &schema_.relation_graph );
+
     File {
         name: String::new(),
         schema: schema_,
         data_sources: stage.data_sources.iter().map(|ds| ds.1.clone()).collect(),
         layouts: layouts_,
-        scripts: vec![],
+        scripts: scripts_,
+        tests: tests_,
     }
 }
 

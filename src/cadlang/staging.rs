@@ -124,7 +124,7 @@ pub struct Stage {
     pub value_lists: BTreeMap<u16, StagedValueList>,
     pub layouts: BTreeMap<u16, StagedLayout>,
     pub scripts: BTreeMap<u16, ProtoScript>,
-    pub tests: BTreeMap<u16, Test>,
+    pub tests: BTreeMap<u16, ProtoScript>,
     pub data_sources: BTreeMap<u16, DataSource>,
 }
 

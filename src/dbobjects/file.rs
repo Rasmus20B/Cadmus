@@ -10,5 +10,6 @@ pub struct File {
     pub schema: Schema,
     pub layouts: Vec<Layout>,
     pub data_sources: Vec<DataSource>,
-    pub scripts: Vec<Script>
+    pub scripts: Vec<Script>,
+    pub tests: Vec<Script>,
 }

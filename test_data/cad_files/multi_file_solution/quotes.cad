@@ -47,3 +47,11 @@ script %1 show_customer = {
   set_variable($name, |Customers::name|)
   print(|$name|)
 }
+
+test %1 make_10_quotes = {
+  set_variable($i, |0|)
+  loop {
+    exit_loop_if(|$i = 10|)
+    new_record()
+  }
+}

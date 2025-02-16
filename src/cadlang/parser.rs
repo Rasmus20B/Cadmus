@@ -603,7 +603,7 @@ pub fn parse_value_list(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, 
     }))
 }
 
-pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Test), CompileErr> {
+pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, ProtoScript), CompileErr> {
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?
         .value.parse::<u16>().expect("Unable to parse object id.");
     let name_ = expect(tokens, &vec![TokenType::Identifier], info)?
@@ -613,15 +613,14 @@ pub fn parse_test(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Test),
     expect(tokens, &vec![TokenType::OpenBrace], info)?;
 
     let code = expect(tokens, &vec![TokenType::ScriptContent], info)?;
-    let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
-    script_[0].name = name_.clone();
+    //let mut script_ = BurnScriptCompiler::compile_burn_script(code.value.as_str());
+    //script_[0].name = name_.clone();
+    //expect(tokens, &vec![TokenType::CloseBrace], info)?;
+    let mut script_ = compile_cadscript(code.value.as_str());
+    script_.name = name_.clone();
     expect(tokens, &vec![TokenType::CloseBrace], info)?;
 
-    Ok((id_, Test {
-        id: id_,
-        name: name_,
-        script: script_[0].clone()
-    }))
+    Ok((id_, script_))
 }
 
 pub fn parse_relation_criteria<'a>(tokens: &'a [Token], info: &mut ParseInfo) -> Result<StagedRelationCriteria, CompileErr> {

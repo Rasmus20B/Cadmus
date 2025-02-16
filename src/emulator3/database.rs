@@ -3,8 +3,8 @@ use crate::dbobjects::file::File;
 use super::record_store::RecordStore;
 
 pub struct Database {
-    file: File,
-    records: RecordStore,
+    pub file: File,
+    pub records: RecordStore,
 }
 
 impl Database {
