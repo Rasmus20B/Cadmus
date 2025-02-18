@@ -5,6 +5,7 @@ pub(crate) enum TokenVal {
     Identifier(String),
     FieldReference(String, String),
     Variable(String),
+    Global(String),
     CalculationArg(String),
     StringArg(String),
     NumberArg(f64),

@@ -44,7 +44,12 @@ pub fn lex(code: &str) -> Vec<TokenVal> {
                         break;
                     }
                 }
-                tokens.push(TokenVal::Variable(buffer.clone()));
+
+                if buffer.chars().nth(1).unwrap() == '$' {
+                    tokens.push(TokenVal::Global(buffer.clone()));
+                } else {
+                    tokens.push(TokenVal::Variable(buffer.clone()));
+                }
                 buffer.clear();
             }
 
