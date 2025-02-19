@@ -337,19 +337,23 @@ fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationG
             }
         };
 
-        let instructions = vec![];
-        for instruction in script.instructions.iter().enumerate() {
-            let finalized = match instruction.1 {
+        tmp.instructions = script.instructions.iter().enumerate().map(|(i, instr)| {
+           ScriptStep { id: i as u32, instruction: match instr {
+                ProtoInstruction::NewRecordRequest => Instruction::NewRecordRequest,
                 ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
                     name: name.to_string(),
                     value: encode_calculation(value.0.as_str(), stage, externs, graph),
                     repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph)
                 },
+                ProtoInstruction::Loop => Instruction::Loop,
+                ProtoInstruction::EndLoop => Instruction::EndLoop,
+                ProtoInstruction::ExitLoopIf { condition } => Instruction::ExitLoopIf {
+                    condition: encode_calculation(condition.0.as_str(), stage, externs, graph),
+                },
                 _ => Instruction::Print,
-            };
-        }
-        tmp.instructions = instructions;
-
+           }
+           }
+        }).collect();
         finished_scripts.push(tmp);
     }
     finished_scripts
@@ -378,6 +382,7 @@ fn build_tests(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGra
                     repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph)
                 },
                 ProtoInstruction::Loop => Instruction::Loop,
+                ProtoInstruction::EndLoop => Instruction::EndLoop,
                 ProtoInstruction::ExitLoopIf { condition } => Instruction::ExitLoopIf {
                     condition: encode_calculation(condition.0.as_str(), stage, externs, graph),
                 },

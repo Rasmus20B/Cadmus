@@ -32,6 +32,7 @@ pub enum ParseErr {
     PositionalLabelMix,
     InvalidLabel,
     UnexpectedEOF,
+    UnexpectedScopeCloser,
 }
 
 pub struct ParseInfo {
@@ -186,11 +187,28 @@ pub fn parse(tokens: Vec<TokenVal>) -> Result<Vec<ProtoInstruction>, ParseErr> {
     }
     let mut info = ParseInfo { cursor: 0 };
     let mut instructions = vec![];
+    let mut scope_stack = vec![TokenVal::EOF];
     while info.cursor < tokens.len() {
         println!("cursor: {} :: {:?}", info.cursor, tokens[info.cursor]);
         let instr = match expect(&tokens, &vec![TokenVal::Identifier(String::new()), TokenVal::OpenBrace, TokenVal::CloseBrace], &mut info)? {
             TokenVal::Identifier(inner) => inner,
-            TokenVal::OpenBrace | TokenVal::CloseBrace => continue,
+            TokenVal::OpenBrace => continue,
+            TokenVal::CloseBrace => {
+                match scope_stack.last() {
+                    Some(TokenVal::Loop) => { 
+                        instructions.push(ProtoInstruction::EndLoop); 
+                        scope_stack.pop();
+                        continue 
+                    },
+                    Some(TokenVal::EOF) => {
+                        break;
+                    }
+                    None => {
+                        return Err(ParseErr::UnexpectedScopeCloser)
+                    }
+                    _ => unreachable!(),
+                }
+            }
             _ => unreachable!()
         };
 
@@ -214,7 +232,10 @@ pub fn parse(tokens: Vec<TokenVal>) -> Result<Vec<ProtoInstruction>, ParseErr> {
                     repetition: CalculationString(rep.value.get_value().unwrap()), 
                 }
             },
-            "loop" => ProtoInstruction::Loop,
+            "loop" => { 
+                scope_stack.push(TokenVal::Loop); 
+                ProtoInstruction::Loop 
+            },
             "exit_loop_if" => ProtoInstruction::ExitLoopIf { condition: CalculationString(arguments.iter()
                 .find(|arg| arg.label == "expr")
                 .unwrap().value

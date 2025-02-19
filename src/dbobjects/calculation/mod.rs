@@ -1,7 +1,9 @@
 
 pub mod token;
+pub mod context;
 
 use super::calculation::token::{Token, Function, GetArgument};
+use super::calculation::context::CalculationContext;
 use std::str::Chars;
 
 use crate::util::encoding_util::fm_string_decrypt;
@@ -17,11 +19,6 @@ pub struct Calculation(pub Vec<u8>);
 pub struct CalculationString(pub String);
 
 impl Calculation {
-    //fn decompile_calculation(bytecode: &[u8]) -> String {
-    //    let mut it = bytecode.iter().peekable();
-    //    let mut result = String::new();
-    //    let mut in_get = false;
-    //
 
     pub fn from_tokens(tokens: &Vec<Token>) -> Self {
         Calculation(tokens.iter()
@@ -143,7 +140,7 @@ impl Calculation {
         result
     }
 
-    pub fn eval(&self) -> String {
+    pub fn eval<T>(&self, context: &T) -> String where T: CalculationContext {
         todo!()
     }
 }

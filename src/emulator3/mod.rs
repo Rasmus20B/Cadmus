@@ -1,4 +1,5 @@
 
+mod context;
 mod database;
 mod database_mgr;
 mod record_store;
@@ -12,6 +13,7 @@ use super::emulator3::window_mgr::WindowMgr;
 use super::emulator3::window::Window;
 
 use crate::dbobjects::scripting::script::Script;
+
 
 pub struct EmulatorState {
 }
@@ -53,7 +55,10 @@ impl<'a> Emulator<'a> {
 
     pub fn run_test_with_file(&mut self, test: &'a Script, path: String) {
         println!("Running test: {} on file: {}", test.name, path);
-        let status = self.script_mgr.run_script(&test, &mut self.database_mgr, &mut self.window_mgr);
+        for instr in &test.instructions {
+            println!("{:?}", instr);
+        }
+        let status = self.script_mgr.run_script(&test, &mut self.database_mgr, &mut self.window_mgr, &mut self.state);
         println!("{:?}", status);
     }
 }

@@ -12,6 +12,9 @@ pub(crate) enum TokenVal {
     KeywordArg(String),
     ArgLabel(String),
 
+    Loop,
+    EndLoop,
+
     OpenBrace,
     CloseBrace,
     OpenParen,
@@ -21,6 +24,8 @@ pub(crate) enum TokenVal {
 
     Comma,
     SemiColon,
+
+    EOF,
 }
 
 impl TokenVal {

@@ -1,6 +1,8 @@
 
 use super::database_mgr::DatabaseMgr;
 use super::window_mgr::WindowMgr;
+use super::EmulatorState;
+use super::context::EmulatorContext;
 
 use crate::dbobjects::scripting::{script::Script, instructions::Instruction};
 use crate::dbobjects::calculation::Calculation;
@@ -25,19 +27,40 @@ impl<'a> ScriptMgr<'a> {
         }
     }
 
-    pub fn run_script(&mut self, test: &'a Script, db_mgr: &mut DatabaseMgr, window_mgr: &mut WindowMgr) -> Result<(), ScriptErr> {
+    pub fn run_script(&mut self, test: &'a Script, db_mgr: &mut DatabaseMgr, window_mgr: &mut WindowMgr, state: &mut EmulatorState) -> Result<(), ScriptErr> {
         self.program_counters.push((1, test));
 
-        while let Some(ip) = self.program_counters.last() {
+        while let Some(ip) = self.program_counters.last_mut() {
             let cur_instr = &ip.1.instructions[ip.0 as usize];
 
             match &cur_instr.instruction {
-                Instruction::SetVariable { name, value, repetition } => {
+                Instruction::NewRecordRequest => {
+                    ip.0 += 1;
                 }
-                _ => {}
+                Instruction::SetVariable { name, value, repetition } => {
+                    let context = EmulatorContext {
+                        database_mgr: &*db_mgr,
+                        variables: self.variables.last().unwrap(),
+                        globals: &self.globals,
+                        window_mgr: &*window_mgr,
+                        state: &*state,
+                    };
+
+                    value.eval(&context);
+                    ip.0 += 1;
+                }
+                Instruction::Loop => {
+                    ip.0 += 1;
+                }
+                Instruction::EndLoop => {
+                    ip.0 += 1;
+                }
+                Instruction::ExitLoopIf { condition } => {
+                    ip.0 += 1;
+                },
+                _ => {
+                }
             }
-
-
 
             if ip.0 >= ip.1.instructions.len() as u32 {
                 self.program_counters.pop();
