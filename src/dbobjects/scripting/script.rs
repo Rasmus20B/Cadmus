@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ScriptStep {
-    id: u32,
-    instruction: Instruction,
+    pub id: u32,
+    pub instruction: Instruction,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

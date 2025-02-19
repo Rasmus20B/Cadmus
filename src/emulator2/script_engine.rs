@@ -63,19 +63,19 @@ impl ScriptEngine {
                 //cur_record.set_field(field, &step.switches[1]);
             },
             Instruction::PerformScript { script, args } => {
-                let db = dbs.databases.get(&window_mgr.current_window().file).unwrap();
-                let script_ref = match script {
-                    ScriptSelection::FromList(name) => name,
-                    ScriptSelection::ByCalculation(calc) => {
-                        let name = calc.eval();
-                        ScriptReference { 
-                            data_source: 0,
-                            script_id: db.scripts.iter().find(|script| script.name == name).unwrap().id as u32
-                        }
-                    }
-                    _ => unreachable!(),
-                };
-                let script = db.scripts.iter().find(|s| s.id == script_ref.script_id).unwrap();
+                //let db = dbs.databases.get(&window_mgr.current_window().file).unwrap();
+                //let script_ref = match script {
+                //    ScriptSelection::FromList(name) => name,
+                //    ScriptSelection::ByCalculation(calc) => {
+                //        //let name = calc.eval();
+                //        //ScriptReference { 
+                //        //    data_source: 0,
+                //        //    script_id: db.scripts.iter().find(|script| script.name == name).unwrap().id as u32
+                //        //}
+                //    }
+                //    _ => unreachable!(),
+                //};
+                //let script = db.scripts.iter().find(|s| s.id == script_ref.script_id).unwrap();
 
                 //self.instr_ptrs.push((script.clone(), 1));
                 return Ok(())

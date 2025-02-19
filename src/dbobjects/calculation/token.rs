@@ -3,6 +3,28 @@ use crate::util::encoding_util::{fm_string_encrypt, put_path_int, get_path_int};
 use crate::dbobjects::reference::FieldReference;
 
 #[derive(Debug, PartialEq)]
+pub enum GetArgument {
+    CurrentTime,
+    AccountName,
+    DocumentsPath,
+    DocumentsPathListing,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Function {
+    Char,
+
+    Abs,
+    Cos,
+    Sin,
+    Tan,
+    Acos,
+    Asin,
+    Atan,
+    Get(GetArgument),
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Variable(String),
     Number(f64),
@@ -10,6 +32,7 @@ pub enum Token {
     Identifier(String),
     FieldReference(String, String),
     ResolvedFieldReference(FieldReference),
+    Function(Function),
 
     Equal,
     NotEqual,

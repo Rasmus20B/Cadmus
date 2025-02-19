@@ -1,8 +1,12 @@
 
 pub mod token;
 
-use super::calculation::token::Token;
+use super::calculation::token::{Token, Function, GetArgument};
 use std::str::Chars;
+
+use crate::util::encoding_util::fm_string_decrypt;
+
+use crate::emulator3::Emulator;
 
 use serde::{Serialize, Deserialize};
 
@@ -18,123 +22,6 @@ impl Calculation {
     //    let mut result = String::new();
     //    let mut in_get = false;
     //
-    //    while let Some(c) = it.next() {
-    //        match c {
-    //            0x4 => {
-    //                result.push('(');
-    //            }
-    //            0x5 => {
-    //                result.push(')');
-    //            }
-    //            0x2d => {
-    //                result.push_str("Abs");
-    //            }
-    //            0x9b => {
-    //                result.push_str("Get");
-    //            }
-    //            0x9c => {
-    //                match it.next().unwrap() {
-    //                    0x1d => {
-    //                        result.push_str("CurrentTime");
-    //                    }
-    //                    0x20 => {
-    //                        result.push_str("AccountName");
-    //                    }
-    //                    0x49 => {
-    //                        result.push_str("DocumentsPath");
-    //                    }
-    //                    0x5d => {
-    //                        result.push_str("DocumentsPathListing");
-    //                    }
-    //                    _ => {}
-    //                }
-    //            }
-    //            0x9d => {
-    //                result.push_str("Acos");
-    //            }
-    //            0xfb => {
-    //                match it.next().unwrap() {
-    //                    0x3 => { result.push_str("Char")}
-    //                    _ => eprintln!("unrecognized intrinsic.")
-    //                }
-    //            }
-    //            0x10 => {
-    //                /* decode number */
-    //                for i in 0..19 {
-    //                    let cur = it.next();
-    //                    if i == 8 {
-    //                        result.push_str(&cur.unwrap().to_string());
-    //                    }
-    //                }
-    //            },
-    //            0x13 => {
-    //                /* Processing String */
-    //                let n = it.next();
-    //                let mut s = String::new();
-    //                for i in 1..=*n.unwrap() as usize {
-    //                    s.push(*it.next().unwrap() as char);
-    //                }
-    //                let mut text = String::new();
-    //                text.push('"');
-    //                text.push_str(&fm_string_decrypt(s.as_bytes()));
-    //                text.push('"');
-    //
-    //                result.push_str(&text);
-    //            }
-    //            0x1a => {
-    //                /* decode variable */
-    //                let n = it.next();
-    //                let mut name_arr = String::new();
-    //                for i in 1..=*n.unwrap() as usize {
-    //                    name_arr.push(*it.next().unwrap() as char);
-    //                }
-    //                let name = fm_string_decrypt(name_arr.as_bytes());
-    //                result.push_str(&name);
-    //            },
-    //            0x25 => {
-    //                result.push('+');
-    //            }
-    //            0x26 => {
-    //                result.push('-');
-    //            }
-    //            0x27 => {
-    //                result.push('*');
-    //            }
-    //            0x28 => {
-    //                result.push('/');
-    //            },
-    //            0x41 => {
-    //                result.push('<');
-    //            }
-    //            0x43 => {
-    //                result.push_str("<=");
-    //            }
-    //            0x44 => {
-    //                result.push_str("==");
-    //            }
-    //            0x46 => {
-    //                result.push_str("!=");
-    //            }
-    //            0x47 => {
-    //                result.push_str(">=");
-    //            }
-    //            0x49 => {
-    //                result.push('>');
-    //            }
-    //            0x50 => {
-    //                result.push('&');
-    //            }
-    //            0xC => {
-    //                result.push(' ');
-    //            }
-    //            _ => {
-    //
-    //            }
-    //        }
-    //
-    //    }
-    //    return result;
-    //}
 
     pub fn from_tokens(tokens: &Vec<Token>) -> Self {
         Calculation(tokens.iter()
@@ -144,12 +31,116 @@ impl Calculation {
     }
 
     pub fn from_text(code: &str) -> Self {
-        let tokens = lex(code);
+        Calculation::from_tokens(&lex_text(code))
+    }
 
-        Calculation(tokens.iter()
-            .map(|token| token.encode())
-            .flatten()
-            .collect())
+    fn lex(&self) -> Vec<Token> {
+        let mut result = vec![];
+        let mut ptr = 0;
+        while ptr < self.0.len() {
+            match self.0[ptr] {
+                0x4 => {
+                    result.push(Token::OpenParen)
+                }
+                0x5 => {
+                    result.push(Token::CloseParen);
+                }
+                0x2d => {
+                    result.push(Token::Function(Function::Abs))
+                }
+                0x9b => {
+                    ptr += 1;
+                    if self.0[ptr] == 0x9c {
+                        ptr += 1;
+                        match self.0[ptr] {
+                            0x1d => {
+                                result.push(Token::Function(Function::Get(GetArgument::CurrentTime)))
+                            }
+                            0x20 => {
+                                result.push(Token::Function(Function::Get(GetArgument::AccountName)))
+                            }
+                            0x49 => {
+                                result.push(Token::Function(Function::Get(GetArgument::DocumentsPath)))
+                            }
+                            0x5d => {
+                                result.push(Token::Function(Function::Get(GetArgument::DocumentsPathListing)))
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                0x9d => {
+                    result.push(Token::Function(token::Function::Acos));
+                }
+                0xfb => {
+                    ptr += 1;
+                    match self.0[ptr] {
+                        0x3 => { result.push(Token::Function(Function::Char)) }
+                        _ => eprintln!("unrecognized intrinsic.")
+                    }
+                }
+                0x10 => {
+                    /* decode number */
+                    let end = ptr + 19;
+                    while ptr < end {
+                        let cur = self.0[ptr];
+                        if self.0[ptr] == 8 {
+                            result.push(Token::Number(cur as f64));
+                            break;
+                        }
+                        ptr += 1;
+                    }
+                },
+                0x13 => {
+                    /* Processing String */
+                    ptr += 1;
+                    let len = self.0[ptr] as usize;
+                    result.push(Token::String(String::from(&fm_string_decrypt(&self.0[ptr..ptr+len]))));
+                }
+                0x1a => {
+                    /* decode variable */
+                    ptr += 1;
+                    let len = self.0[ptr] as usize;
+                    result.push(Token::Variable(String::from(&fm_string_decrypt(&self.0[ptr..ptr+len]))));
+                },
+                0x25 => {
+                    result.push(Token::Add);
+                }
+                0x26 => {
+                    result.push(Token::Subtract);
+                }
+                0x27 => {
+                    result.push(Token::Multiply);
+                }
+                0x28 => {
+                    result.push(Token::Divide);
+                },
+                0x41 => {
+                    result.push(Token::Less);
+                }
+                0x43 => {
+                    result.push(Token::LessEqual);
+                }
+                0x44 => {
+                    result.push(Token::Equal);
+                }
+                0x46 => {
+                    result.push(Token::NotEqual);
+                }
+                0x47 => {
+                    result.push(Token::GreaterEqual)
+                }
+                0x49 => {
+                    result.push(Token::Greater);
+                }
+                0x50 => {
+                    result.push(Token::Concatenate);
+                }
+                _ => {
+                }
+            }
+        }
+        result
     }
 
     pub fn eval(&self) -> String {
@@ -157,7 +148,7 @@ impl Calculation {
     }
 }
 
-pub fn lex(code: &str) -> Vec<Token> {
+pub fn lex_text(code: &str) -> Vec<Token> {
     let mut result = vec![];
     let mut iter = code.chars().into_iter().peekable();
     let mut buffer = String::new();
@@ -292,7 +283,7 @@ pub fn lex(code: &str) -> Vec<Token> {
 mod tests {
     use super::token::Token;
     use super::Calculation;
-    use super::lex;
+    use super::lex_text;
 
     use crate::dbobjects::schema::Schema;
     #[test]
@@ -317,7 +308,7 @@ mod tests {
             Token::Space,
             Token::Number(10.0)
         ];
-        assert_eq!(lex(code), expected);
+        assert_eq!(lex_text(code), expected);
 
         let code = "!($x != 10)";
         let expected = vec![
@@ -330,7 +321,7 @@ mod tests {
             Token::Number(10.0),
             Token::CloseParen,
         ];
-        assert_eq!(lex(code), expected);
+        assert_eq!(lex_text(code), expected);
 
         let code = "!(Person::FirstName != \"Kevin\")";
         let expected = vec![
@@ -343,7 +334,7 @@ mod tests {
             Token::String(String::from("Kevin")),
             Token::CloseParen,
         ];
-        assert_eq!(lex(code), expected);
+        assert_eq!(lex_text(code), expected);
 
         let code = "!(GetRepetition(Person::FirstName; 4) != \"Kevin\")";
         let expected = vec![
@@ -362,7 +353,7 @@ mod tests {
             Token::String(String::from("Kevin")),
             Token::CloseParen,
         ];
-        assert_eq!(lex(code), expected);
+        assert_eq!(lex_text(code), expected);
     }
 }
 

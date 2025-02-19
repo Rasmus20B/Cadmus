@@ -13,10 +13,21 @@ use super::emulator3::window::Window;
 
 use crate::dbobjects::scripting::script::Script;
 
+pub struct EmulatorState {
+}
+
+impl EmulatorState {
+    pub fn new() -> Self {
+        Self {
+        }
+    }
+}
+
 pub struct Emulator<'a> {
     database_mgr: DatabaseMgr,
     script_mgr: ScriptMgr<'a>,
     window_mgr: WindowMgr,
+    state: EmulatorState,
 }
 
 impl<'a> Emulator<'a> {
@@ -25,6 +36,7 @@ impl<'a> Emulator<'a> {
             database_mgr: DatabaseMgr::new(),
             script_mgr: ScriptMgr::new(),
             window_mgr: WindowMgr::new(),
+            state: EmulatorState::new(),
         }
     }
 

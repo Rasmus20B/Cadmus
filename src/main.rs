@@ -36,6 +36,9 @@ fn main() -> Result<(), std::io::Error>{
                 String::new()
             };
 
+
+            println!("{:?}", stored_tests);
+
             if let Some(tests) = tests {
                 for test in tests {
                     let to_run = stored_tests
