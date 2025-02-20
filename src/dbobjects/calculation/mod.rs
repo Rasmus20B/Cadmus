@@ -56,13 +56,14 @@ impl Calculation {
             //println!("{}", self.0[ptr]);
             match self.0[ptr] {
                 0x4 => {
-                    result.push(Token::OpenParen)
+                    result.push(Token::OpenParen);
+                    ptr += 1;
                 }
                 0x5 => {
                     result.push(Token::CloseParen);
+                    ptr += 1;
                 }
                 12 => {
-                    println!("We do space");
                     ptr += 1;
                     if self.0[ptr] != 19 {  } // error
                     ptr += 1;
@@ -74,7 +75,8 @@ impl Calculation {
                     ptr += 1;
                 }
                 0x2d => {
-                    result.push(Token::Function(Function::Abs))
+                    result.push(Token::Function(Function::Abs));
+                    ptr += 1;
                 }
                 0x9b => {
                     ptr += 1;
@@ -128,6 +130,7 @@ impl Calculation {
                     /* decode variable */
                     ptr += 1;
                     let len = self.0[ptr] as usize;
+                    ptr += 1;
                     result.push(Token::Variable(String::from(&fm_string_decrypt(&self.0[ptr..ptr+len]))));
                     ptr += len;
                 },
@@ -183,10 +186,6 @@ impl Calculation {
 
     pub fn eval<T>(&self, ctx: &T) -> Result<String, String> where T: CalculationContext {
         let tokens = self.lex();
-        println!("TOKENS: ");
-        for t in &tokens {
-            println!("{:?}", t);
-        }
         let ast = parser::Parser::new(&tokens).parse();
         match ast.eval(ctx) {
             Ok(inner) => Ok(inner.as_text()),
@@ -232,6 +231,9 @@ impl Expr {
                             Ok(Value::Number(left_val.as_number() / denom))
                         }
                     }
+                    Token::Equal => {
+                        Ok(Value::Text((left_val.as_number() == right_val.as_number()).to_string()))
+                    },
                     Token::Concatenate => Ok(Value::Text(left_val.as_text() + &right_val.as_text())), // Concatenation
                     _ => Err("Unsupported binary operator".to_string()),
                 }
@@ -307,9 +309,7 @@ pub fn lex_text(code: &str) -> Vec<Token> {
                 result.push(Token::SemiColon)
             }
             '=' => {
-                if *iter.peek().unwrap() == '=' {
-                    result.push(Token::Equal)
-                }
+                result.push(Token::Equal);
                 iter.next();
             }
             '(' => {

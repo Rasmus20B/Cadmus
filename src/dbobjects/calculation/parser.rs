@@ -53,15 +53,35 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_concatenation(&mut self) -> Expr {
-        let mut expr = self.parse_term();
+        let mut expr = self.parse_comparison();
         while let Some(Token::Concatenate) = self.tokens.peek() {
             self.tokens.next();
-            let right = self.parse_term();
+            let right = self.parse_comparison();
             expr = Expr::BinaryOp {
                 left: Box::new(expr),
                 op: Token::Concatenate,
                 right: Box::new(right),
             };
+        }
+        expr
+    }
+
+
+     fn parse_comparison(&mut self) -> Expr {
+        let mut expr = self.parse_term();
+        while let Some(op) = self.tokens.peek() {
+            match op {
+                Token::Equal | Token::NotEqual | Token::Greater | Token::GreaterEqual | Token::Less | Token::LessEqual => {
+                    let op = self.tokens.next().unwrap().clone();
+                    let right = self.parse_term();
+                    expr = Expr::BinaryOp {
+                        left: Box::new(expr),
+                        op,
+                        right: Box::new(right),
+                    };
+                }
+                _ => break,
+            }
         }
         expr
     }

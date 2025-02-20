@@ -22,7 +22,11 @@ impl CalculationContext for EmulatorContext<'_> {
     fn get_active_fieldname(&self) -> String { todo!() }
     fn get_host_ip_addr(&self) -> String { todo!() }
 
-    fn get_var(&self, name: &str) -> Option<String> { todo!() }
+    fn get_var(&self, name: &str) -> Option<String> { 
+        self.variables.iter()
+            .find(|var| var.0 == name)
+            .map(|var| var.1.clone())
+    }
     fn get_global_var(&self, name: &str) -> Option<String> { todo!() }
 
     fn lookup_field(&self, reference: FieldReference) -> Option<String> {
