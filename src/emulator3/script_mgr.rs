@@ -27,8 +27,35 @@ impl<'a> ScriptMgr<'a> {
         }
     }
 
+    pub fn get_var(&self, name: &str) -> Option<String> {
+        self.variables.last()
+            .unwrap()
+            .iter()
+            .find(|var| var.0.as_str() == name)
+            .map(|var| var.1.clone())
+            .or_else(|| None)
+    }
+
+    pub fn set_var(&mut self, name: &str, value: String) {
+        let handle = self.variables.last_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|var| var.0.as_str() == name);
+
+        match handle {
+            Some(inner) => { inner.1 = value },
+            None => { 
+                self.variables
+                    .last_mut()
+                    .unwrap()
+                    .push((name.to_string(), value));
+            }
+        }
+    }
+
     pub fn run_script(&mut self, test: &'a Script, db_mgr: &mut DatabaseMgr, window_mgr: &mut WindowMgr, state: &mut EmulatorState) -> Result<(), ScriptErr> {
-        self.program_counters.push((1, test));
+        self.program_counters.push((0, test));
+        self.variables.push(vec![]);
 
         while let Some(ip) = self.program_counters.last_mut() {
             let cur_instr = &ip.1.instructions[ip.0 as usize];
@@ -46,7 +73,10 @@ impl<'a> ScriptMgr<'a> {
                         state: &*state,
                     };
 
-                    value.eval(&context);
+                    let val = value.eval(&context);
+                    let rep = repetition.eval(&context);
+
+
                     ip.0 += 1;
                 }
                 Instruction::Loop => {

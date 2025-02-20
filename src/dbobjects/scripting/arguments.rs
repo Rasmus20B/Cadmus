@@ -18,6 +18,15 @@ pub enum ScriptSelection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RecordSelection {
+    First,
+    Last,
+    Next,
+    Previous,
+    ByCalc(Calculation),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LayoutSelection {
     Current,
     FromList(LayoutReference),

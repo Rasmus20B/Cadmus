@@ -23,7 +23,7 @@ pub enum ProtoLayoutSelection {
 	InsertFromLastVisited,
 	InsertCurrentDate,
 	InsertCurrentTime,
-	GoToRecordRequestPage,
+	GoToRecordRequestPage { record: RecordSelection },
 	GoToField,
 	CheckSelection,
 	CheckRecord,
@@ -201,5 +201,5 @@ pub enum ProtoLayoutSelection {
 	SetDictionary,
 	PerformScriptOnServerWithCallback,
 	TriggerClarisConnectFlow,
-        Assert,
+        Assert { expr: CalculationString },
 }

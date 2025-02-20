@@ -30,7 +30,7 @@ impl ArgKeyVal {
 pub enum ParseErr {
     UnexpectedToken { token: TokenVal, expected: Vec<TokenVal> },
     PositionalLabelMix,
-    InvalidLabel,
+    InvalidLabel(String),
     UnexpectedEOF,
     UnexpectedScopeCloser,
 }
@@ -129,6 +129,8 @@ pub fn parse_first_arg<'a>(instr: &'a str, tokens: &'a [TokenVal], info: &mut Pa
     ],
     info)?;
 
+    println!("CALC: {:?}", name_or_val);
+
     if [TokenVal::CloseParen, TokenVal::OpenBrace].contains(name_or_val) {
         return Ok(None);
     }
@@ -137,7 +139,7 @@ pub fn parse_first_arg<'a>(instr: &'a str, tokens: &'a [TokenVal], info: &mut Pa
         TokenVal::Comma | TokenVal::CloseParen => {
             let name = match ARG_LOOKUP.get_argname(instr, 0) {
                 Some(name) => name,
-                None => return Err(ParseErr::InvalidLabel)
+                None => return Err(ParseErr::InvalidLabel(instr.to_string()))
             };
             Ok(Some((ArgFormat::Positional, ArgKeyVal::new(name.to_string(), name_or_val.clone()))))
         }
@@ -307,6 +309,7 @@ mod tests {
                 value: CalculationString("$x + 1".to_string()),
                 repetition: CalculationString("1".to_string()) 
             },
+            ProtoInstruction::EndLoop,
         ];
 
         assert_eq!(instrs.len(), expected.len());

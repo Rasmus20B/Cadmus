@@ -1,16 +1,34 @@
 
-pub mod token;
 pub mod context;
+mod parser;
+pub mod token;
 
-use super::calculation::token::{Token, Function, GetArgument};
-use super::calculation::context::CalculationContext;
-use std::str::Chars;
-
+use super::calculation::token::{Token, Function, GetArgument}; use super::calculation::context::CalculationContext; use super::calculation::parser::*;
 use crate::util::encoding_util::fm_string_decrypt;
 
-use crate::emulator3::Emulator;
-
 use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone)]
+enum Value {
+    Number(f64),
+    Text(String),
+}
+
+impl Value {
+    fn as_number(&self) -> f64 {
+        match self {
+            Value::Number(n) => *n,
+            Value::Text(s) => s.chars().filter(|c| c.is_numeric() || *c == '.').collect::<String>().parse().unwrap_or(0.0),
+        }
+    }
+
+    fn as_text(&self) -> String {
+        match self {
+            Value::Number(n) => n.to_string(),
+            Value::Text(s) => s.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Calculation(pub Vec<u8>);
@@ -35,12 +53,25 @@ impl Calculation {
         let mut result = vec![];
         let mut ptr = 0;
         while ptr < self.0.len() {
+            //println!("{}", self.0[ptr]);
             match self.0[ptr] {
                 0x4 => {
                     result.push(Token::OpenParen)
                 }
                 0x5 => {
                     result.push(Token::CloseParen);
+                }
+                12 => {
+                    println!("We do space");
+                    ptr += 1;
+                    if self.0[ptr] != 19 {  } // error
+                    ptr += 1;
+                    if self.0[ptr] != 1 {  } // error
+                    ptr += 1;
+                    if self.0[ptr] != 122 {  } // error
+                    ptr += 1;
+                    if self.0[ptr] != 0 { } // error
+                    ptr += 1;
                 }
                 0x2d => {
                     result.push(Token::Function(Function::Abs))
@@ -78,12 +109,11 @@ impl Calculation {
                 }
                 0x10 => {
                     /* decode number */
-                    let end = ptr + 19;
+                    let end = ptr + 20;
                     while ptr < end {
                         let cur = self.0[ptr];
-                        if self.0[ptr] == 8 {
+                        if ptr == end - 11 {
                             result.push(Token::Number(cur as f64));
-                            break;
                         }
                         ptr += 1;
                     }
@@ -99,36 +129,47 @@ impl Calculation {
                     ptr += 1;
                     let len = self.0[ptr] as usize;
                     result.push(Token::Variable(String::from(&fm_string_decrypt(&self.0[ptr..ptr+len]))));
+                    ptr += len;
                 },
                 0x25 => {
                     result.push(Token::Add);
+                    ptr += 1;
                 }
                 0x26 => {
                     result.push(Token::Subtract);
+                    ptr +=1;
                 }
                 0x27 => {
                     result.push(Token::Multiply);
+                    ptr += 1;
                 }
                 0x28 => {
                     result.push(Token::Divide);
+                    ptr +=1;
                 },
                 0x41 => {
                     result.push(Token::Less);
+                    ptr +=1;
                 }
                 0x43 => {
                     result.push(Token::LessEqual);
+                    ptr +=1;
                 }
                 0x44 => {
                     result.push(Token::Equal);
+                    ptr +=1;
                 }
                 0x46 => {
                     result.push(Token::NotEqual);
+                    ptr +=1;
                 }
                 0x47 => {
-                    result.push(Token::GreaterEqual)
+                    result.push(Token::GreaterEqual);
+                    ptr +=1;
                 }
                 0x49 => {
                     result.push(Token::Greater);
+                    ptr +=1;
                 }
                 0x50 => {
                     result.push(Token::Concatenate);
@@ -140,8 +181,88 @@ impl Calculation {
         result
     }
 
-    pub fn eval<T>(&self, context: &T) -> String where T: CalculationContext {
-        todo!()
+    pub fn eval<T>(&self, ctx: &T) -> Result<String, String> where T: CalculationContext {
+        let tokens = self.lex();
+        println!("TOKENS: ");
+        for t in &tokens {
+            println!("{:?}", t);
+        }
+        let ast = parser::Parser::new(&tokens).parse();
+        match ast.eval(ctx) {
+            Ok(inner) => Ok(inner.as_text()),
+            Err(e) => Err(e)
+        }
+    }
+}
+
+
+impl Expr {
+    pub fn eval<T>(&self, ctx: &T) -> Result<Value, String> where T: CalculationContext {
+        match self {
+            Expr::Number(n) => Ok(Value::Text(n.to_string())), // Numbers are stored as text initially
+            Expr::String(s) => Ok(Value::Text(s.to_string())),
+            
+            Expr::Variable(name) => ctx.get_var(name)
+                .map(|val| Ok(Value::Text(val.clone())))
+                .unwrap_or(Ok(Value::Text("".to_string()))),
+            
+            Expr::Global(name) => ctx.get_global_var(name)
+                .map(|val| Ok(Value::Text(val.clone())))
+                .unwrap_or(Ok(Value::Text("".to_string()))),
+
+            Expr::FieldReference(reference) => {
+                // Query database manager
+                ctx.lookup_field(reference.clone())
+                .map(|val| Value::Text(val))
+                .ok_or_else(|| format!("Field not found: {:?}", reference))
+            }
+
+            Expr::BinaryOp { left, op, right } => {
+                let left_val = left.eval(ctx)?;
+                let right_val = right.eval(ctx)?;
+                match op {
+                    Token::Add => Ok(Value::Number(left_val.as_number() + right_val.as_number())),
+                    Token::Subtract => Ok(Value::Number(left_val.as_number() - right_val.as_number())),
+                    Token::Multiply => Ok(Value::Number(left_val.as_number() * right_val.as_number())),
+                    Token::Divide => {
+                        let denom = right_val.as_number();
+                        if denom == 0.0 {
+                            Err("Division by zero".to_string())
+                        } else {
+                            Ok(Value::Number(left_val.as_number() / denom))
+                        }
+                    }
+                    Token::Concatenate => Ok(Value::Text(left_val.as_text() + &right_val.as_text())), // Concatenation
+                    _ => Err("Unsupported binary operator".to_string()),
+                }
+            }
+
+            Expr::UnaryOp { op, expr } => {
+                let val = expr.eval(ctx)?;
+                match op {
+                    Token::Subtract => Ok(Value::Number(-val.as_number())),
+                    _ => Err("Unsupported unary operator".to_string()),
+                }
+            }
+
+            Expr::FunctionCall { name, args } => {
+                let arg_vals: Result<Vec<Value>, _> = args.iter().map(|arg| arg.eval(ctx)).collect();
+                let arg_vals = arg_vals?;
+                match name.as_str() {
+                    "Abs" => arg_vals.get(0).map(|v| Ok(Value::Number(v.as_number().abs()))).unwrap_or(Err("Missing argument for Abs".to_string())),
+                    "UpperCase" => arg_vals.get(0).map(|v| Ok(Value::Text(v.as_text().to_uppercase()))).unwrap_or(Err("Missing argument for UpperCase".to_string())),
+                    _ => Err(format!("Unknown function: {}", name)),
+                }
+            }
+
+            Expr::Subscript { array, index } => {
+                let array_val = array.eval(ctx)?.as_text(); // Assume arrays are stored as text
+                let index_val = index.eval(ctx)?.as_number() as usize;
+                array_val.chars().nth(index_val)
+                    .map(|c| Ok(Value::Text(c.to_string())))
+                    .unwrap_or(Err("Index out of bounds".to_string()))
+            }
+        }
     }
 }
 
@@ -281,6 +402,8 @@ mod tests {
     use super::token::Token;
     use super::Calculation;
     use super::lex_text;
+    use super::parser::*;
+    use super::context::DummyContext;
 
     use crate::dbobjects::schema::Schema;
     #[test]
@@ -351,6 +474,13 @@ mod tests {
             Token::CloseParen,
         ];
         assert_eq!(lex_text(code), expected);
+    }
+
+    #[test]
+    fn addition_eval() {
+        let code = Calculation::from_text("3 + 12");
+        println!("COde: {:?}", code);
+        assert_eq!(code.eval(&DummyContext::new()).unwrap(), "15".to_string());
     }
 }
 

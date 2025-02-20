@@ -1,14 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-use crate::emulator2::database_mgr::DatabaseMgr;
-
-pub enum ResolveErr {
-}
-
-pub trait Resolvable {
-    type Output;
-    fn resolve(&self, from: String, db_mgr: &DatabaseMgr) -> Result<Self::Output, ResolveErr>;
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct FieldReference {

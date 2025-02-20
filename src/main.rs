@@ -11,7 +11,6 @@ mod hbam2;
 mod schema;
 mod fm_script_engine;
 mod dbobjects;
-mod emulator2;
 mod emulator3;
 mod cli;
 mod diff;

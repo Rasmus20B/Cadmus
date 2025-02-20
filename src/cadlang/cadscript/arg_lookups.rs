@@ -4,11 +4,14 @@
 
 
 
-pub struct ArgLookupTable([(&'static str, u8, &'static str); 12]);
+pub struct ArgLookupTable([(&'static str, u8, &'static str); 14]);
 
 impl ArgLookupTable {
     pub const fn new() -> Self {
         Self([
+
+            ("go_to_record", 0, "record"),
+
             ("set_variable", 0, "var"),
             ("set_variable", 1, "expr"),
             ("set_variable", 2, "rep"),
@@ -26,6 +29,7 @@ impl ArgLookupTable {
 
             ("exit_loop_if", 0, "expr"),
 
+            ("assert", 0, "expr"),
             ("print", 0, "expr"),
         ])
     }

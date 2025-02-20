@@ -47,46 +47,44 @@ layout %2 SalaryLevel : SalaryLevel = {
 }
 
 test %1 multi_crit_test = {
-  define multi_crit_test() {
-    go_to_layout("Person");
-    new_record_request();
-    show_custom_dialog("new rec");
-    set_field(Person::name, "first");
-    set_field(Person::salary, 40000);
-    show_custom_dialog("added first");
-    new_record_request();
-    set_field(Person::name, "second");
-    set_field(Person::salary, 60000);
-    show_custom_dialog("added second");
-    new_record_request();
-    set_field(Person::name, "third");
-    set_field(Person::salary, 20000);
-    new_record_request();
-    set_field(Person::name, "fourth");
-    set_field(Person::salary, 100000);
+    go_to_layout(Person)
+    new_record_request()
+    print(|"new rec"|)
+    set_field(Person::name, |"first"|)
+    set_field(Person::salary, |40000|)
+    print("added first")
+    new_record_request()
+    set_field(Person::name, |"second"|)
+    set_field(Person::salary, |60000|)
+    print(|"added second"|)
+    new_record_request()
+    set_field(Person::name, |"third"|)
+    set_field(Person::salary, |20000|)
+    new_record_request()
+    set_field(Person::name, |"fourth"|)
+    set_field(Person::salary, |100000|)
 
-    go_to_layout("SalaryLevel");
-    show_custom_dialog("moved to salarylvel");
-    new_record_request();
-    set_field(SalaryLevel::id, 1);
-    set_field(SalaryLevel::start, 30000);
-    set_field(SalaryLevel::end, 50000);
-    new_record_request();
-    set_field(SalaryLevel::id, 2);
-    set_field(SalaryLevel::start, 90000);
-    set_field(SalaryLevel::end, 120000);
+    go_to_layout(SalaryLevel)
+    print(|"moved to salarylvel"|)
+    new_record_request()
+    set_field(SalaryLevel::id, |1|)
+    set_field(SalaryLevel::start, |30000|)
+    set_field(SalaryLevel::end, |50000|)
+    new_record_request()
+    set_field(SalaryLevel::id, |2|)
+    set_field(SalaryLevel::start, |90000|)
+    set_field(SalaryLevel::end, |120000|)
 
-    go_to_layout("Person");
-    go_to_record("first");
-    assert(SalaryLevel::id == 1);
-    go_to_record("next");
-    assert(Count(SalaryLevel::id) == 0);
-    go_to_record("next");
-    assert(Count(SalaryLevel::id) == 0);
-    go_to_record("next");
-    assert(Count(SalaryLevel::id) == 1);
-    assert(SalaryLevel::id == 2);
-  }
+    go_to_layout(Person)
+    go_to_record("first")
+    assert(|SalaryLevel::id == 1|)
+    go_to_record("next")
+    assert(|Count(SalaryLevel::id) == 0|)
+    go_to_record("next")
+    assert(|Count(SalaryLevel::id) == 0|)
+    go_to_record("next")
+    assert(|Count(SalaryLevel::id) == 1|)
+    assert(|SalaryLevel::id == 2|)
 }
 
 

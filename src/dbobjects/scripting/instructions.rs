@@ -21,7 +21,7 @@ use super::arguments::*;
 	InsertFromLastVisited,
 	InsertCurrentDate,
 	InsertCurrentTime,
-	GoToRecordRequestPage,
+	GoToRecordRequestPage { record: RecordSelection },
 	GoToField,
 	CheckSelection,
 	CheckRecord,
@@ -199,7 +199,7 @@ use super::arguments::*;
 	SetDictionary,
 	PerformScriptOnServerWithCallback,
 	TriggerClarisConnectFlow,
-        Assert,
+        Assert { expr: Calculation },
 }
 
 //impl FromStr for Instruction {
