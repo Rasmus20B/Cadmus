@@ -15,12 +15,17 @@ use super::emulator3::window::Window;
 use crate::dbobjects::scripting::script::Script;
 
 
+#[derive(Debug, Clone)]
 pub struct EmulatorState {
+    pub active_database: String,
+    pub active_window: u32,
 }
 
 impl EmulatorState {
     pub fn new() -> Self {
         Self {
+            active_database: String::new(),
+            active_window: 0,
         }
     }
 }
@@ -44,7 +49,7 @@ impl<'a> Emulator<'a> {
 
     pub fn load_file(&mut self, path: String) {
         let db = self.database_mgr.load_file(path);
-        let window = self.window_mgr.add_window(db);
+        self.state.active_window = self.window_mgr.add_window(db);
         // For now, we will assume all external files are needed as soon
         // as the specified file is opened.
 
@@ -55,9 +60,14 @@ impl<'a> Emulator<'a> {
 
     pub fn run_test_with_file(&mut self, test: &'a Script, path: String) {
         println!("Running test: {} on file: {}", test.name, path);
-        for instr in &test.instructions {
-            println!("{:?}", instr);
+        //for instr in &test.instructions {
+        //    println!("{:?}", instr);
+        //}
+        self.load_file(path.clone());
+        for (name, db) in &self.database_mgr.databases {
+            println!("{}", name);
         }
+        self.state.active_database = path;
         let status = self.script_mgr.run_script(&test, &mut self.database_mgr, &mut self.window_mgr, &mut self.state);
         println!("{:?}", status);
     }

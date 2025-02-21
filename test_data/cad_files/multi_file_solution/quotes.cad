@@ -39,6 +39,9 @@ table_occurrence %5 MaterialJoin : MaterialJoin
 layout %1 Quotes : Quotes = {
 }
 
+layout %2 MatJoin : MaterialJoin = {
+}
+
 relation %1 = Quotes::customer_id == Customers::id
 relation %2 = Quotes::id == MaterialJoin::quote_id
 relation %3 = MaterialJoin::material_id == Materials::id
@@ -53,6 +56,7 @@ test %1 make_10_quotes = {
   loop {
     exit_loop_if(|$i = 10|)
     new_record()
+    set_field(Quotes::id, |$i|)
     set_variable($i, |$i + 1|)
   }
 }

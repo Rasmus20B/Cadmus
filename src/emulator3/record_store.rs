@@ -27,7 +27,7 @@ impl RecordStore {
 
         records.push(Record {
             id: records.iter().max_by(|a, b| a.id.cmp(&b.id)).unwrap_or(&Record { id: 0, fields: vec![] }).id + 1,
-            fields: table.fields.iter().map(|field| (field.1.id, String::new())).collect(),
+            fields: table.fields.iter().inspect(|f| println!("pushing field: {}", f.1.name)).map(|field| (field.1.id, String::new())).collect(),
         });
     }
 

@@ -64,6 +64,30 @@ impl<'a> ScriptMgr<'a> {
 
             match &cur_instr.instruction {
                 Instruction::NewRecordRequest => {
+                    let window = window_mgr.windows.get(&state.active_window).unwrap();
+
+                    let occ = db_mgr.databases.get(&state.active_database)
+                        .unwrap()
+                        .file.layouts.iter()
+                        .find(|search| search.id == window.layout_id).unwrap()
+                        .occurrence.table_occurrence_id;
+
+                    let table_id = db_mgr.databases.get(&state.active_database)
+                        .unwrap().file.schema.relation_graph.nodes.iter()
+                        .find(|search| search.id == occ)
+                        .map(|found| found.base.table_id)
+                        .unwrap();
+
+                    let table = db_mgr.databases.get(&state.active_database)
+                        .unwrap().file.schema.tables.iter()
+                        .find(|search| search.id == table_id)
+                        .unwrap().clone();
+
+                    db_mgr.databases.get_mut(&state.active_database).unwrap()
+                        .records.new_record(&table);
+
+                    println!("{:?}", db_mgr.databases.get(&state.active_database).unwrap()
+                        .records.records_by_table.get(&table_id));
                     ip.0 += 1;
                 }
                 Instruction::SetVariable { name, value, repetition } => {
@@ -82,6 +106,42 @@ impl<'a> ScriptMgr<'a> {
                     self.set_var(name, val);
                     ip.0 += 1;
                 }
+                Instruction::SetField { field, value, repetition } => {
+
+                    let context = EmulatorContext {
+                        database_mgr: &*db_mgr,
+                        variables: self.variables.last().unwrap(),
+                        globals: &self.globals,
+                        window_mgr: &*window_mgr,
+                        state: &*state,
+                    };
+                    let val = value.eval(&context).unwrap();
+
+                    let occurrence = db_mgr.databases.get(&state.active_database)
+                        .unwrap()
+                        .file.schema.relation_graph.nodes.iter()
+                        .find(|occ| occ.id == field.table_occurrence_id)
+                        .unwrap();
+
+                    let source_table = occurrence.base.table_id;
+                    let ds = occurrence.base.data_source;
+
+                    if ds == 0 {
+                        // Same data source as starting table
+                        db_mgr.databases.get_mut(&state.active_database).unwrap()
+                            .records.set_field(source_table, 1, field.field_id, val)
+                    } else {
+                        let source = db_mgr.databases.get(&state.active_database).unwrap()
+                            .file.data_sources.iter()
+                            .find(|source| source.id == ds)
+                            .map(|source| source.name.clone())
+                            .unwrap();
+
+                        let other_handle = db_mgr.databases.get_mut(&source).unwrap();
+                        other_handle.records.set_field(source_table, 1, field.field_id, val);
+                    }
+                    ip.0 += 1;
+                },
                 Instruction::Loop => {
                     self.loop_stack.push(ip.0);
                     ip.0 += 1;

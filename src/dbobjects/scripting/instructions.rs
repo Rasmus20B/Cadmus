@@ -76,7 +76,7 @@ use super::arguments::*;
 	EndLoop,
 	GoToRelatedRecord,
 	CommitRecordsRequests,
-	SetField { field: FieldReference, value: Calculation },
+	SetField { field: FieldReference, value: Calculation, repetition: Calculation },
 	InsertCalculatedResult,
 	FreezeWindow,
 	RefreshWindow,

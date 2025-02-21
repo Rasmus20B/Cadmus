@@ -9,6 +9,11 @@ pub enum ProtoLayoutSelection {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ProtoFieldSelection {
+    UnresolvedReference { occurrence: String, field: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 #[repr(u16)] pub enum ProtoInstruction {
 	PerformScript { script: ScriptSelection, args: CalculationString },
 	SaveACopyAsXml,
@@ -78,7 +83,7 @@ pub enum ProtoLayoutSelection {
 	EndLoop,
 	GoToRelatedRecord,
 	CommitRecordsRequests,
-	SetField { field: FieldReference, value: CalculationString },
+	SetField { field: ProtoFieldSelection, value: CalculationString, repetition: CalculationString },
 	InsertCalculatedResult,
 	FreezeWindow,
 	RefreshWindow,

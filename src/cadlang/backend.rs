@@ -21,7 +21,7 @@ use crate::dbobjects::{
     }
 };
 use super::staging::*;
-use super::cadscript::proto_instruction::ProtoInstruction;
+use super::cadscript::proto_instruction::{ProtoInstruction, ProtoFieldSelection};
 
 use std::collections::{HashSet, HashMap, BTreeMap};
 
@@ -340,6 +340,43 @@ fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationG
         tmp.instructions = script.instructions.iter().enumerate().map(|(i, instr)| {
            ScriptStep { id: i as u32, instruction: match instr {
                 ProtoInstruction::NewRecordRequest => Instruction::NewRecordRequest,
+                ProtoInstruction::SetField { field, value, repetition } => Instruction::SetField {
+                    field: match field {
+                        ProtoFieldSelection::UnresolvedReference { occurrence, field } => {
+                            let node = graph.nodes
+                                .iter()
+                                .find(|search_occ| search_occ.name == *occurrence)
+                                .unwrap();
+
+                            let occ_id = node.id;
+                            let (external_ds, table_id) = (node.base.data_source, node.base.table_id);
+
+                            let field_id_ = if external_ds == 0 {
+                                stage.tables.get(&(table_id as u16)).unwrap()
+                                    .fields.iter()
+                                    .find(|search| search.1.name.value == *field)
+                                    .map(|f| f.1.id)
+                                    .unwrap()
+                            } else {
+                                let data_source = externs.get(&external_ds).unwrap();
+                                data_source.tables.get(&(table_id as u16)).unwrap()
+                                    .fields.iter()
+                                    .find(|search| search.1.name.value == *field)
+                                    .map(|f| f.1.id)
+                                    .unwrap()
+                            };
+
+                            FieldReference { 
+                                data_source: external_ds,
+                                table_occurrence_id: occ_id, 
+                                field_id: field_id_ as u32,
+                            }
+
+                        },
+                    },
+                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
+                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph),
+                },
                 ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
                     name: name.to_string(),
                     value: encode_calculation(value.0.as_str(), stage, externs, graph),
@@ -376,6 +413,43 @@ fn build_tests(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGra
         tmp.instructions = script.instructions.iter().enumerate().map(|(i, instr)| {
            ScriptStep { id: i as u32, instruction: match instr {
                 ProtoInstruction::NewRecordRequest => Instruction::NewRecordRequest,
+                ProtoInstruction::SetField { field, value, repetition } => Instruction::SetField {
+                    field: match field {
+                        ProtoFieldSelection::UnresolvedReference { occurrence, field } => {
+                            let node = graph.nodes
+                                .iter()
+                                .find(|search_occ| search_occ.name == *occurrence)
+                                .unwrap();
+
+                            let occ_id = node.id;
+                            let (external_ds, table_id) = (node.base.data_source, node.base.table_id);
+
+                            let field_id_ = if external_ds == 0 {
+                                stage.tables.get(&(table_id as u16)).unwrap()
+                                    .fields.iter()
+                                    .find(|search| search.1.name.value == *field)
+                                    .map(|f| f.1.id)
+                                    .unwrap()
+                            } else {
+                                let data_source = externs.get(&external_ds).unwrap();
+                                data_source.tables.get(&(table_id as u16)).unwrap()
+                                    .fields.iter()
+                                    .find(|search| search.1.name.value == *field)
+                                    .map(|f| f.1.id)
+                                    .unwrap()
+                            };
+
+                            FieldReference { 
+                                data_source: external_ds,
+                                table_occurrence_id: occ_id, 
+                                field_id: field_id_ as u32,
+                            }
+
+                        },
+                    },
+                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
+                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph),
+                },
                 ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
                     name: name.to_string(),
                     value: encode_calculation(value.0.as_str(), stage, externs, graph),

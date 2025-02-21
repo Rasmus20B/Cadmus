@@ -6,20 +6,19 @@ use super::database::Database;
 use super::window::Window;
 
 pub struct WindowMgr {
-    windows: BTreeMap<u32, Window>,
-    current: Option<u32>,
+    pub windows: BTreeMap<u32, Window>,
 }
 
 impl WindowMgr {
     pub fn new() -> Self {
         Self {
             windows: BTreeMap::new(),
-            current: None,
         }
     }
 
-    pub fn add_window(&mut self, database: &Database) {
-        let layout_id = database.file.layouts.get(0).unwrap().id;
+    pub fn add_window(&mut self, database: &Database) -> u32 {
+        let layout_id = database.file.layouts.iter().inspect(|l| println!("Layout: {}::{}::{:?}", l.id, l.name, l.occurrence)).min_by(|a, b| a.id.cmp(&b.id)).unwrap().id;
+        println!("Chosen: {}", layout_id);
         let window_id = self.windows.len() as u32;
         self.windows.insert(window_id,
             Window::new()
@@ -28,5 +27,7 @@ impl WindowMgr {
                 .database(database.file.name.clone())
                 .layout_id(layout_id)
             );
+
+        window_id
     }
 }

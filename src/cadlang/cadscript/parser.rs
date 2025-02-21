@@ -1,7 +1,7 @@
 
 use crate::dbobjects::{calculation::{Calculation, CalculationString}, scripting::{instructions::Instruction, arguments::*, script::Script}};
 use super::token::TokenVal;
-use super::proto_instruction::{ProtoInstruction, ProtoLayoutSelection};
+use super::proto_instruction::{ProtoInstruction, ProtoFieldSelection, ProtoLayoutSelection};
 
 use std::collections::HashMap;
 use super::arg_lookups::ARG_LOOKUP;
@@ -246,6 +246,26 @@ pub fn parse(tokens: Vec<TokenVal>) -> Result<Vec<ProtoInstruction>, ParseErr> {
                     .clone()) 
             },
             "new_record" | "new_request" => ProtoInstruction::NewRecordRequest,
+            "set_field" => {
+                let name = arguments.iter().find(|arg| arg.label == "field").unwrap();
+                let val = arguments.iter().find(|arg| arg.label == "expr").unwrap();
+                let rep = arguments.iter().find(|arg| arg.label == "rep");
+                let rep = match rep {
+                    Some(rep) => rep,
+                    None => &ArgKeyVal { 
+                        label: String::from("rep"),
+                        value: TokenVal::CalculationArg(String::from("1")) 
+                    },
+                };
+                ProtoInstruction::SetField {
+                    field: match &name.value { 
+                        TokenVal::FieldReference(table_, field_) => ProtoFieldSelection::UnresolvedReference { occurrence: table_.to_string(), field: field_.to_string() },
+                        _ => unreachable!(),
+                    },
+                    value: CalculationString(val.value.get_value().unwrap()),
+                    repetition: CalculationString(rep.value.get_value().unwrap()),
+                }
+            },
             "go_to_layout" => {
                 let layout_ = match &arguments.iter().find(|arg| arg.label == "layout").unwrap().value {
                     TokenVal::CalculationArg(calc) => ProtoLayoutSelection::Calculation(CalculationString(calc.to_string())),
