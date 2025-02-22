@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::cmp::Ordering;
 
-use crate::dbobjects::schema::table::Table;
+use crate::dbobjects::schema::table::{Table, TableID};
 
 #[derive(Debug, PartialEq)]
 pub struct Record {
@@ -12,7 +12,7 @@ pub struct Record {
 
 #[derive(Debug, PartialEq)]
 pub struct RecordStore {
-    pub records_by_table: HashMap<u32, Vec<Record>>,
+    pub records_by_table: HashMap<TableID, Vec<Record>>,
 }
 
 impl RecordStore {
@@ -22,13 +22,15 @@ impl RecordStore {
         }
     }
 
-    pub fn new_record(&mut self, table: &Table) {
+    pub fn new_record(&mut self, table: &Table) -> u32 {
         let records = self.records_by_table.get_mut(&table.id).unwrap();
 
         records.push(Record {
             id: records.iter().max_by(|a, b| a.id.cmp(&b.id)).unwrap_or(&Record { id: 0, fields: vec![] }).id + 1,
             fields: table.fields.iter().inspect(|f| println!("pushing field: {}", f.1.name)).map(|field| (field.1.id, String::new())).collect(),
         });
+
+        records.iter().max_by(|a, b| a.id.cmp(&b.id)).unwrap().id
     }
 
     pub fn set_field(&mut self, table: u32, record: u32, field: u32, value: String) {

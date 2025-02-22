@@ -543,6 +543,14 @@ mod tests {
                     data_source: 0,
                     table_occurrence_id: 1,
                 }
+            },
+            Layout {
+                id: 2,
+                name: String::from("MatJoin"),
+                occurrence: TableOccurrenceReference {
+                    data_source: 0,
+                    table_occurrence_id: 5,
+                }
             }
         ];
         assert_eq!(file.layouts, expected_layouts);

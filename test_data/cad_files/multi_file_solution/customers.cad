@@ -34,4 +34,6 @@ table %2 Customers_BACKUP = {
   }
 }
 
-
+table_occurrence %1 Customers : Customers
+table_occurrence %2 Customers_Name_Duplicates : Customers
+table_occurrence %3 Customers_BACKUP : Customers_BACKUP

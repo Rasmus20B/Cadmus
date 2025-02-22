@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use super::field::Field;
 
+pub type TableID = u32;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Table {
     pub id: u32,

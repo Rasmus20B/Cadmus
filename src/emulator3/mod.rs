@@ -2,6 +2,7 @@
 mod context;
 mod database;
 mod database_mgr;
+mod find;
 mod record_store;
 mod script_mgr;
 mod window_mgr;
@@ -50,6 +51,8 @@ impl<'a> Emulator<'a> {
     pub fn load_file(&mut self, path: String) {
         let db = self.database_mgr.load_file(path);
         self.state.active_window = self.window_mgr.add_window(db);
+        let window = self.window_mgr.windows.get_mut(&self.state.active_window).unwrap();
+        window.init_found_sets(db);
         // For now, we will assume all external files are needed as soon
         // as the specified file is opened.
 

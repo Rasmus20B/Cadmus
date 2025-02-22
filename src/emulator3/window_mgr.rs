@@ -27,7 +27,6 @@ impl WindowMgr {
                 .database(database.file.name.clone())
                 .layout_id(layout_id)
             );
-
         window_id
     }
 }
