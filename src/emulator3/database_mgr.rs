@@ -16,6 +16,7 @@ impl DatabaseMgr {
     }
 
     pub fn load_file(&mut self, path: String) -> &Database {
+        println!("opening {}", path);
         if path.ends_with(".cad") {
             // load cad file
             let cadcode = read_to_string(&path).unwrap();

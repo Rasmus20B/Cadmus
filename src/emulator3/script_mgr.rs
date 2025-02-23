@@ -3,12 +3,14 @@ use super::database_mgr::DatabaseMgr;
 use super::window_mgr::WindowMgr;
 use super::EmulatorState;
 use super::context::EmulatorContext;
+use super::ManagerRefs;
 
 use crate::dbobjects::scripting::{script::Script, instructions::Instruction};
 use crate::dbobjects::calculation::Calculation;
 
-pub struct ScriptMgr<'a> {
-    pub program_counters: Vec<(u32, &'a Script)>,
+
+pub struct ScriptMgr {
+    pub program_counters: Vec<(u32, Script)>,
     pub variables: Vec<Vec<(String, String)>>,
     pub globals: Vec<(String, String)>,
 
@@ -19,7 +21,7 @@ pub struct ScriptMgr<'a> {
 pub enum ScriptErr {
 }
 
-impl<'a> ScriptMgr<'a> {
+impl ScriptMgr {
     pub fn new() -> Self {
         Self {
             program_counters: vec![],
@@ -55,9 +57,11 @@ impl<'a> ScriptMgr<'a> {
         }
     }
 
-    pub fn run_script(&mut self, test: &'a Script, db_mgr: &mut DatabaseMgr, window_mgr: &mut WindowMgr, state: &mut EmulatorState) -> Result<(), ScriptErr> {
+    pub fn run_script(&mut self, test: Script, managers: ManagerRefs, state: &mut EmulatorState) -> Result<(), ScriptErr> {
         self.program_counters.push((0, test));
         self.variables.push(vec![]);
+
+        let (window_mgr, db_mgr) = (managers.window_mgr, managers.database_mgr);
 
         while let Some(mut ip) = self.program_counters.pop() {
             let cur_instr = &ip.1.instructions[ip.0 as usize];
@@ -208,11 +212,8 @@ mod tests {
         let code = read_to_string(Path::new("test_data/cad_files/multi_file_solution/quotes.cad")).unwrap();
         stored_tests.extend(crate::cadlang::compiler::compile_to_file(code).unwrap().tests);
 
-        let to_run = stored_tests.iter()
-            .find(|test| test.name == "make_10_quotes")
-            .unwrap();
 
-        emulator.run_test_with_file(&to_run, "test_data/cad_files/multi_file_solution/quotes.cad".to_string());
+        emulator.run_test_with_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");
 
         let window = emulator.window_mgr.windows.get(&emulator.state.active_window).unwrap();
         assert_eq!(window.found_sets.len(), 5);

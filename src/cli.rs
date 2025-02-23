@@ -23,6 +23,8 @@ pub enum Command {
         #[clap(long)]
         tests: Option<Vec<String>>,
     },
+    Shell {
+    },
     Sync {
         #[clap(long)]
         cadmus_file: Option<String>,

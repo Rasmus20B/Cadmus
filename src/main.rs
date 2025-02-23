@@ -2,6 +2,7 @@ use std::{fs::read_to_string, path::Path};
 use clap::Parser;
 use cli::CommandLine;
 use hbam2::{api::{self}, page_store::PageStore, path::HBAMPath, chunk::{LocalChunk, LocalChunkContents, Chunk}};
+use shell::Shell;
 
 mod cadlang;
 mod util;
@@ -13,13 +14,16 @@ mod fm_script_engine;
 mod dbobjects;
 mod emulator3;
 mod cli;
-mod diff;
-
-use dbobjects::file::File;
+mod shell;
 
 fn main() -> Result<(), std::io::Error>{
     let args = CommandLine::parse();
     match args.command {
+        cli::Command::Shell { } => {
+            let mut env = emulator3::Emulator::new();
+            let mut shell = Shell::new(&mut env);
+            shell.main_loop().unwrap()
+        },
         cli::Command::Test { file, tests } => {
             let mut env = emulator3::Emulator::new();
             let mut stored_tests = vec![];
@@ -44,11 +48,11 @@ fn main() -> Result<(), std::io::Error>{
                         .iter()
                         .find(|search| search.name == test)
                         .unwrap();
-                    env.run_test_with_file(&to_run, filename.clone());
+                    env.run_test_with_file(&to_run.name, &filename);
                 }
             } else {
                 for test in &stored_tests {
-                    env.run_test_with_file(&test, filename.clone())
+                    env.run_test_with_file(&test.name, &filename);
                 }
             }
         },

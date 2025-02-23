@@ -57,7 +57,7 @@ impl FoundSet {
 mod tests {
     use std::fs::read_to_string;
     use std::path::Path;
-    use super::{Database, super::Window};
+    use super::{Database, super::window::Window};
     #[test]
     fn basic_find() {
         let db_file = crate::cadlang::compiler::compile_to_file(read_to_string(Path::new("test_data/cad_files/multi_file_solution/customers.cad")).unwrap()).unwrap();

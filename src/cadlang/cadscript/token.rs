@@ -47,3 +47,6 @@ pub struct Token {
     pub value: TokenVal,
     pub location: (usize, usize),
 }
+
+impl Token {
+}
