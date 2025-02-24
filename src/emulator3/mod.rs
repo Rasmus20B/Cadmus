@@ -4,6 +4,7 @@ mod database;
 mod database_mgr;
 mod find;
 mod record_store;
+mod relation_path;
 mod script_mgr;
 mod window_mgr;
 mod window;
@@ -57,8 +58,8 @@ impl Emulator {
         }
     }
 
-    pub fn load_file(&mut self, path: String) -> &Database {
-        let db = self.database_mgr.load_file(path.clone());
+    pub fn load_file(&mut self, path: &str) -> &Database {
+        let db = self.database_mgr.load_file(path);
         self.state.active_window = self.window_mgr.add_window(db);
         let window = self.window_mgr.windows.get_mut(&self.state.active_window).unwrap();
         window.init_found_sets(db);
@@ -66,14 +67,14 @@ impl Emulator {
         // as the specified file is opened.
 
         for externs in db.file.data_sources.clone() {
-            self.database_mgr.load_file(externs.paths[0].clone());
+            self.database_mgr.load_file(&externs.paths[0]);
         }
-        self.database_mgr.databases.get(&path).unwrap()
+        self.database_mgr.databases.get(path).unwrap()
     }
 
     pub fn run_test_with_file(&mut self, test_name: &str, path: &str) -> Result<(), EmulatorErr>{
         self.state.active_database = path.to_string();
-        let file = &self.load_file(path.to_string()).file.tests;
+        let file = &self.load_file(path).file.tests;
         let test = match file
             .iter()
             .find(|search| &search.name == test_name) {
