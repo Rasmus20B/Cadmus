@@ -21,17 +21,23 @@ impl DatabaseMgr {
      * This includes: Table occurrence and record ID.
      * We also need to supply information about the field we are looking for:
      * This is just the FieldReference itself. */
-    pub fn get_field(&self, from: (TableOccurrenceReference, u32),
+    pub fn get_field(&self,
+        from: (TableOccurrenceReference, u32),
         to: FieldReference,
-        active_database: &str) -> String {
+        active_database: &str
+        ) -> String {
 
         let cur_db = self.databases.get(active_database).unwrap();
+        let graph = &cur_db.file.schema.relation_graph;
+        let target_database = cur_db.file.data_sources.iter()
+            .find(|source| source.id == to.data_source);
 
         let from_table_id = cur_db
             .file.schema.relation_graph.nodes.iter()
             .find(|to| to.id == from.0.table_occurrence_id).unwrap()
             .base.table_id;
 
+        
             todo!();
 
 
