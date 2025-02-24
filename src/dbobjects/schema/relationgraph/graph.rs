@@ -15,14 +15,12 @@ impl RelationGraph {
         }
     }
 
-    fn get_path(&self, node1: u32, node2: u32) -> Vec<u32> {
+    fn get_path(&self, node1: u32, node2: u32) -> Option<Vec<u32>> {
         let mut queue = VecDeque::new();
         let mut visited = vec![];
         let start = self.nodes.iter()
             .find(|node| node.id == node1)
             .unwrap();
-
-        let mut path = vec![];
 
         visited.push((node1, None));
         queue.push_back(node1);
@@ -45,7 +43,7 @@ impl RelationGraph {
                     }
                 }
                 path.reverse();
-                return path
+                return Some(path)
             }
 
             for relation in &current_occurrence.relations {
@@ -55,7 +53,7 @@ impl RelationGraph {
                 }
             }
         }
-        path
+        None
     }
 }
 
@@ -75,12 +73,18 @@ mod tests {
             .find(|occurrence| occurrence.id == 4).unwrap();
         let graph = &db.file.schema.relation_graph;
         let path = graph.get_path(node1.id, node2.id);
-        assert_eq!(path, vec![1, 5, 4]);
+        assert_eq!(path, Some(vec![1, 5, 4]));
         let node1 = db.file.schema.relation_graph.nodes.iter()
             .find(|occurrence| occurrence.id == 1).unwrap();
         let node2 = db.file.schema.relation_graph.nodes.iter()
             .find(|occurrence| occurrence.id == 2).unwrap();
         let path = graph.get_path(node1.id, node2.id);
-        assert_eq!(path, vec![1, 2]);
+        assert_eq!(path, Some(vec![1, 2]));
+        let node1 = db.file.schema.relation_graph.nodes.iter()
+            .find(|occurrence| occurrence.id == 5).unwrap();
+        let node2 = db.file.schema.relation_graph.nodes.iter()
+            .find(|occurrence| occurrence.id == 3).unwrap();
+        let path = graph.get_path(node1.id, node2.id);
+        assert_eq!(path, None);
     }
 }
