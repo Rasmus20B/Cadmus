@@ -15,7 +15,7 @@ impl RelationGraph {
         }
     }
 
-    fn get_path(&self, node1: u32, node2: u32) -> Option<Vec<u32>> {
+    pub fn get_path(&self, node1: u32, node2: u32) -> Option<Vec<u32>> {
         let mut queue = VecDeque::new();
         let mut visited = vec![];
         let start = self.nodes.iter()

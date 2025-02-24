@@ -25,10 +25,14 @@ impl DatabaseMgr {
         from: (TableOccurrenceReference, u32),
         to: FieldReference,
         active_database: &str
-        ) -> String {
+        ) -> Option<String> {
 
         let cur_db = self.databases.get(active_database).unwrap();
         let graph = &cur_db.file.schema.relation_graph;
+        let path = match graph.get_path(from.0.table_occurrence_id, to.table_occurrence_id) {
+            Some(inner) => inner,
+            None => { eprintln!("No relation to occurrence."); return None }
+        };
         let target_database = cur_db.file.data_sources.iter()
             .find(|source| source.id == to.data_source);
 
