@@ -8,8 +8,8 @@ use super::shell::parser::Parser;
 
 pub trait Host {
     fn open_file(&mut self);
-    fn run_test(&mut self, test_name: &str);
-    fn run_test_on_file(&mut self, file_name: &str, test_name: &str);
+    fn run_tests(&mut self, filename: &str);
+    fn run_test_from_file(&mut self, file_name: &str, test_name: &str);
     fn step(&mut self);
 }
 
@@ -64,7 +64,7 @@ impl<'a, T> Shell<'a, T> where T: Host {
             match command {
                 command::Command::Run { test_name, file_name } => {
                     println!("Running {} on file: {}", test_name, file_name);
-                    self.host.run_test_on_file(&file_name, &test_name);
+                    self.host.run_test_from_file(&file_name, &test_name);
                 },
                 command::Command::Quit => {
                     return Ok(())

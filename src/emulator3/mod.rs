@@ -71,10 +71,10 @@ impl Emulator {
         self.database_mgr.databases.get(path).unwrap()
     }
 
-    pub fn run_test_with_file(&mut self, test_name: &str, path: &str) -> Result<(), EmulatorErr>{
+    pub fn run_test_on_file(&mut self, test_name: &str, path: &str) -> Result<(), EmulatorErr>{
         self.state.active_database = path.to_string();
-        let file = &self.load_file(path).file.tests;
-        let test = match file
+        let tests = &self.load_file(path).file.tests;
+        let test = match tests
             .iter()
             .find(|search| &search.name == test_name) {
                 Some(inner) => inner.clone(),
@@ -94,9 +94,17 @@ impl Emulator {
 
 impl Host for Emulator {
     fn open_file(&mut self) { todo!() }
-    fn run_test(&mut self, test_name: &str) { todo!() }
-    fn run_test_on_file(&mut self, filename: &str, test_name: &str) { 
-        self.run_test_with_file(test_name, filename);
+
+    fn run_tests(&mut self, filename: &str) { 
+        let tests = self.load_file(filename).file.tests.iter().map(|test| test.name.clone()).collect::<Vec<String>>();
+
+        for test in tests {
+            self.run_test_from_file(filename, &test);
+        }
+    }
+
+    fn run_test_from_file(&mut self, filename: &str, test_name: &str) { 
+        let _ = self.run_test_on_file(test_name, filename);
     }
     fn step(&mut self) { todo!() }
 }

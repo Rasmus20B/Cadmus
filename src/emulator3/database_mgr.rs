@@ -199,6 +199,10 @@ impl DatabaseMgr {
 
     pub fn load_file(&mut self, path: &str) -> &Database {
         println!("opening {}", path);
+        if self.databases.contains_key(path) {
+            return self.databases.get(path).unwrap()
+        }
+
         if path.ends_with(".cad") {
             // load cad file
             let cadcode = read_to_string(&path).unwrap();

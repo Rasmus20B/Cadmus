@@ -213,7 +213,7 @@ mod tests {
         stored_tests.extend(crate::cadlang::compiler::compile_to_file(code).unwrap().tests);
 
 
-        emulator.run_test_with_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");
+        emulator.run_test_on_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");
 
         let window = emulator.window_mgr.windows.get(&emulator.state.active_window).unwrap();
         assert_eq!(window.found_sets.len(), 5);

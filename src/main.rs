@@ -1,4 +1,5 @@
 use std::{fs::read_to_string, path::Path};
+use crate::shell::Host;
 use clap::Parser;
 use cli::CommandLine;
 use hbam2::{api::{self}, page_store::PageStore, path::HBAMPath, chunk::{LocalChunk, LocalChunkContents, Chunk}};
@@ -26,35 +27,15 @@ fn main() -> Result<(), std::io::Error>{
         },
         cli::Command::Test { file, tests } => {
             let mut env = emulator3::Emulator::new();
-            let mut stored_tests = vec![];
             let filename = if let Some(fmp_file_uw) = file.fmp12_file {
-                let code = read_to_string(Path::new(&fmp_file_uw)).unwrap();
-                stored_tests.extend(cadlang::compiler::compile_to_file(code).unwrap().tests);
                 fmp_file_uw
             } else if let Some(cadmus_file_uw) = file.cadmus_file {
-                let code = read_to_string(Path::new(&cadmus_file_uw)).unwrap();
-                stored_tests.extend(cadlang::compiler::compile_to_file(code).unwrap().tests);
                 cadmus_file_uw
             } else {
                 String::new()
             };
-
-
-            println!("{:?}", stored_tests);
-
-            if let Some(tests) = tests {
-                for test in tests {
-                    let to_run = stored_tests
-                        .iter()
-                        .find(|search| search.name == test)
-                        .unwrap();
-                    env.run_test_with_file(&to_run.name, &filename);
-                }
-            } else {
-                for test in &stored_tests {
-                    env.run_test_with_file(&test.name, &filename);
-                }
-            }
+            println!("file: {}", filename);
+            env.run_tests(&filename);
         },
         cli::Command::Sync { cadmus_file, fmp_file } => todo!(),
         cli::Command::Hbam { fmp_file, print_dir, .. } => {
