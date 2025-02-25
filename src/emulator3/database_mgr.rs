@@ -1,9 +1,11 @@
 
 use std::collections::HashMap;
 
-use crate::dbobjects::reference::{FieldReference, TableOccurrenceReference};
+use crate::dbobjects::reference::{TableReference, FieldReference, TableOccurrenceReference};
+use crate::dbobjects::schema::relationgraph::relation::*;
 
 use super::database::Database;
+use super::record_store::Record;
 use std::fs::read_to_string;
 
 pub struct DatabaseMgr {
@@ -17,6 +19,111 @@ impl DatabaseMgr {
         }
     }
 
+    pub fn compare_records<'a>(&'a self,
+        table1: &Vec<Record>,
+        table2: &Vec<Record>,
+        relation: &Relation) -> Vec<u32> {
+            let mut related_records = vec![];
+            for record in table1 {
+                for other in table2 {
+                    for criteria in &relation.criteria {
+                        // TODO: current field value can be cached
+                        let cur_field = record.fields.iter().find(|field| field.0 == criteria.field_self).unwrap();
+                        let next_field = other.fields.iter().find(|field| field.0 == criteria.field_other).unwrap();
+                        if match criteria.comparison {
+                            RelationComparison::Equal => cur_field == next_field,
+                            RelationComparison::NotEqual => cur_field != next_field,
+                            // TODO: Implement the other comparisons
+                            _ => todo!("Other comparisons to be implemented"),
+                        } {
+                            related_records.push(other.id)
+                        }
+                    }
+                }
+            }
+            related_records
+    }
+
+    pub fn get_related_records(&self,
+        from: (TableOccurrenceReference, u32),
+        to: &TableOccurrenceReference,
+        active_database: &str) 
+        -> Option<Vec<u32>> {
+
+            let db = self.databases.get(active_database).unwrap();
+            let cur_table_ref = &db.file.schema.relation_graph.nodes.iter()
+                .find(|source| source.id == from.0.table_occurrence_id)
+                .unwrap().base.table_id;
+
+            let cur_records: &Vec<Record> = db.records.records_by_table
+                .get(cur_table_ref).unwrap();
+
+            let mut cur_records: Vec<&Record> = vec![&cur_records.iter()
+                .find(|record| record.id == from.1).unwrap()];
+
+            println!("Starting records: {:?}", cur_records);
+            let node1 = from.0.table_occurrence_id;
+            let node2 = to.table_occurrence_id;
+
+            let path = db.file.schema.relation_graph.get_path(node1, node2).unwrap();
+
+            for pair in path.windows(2) {
+                let _ = pair[0]; let next = pair[1];
+
+                let next_table_ref = &db.file.schema.relation_graph.nodes.iter()
+                    .find(|occ| occ.id == next).unwrap().base;
+
+                let next_db = if next_table_ref.data_source == 0 {
+                    &db
+                } else {
+                    let target_file = &db.file.data_sources
+                        .iter()
+                        .find(|source| source.id == next_table_ref.data_source)
+                        .unwrap().paths[0];
+
+                    println!("looking for related records in: {}", target_file);
+                    self.databases.get(target_file).unwrap()
+                };
+
+                let next_records = next_db.records.records_by_table.get(&next_table_ref.table_id).unwrap();
+                println!("next tables records\n===========");
+                for record in next_records {
+                    println!("{:?}", record);
+                }
+
+                let relation = db.file.schema.relation_graph.nodes
+                    .iter()
+                    .find(|node| node.id == pair[0]).unwrap().relations
+                    .iter()
+                    .find(|relation| relation.other_occurrence == pair[1]).unwrap();
+
+                let mut related_records = vec![];
+                for record in cur_records {
+                    for other in next_records {
+                        for criteria in &relation.criteria {
+                            // TODO: current field value can be cached
+                            let cur_field = record.fields.iter().find(|field| field.0 == criteria.field_self).unwrap();
+                            let next_field = other.fields.iter().find(|field| field.0 == criteria.field_other).unwrap();
+                            println!("{} == {}", cur_field.1, next_field.1);
+                            if match criteria.comparison {
+                                RelationComparison::Equal => cur_field.1 == next_field.1,
+                                RelationComparison::NotEqual => cur_field.1 != next_field.1,
+                                _ => todo!("Other comparisons to be implemented"),
+                            } {
+                                related_records.push(other)
+                            }
+                        }
+                    }
+                }
+                if related_records.is_empty() {
+                    return None
+                }
+                cur_records = related_records.clone();
+            }
+
+            Some(cur_records.iter().map(|record| record.id).collect())
+    }
+
     /* We need to supply information about the record, and record ID itself.
      * This includes: Table occurrence and record ID.
      * We also need to supply information about the field we are looking for:
@@ -27,24 +134,67 @@ impl DatabaseMgr {
         active_database: &str
         ) -> Option<String> {
 
-        let cur_db = self.databases.get(active_database).unwrap();
-        let graph = &cur_db.file.schema.relation_graph;
-        let path = match graph.get_path(from.0.table_occurrence_id, to.table_occurrence_id) {
-            Some(inner) => inner,
-            None => { eprintln!("No relation to occurrence."); return None }
+        let to_occurrence_ref = TableOccurrenceReference {
+            data_source: to.data_source,
+            table_occurrence_id: to.table_occurrence_id
         };
-        let target_database = cur_db.file.data_sources.iter()
-            .find(|source| source.id == to.data_source);
+        let record_ids = match self.get_related_records(from, &to_occurrence_ref, active_database) {
+            Some(inner) => inner,
+            None => return None,
+        };
 
-        let from_table_id = cur_db
-            .file.schema.relation_graph.nodes.iter()
-            .find(|to| to.id == from.0.table_occurrence_id).unwrap()
-            .base.table_id;
+        let cur_db = self.databases.get(active_database).unwrap();
 
-        
-            todo!();
+        let other_db = self.databases.get(
+            &cur_db.file.data_sources
+                .iter()
+                .find(|source| source.id == to.data_source)
+                .unwrap().paths[0]
+            ).unwrap();
 
+        let other_table = cur_db.file.schema.relation_graph.nodes
+            .iter()
+            .find(|node| node.id == to.table_occurrence_id)
+            .unwrap().base.table_id;
 
+        Some(other_db.records.get_field(other_table, record_ids[0], to.field_id))
+    }
+
+    pub fn set_field(&mut self,
+        from: (TableOccurrenceReference, u32),
+        to: FieldReference,
+        active_database: &str,
+        value: &str,
+        ) -> Result<(), &str> {
+
+        let to_occurrence_ref = TableOccurrenceReference {
+            data_source: to.data_source,
+            table_occurrence_id: to.table_occurrence_id
+        };
+        let record_ids = match self.get_related_records(from, &to_occurrence_ref, active_database) {
+            Some(inner) => inner,
+            None => return Err("No related record exists"),
+        };
+
+        let cur_db = self.databases.get(active_database).unwrap();
+        let other_db_path = cur_db.file.data_sources.iter().find(|source| source.id == to.data_source).unwrap()
+            .paths[0].clone();
+        let other_table = cur_db.file.schema.relation_graph.nodes
+            .iter()
+            .find(|node| node.id == to.table_occurrence_id)
+            .unwrap().base.table_id;
+
+        let other_db = self.databases.get_mut(&other_db_path).unwrap();
+        other_db.records.set_field(other_table, record_ids[0], to.field_id, value.to_string());
+        Ok(())
+    }
+
+    pub fn new_record(&mut self,
+        table_ref: TableReference,
+        active_database: &str) -> u32 {
+
+        let db = self.databases.get_mut(active_database).unwrap();
+        db.records.new_record(db.file.schema.tables.iter().find(|table| table.id == table_ref.table_id).unwrap())
     }
 
     pub fn load_file(&mut self, path: &str) -> &Database {
@@ -57,10 +207,100 @@ impl DatabaseMgr {
             self.databases.insert(path.to_string(), database);
             self.databases.get(path).unwrap()
         } else if path.ends_with(".fmp12") {
-            // load hbam file
+            // TODO: load hbam file
             todo!()
         } else {
             todo!()
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::read_to_string;
+    use std::path::Path;
+    use super::super::Emulator;
+    use crate::dbobjects::reference::*;
+    #[test]
+    fn related_records() {
+        let mut env = Emulator::new();
+        let quotes_path = "test_data/cad_files/multi_file_solution/quotes.cad";
+        let customers_path = "test_data/cad_files/multi_file_solution/customers.cad";
+        let material_path = "test_data/cad_files/multi_file_solution/materials.cad";
+        env.load_file(quotes_path);
+
+        let quotes_to_ref = TableOccurrenceReference {
+            data_source: 0,
+            table_occurrence_id: 1,
+        };
+        assert_eq!(env.database_mgr.databases.len(), 3);
+        let quote_record = env.database_mgr.new_record(
+            TableReference {
+                data_source: 0,
+                table_id: 1,
+            },
+            quotes_path
+        );
+
+        env.database_mgr.databases.get_mut(quotes_path).unwrap()
+            .records.set_field(1, 1, 2, 2.to_string());
+
+        for i in 1..=5 {
+            let record_id = env.database_mgr.new_record(
+                TableReference {
+                    data_source: 0,
+                    table_id: 1,
+                },
+                customers_path
+            );
+
+            env.database_mgr.databases.get_mut(customers_path).unwrap()
+                .records.set_field(1, record_id, 1, i.to_string())
+        }
+
+        let related_records = env.database_mgr.get_related_records((quotes_to_ref.clone(), 1),
+            &TableOccurrenceReference {
+                data_source: 1,
+                table_occurrence_id: 2 
+            },
+            quotes_path);
+
+        println!("Quotes\n=============");
+        for record in env.database_mgr.databases.get(quotes_path).unwrap()
+            .records.records_by_table.get(&1).unwrap() {
+                println!("{:?}", record);
+            }
+        println!("Customers\n=============");
+        for record in env.database_mgr.databases.get(customers_path).unwrap()
+            .records.records_by_table.get(&1).unwrap() {
+                println!("{:?}", record);
+        }
+
+        assert_eq!(related_records.unwrap().len(), 1);
+
+        let _ = env.database_mgr.set_field(
+            (quotes_to_ref.clone(), 1),
+            FieldReference {
+                data_source: 1,
+                table_occurrence_id: 2,
+                field_id: 1,
+            },
+            quotes_path,
+            "",
+        );
+
+        let related_records = env.database_mgr.get_related_records((quotes_to_ref, 1),
+            &TableOccurrenceReference {
+                data_source: 1,
+                table_occurrence_id: 2 
+            },
+            quotes_path);
+
+        assert_eq!(related_records, None);
+    }
+}
+
+
+
+
+

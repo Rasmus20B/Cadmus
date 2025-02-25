@@ -4,7 +4,6 @@ mod database;
 mod database_mgr;
 mod find;
 mod record_store;
-mod relation_path;
 mod script_mgr;
 mod window_mgr;
 mod window;
