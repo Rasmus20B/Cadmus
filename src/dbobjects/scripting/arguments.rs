@@ -14,7 +14,6 @@ pub enum FieldSelection {
 pub enum ScriptSelection {
     FromList(ScriptReference),
     ByCalculation(Calculation),
-    UnresolvedName(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -32,7 +31,6 @@ pub enum LayoutSelection {
     FromList(LayoutReference),
     NameByCalculation(Calculation),
     NumberByCalculation(Calculation),
-    UnresolvedName(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

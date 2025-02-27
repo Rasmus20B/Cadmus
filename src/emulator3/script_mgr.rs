@@ -5,6 +5,7 @@ use super::EmulatorState;
 use super::context::EmulatorContext;
 use super::ManagerRefs;
 
+use crate::dbobjects::scripting::arguments::ScriptSelection;
 use crate::dbobjects::scripting::{script::Script, instructions::Instruction};
 use crate::dbobjects::calculation::Calculation;
 
@@ -66,6 +67,38 @@ impl ScriptMgr {
         while let Some(mut ip) = self.program_counters.pop() {
             let cur_instr = &ip.1.instructions[ip.0 as usize];
             match &cur_instr.instruction {
+                Instruction::PerformScript { script, args } => {
+                    /* Case where the script is in another data_source:
+                     * 1. check if there is a window open for that data source.
+                     * 2a. if not, open one, and change the context of the emulator to be looking
+                     * at it.
+                     * 3. Once we are looking at that window in that files context, do the regular
+                     *    steps.*/
+                    let script = match script {
+                        ScriptSelection::FromList(script) => {
+                            if script.data_source == 0 {
+                                todo!()
+                            } else {
+                                todo!("Calling scripts from other files not supported yet.");
+                                return Ok(());
+                            }
+                        }
+                        ScriptSelection::ByCalculation(calc) => {
+                            let name = calc.eval(&EmulatorContext {
+                                database_mgr: &db_mgr,
+                                variables: self.variables.last().unwrap(),
+                                globals: &self.globals,
+                                window_mgr: &window_mgr,
+                                state: &state,
+                            }).unwrap();
+
+                            db_mgr.databases.get(&state.active_database).unwrap()
+                                .file.scripts.iter()
+                                .find(|script| script.name == name)
+                                .unwrap()
+                        }
+                    };
+                },
                 Instruction::NewRecordRequest => {
                     let window = window_mgr.windows.get_mut(&state.active_window).unwrap();
 
