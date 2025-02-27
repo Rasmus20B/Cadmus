@@ -14,6 +14,20 @@ pub enum RelationComparison {
     Cartesian
 }
 
+impl RelationComparison {
+    pub fn mirrored(&self) -> Self {
+        match self {
+            Self::Equal => Self::Equal,
+            Self::NotEqual => Self::NotEqual,
+            Self::Greater => Self::LessEqual,
+            Self::GreaterEqual => Self::Less,
+            Self::LessEqual => Self::Greater,
+            Self::Less => Self::GreaterEqual,
+            Self::Cartesian => Self::Cartesian,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub struct RelationCriteria {
     pub field_self: u32,

@@ -1,8 +1,8 @@
-use crate::{hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, LayoutFM, Relation, RelationComparison, RelationCriteria, Script, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}, fm_script_engine::fm_script_engine_instructions::*};
+use crate::{dbobjects::{reference::TableReference, schema::relationgraph::relation::Relation}, fm_script_engine::fm_script_engine_instructions::*, hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, LayoutFM, Script, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
-use crate::dbobjects::schema::{relationgraph::{graph::RelationGraph, table_occurrence::TableOccurrence}, table::Table, field::Field};
+use crate::dbobjects::schema::{relationgraph::{graph::RelationGraph, table_occurrence::TableOccurrence, relation::*}, table::Table, field::Field};
 
 use std::collections::HashMap;
 use std::collections::BTreeMap;
@@ -68,60 +68,53 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
     result
 }
 
-pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usize, TableOccurrence>, HashMap<usize, Relation>) {
+pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, TableOccurrence> {
     let view_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[17], &[5]]), cache, file)
         .expect("Unable to get table info from file.") {
             Some(inner) => inner,
-            None => return (HashMap::new(), HashMap::new())
+            None => return HashMap::new()
         };
     let mut relations = HashMap::<usize, Relation>::new();
     let mut occurrences = HashMap::<usize, TableOccurrence>::new();
 
+    // 1. Get all occurrences as they are in HashMap.
+    // 2. Work through the relationship directory, using the definition for the relationship
+    //    defined at reference::2;
+    //
+    //
     for dir in view_option.get_dirs().unwrap() {
         let path_id = dir.path.components.last().unwrap();
-        let id_ = get_path_int(path_id);
+        let id_ = get_path_int(path_id) - 128;
         let definition = dir.get_value(2).unwrap();
-        //occurrences.insert(id_, TableOccurrence {
-        //    id: id_ as u32,
-        //    name: fm_string_decrypt(dir.get_value(16).unwrap()),
-        //    created_by: fm_string_decrypt(dir.get_value(64513).unwrap()),
-        //    modified_by: fm_string_decrypt(dir.get_value(64514).unwrap()),
-        //    base: TableReference {
-        //        data_source: 0,
-        //        table_id: definition[6] as u16 + 128,
-        //    }
-        //});
 
-        let storage = match dir.get_dir_relative(&mut HBAMPath::new(vec![&[251]])) {
-            Some(inner) => inner,
-            None => { continue; }
+        let tmp = TableOccurrence {
+            id: id_ as u32,
+            name: fm_string_decrypt(dir.get_value(16).unwrap()),
+            base: TableReference {
+                data_source: 0,
+                table_id: definition[6] as u32,
+            },
+            relations: vec![],
         };
 
-        let relation_definitions = storage.get_simple_data().unwrap();
-        for def in relation_definitions {
-            let table1 = DBObjectReference { 
-                data_source: 0,
-                top_id: id_ as u16,
-                inner_id: 0,
-            };
-            let table2 = DBObjectReference { 
-                data_source: 0,
-                top_id: def[2] as u16 + 128,
-                inner_id: 0,
-            };               
-
-            let tmp = Relation::new(def[4] as usize, table1, table2);
-            relations.insert(tmp.id, tmp);
-        }
+        occurrences.insert(id_, tmp);
     }
 
-    let relation_option = match get_view_from_key(&HBAMPath::new(vec![&[3], &[251], &[5]]), cache, file).unwrap() {
+    // We have the table occurrences with their IDs stored at this point.
+
+    let relation_storage = match get_view_from_key(&HBAMPath::new(vec![&[3], &[251], &[5]]), cache, file).unwrap() {
         Some(inner) => inner,
-        None => return (occurrences, relations)
+        None => return occurrences,
     };
 
-    for relation_dir in relation_option.get_dirs().unwrap() {
+    for relation_dir in relation_storage.get_dirs().unwrap() {
 
+        let top_definition = relation_dir.get_value(2).unwrap();
+        let from = top_definition[4];
+        let to = top_definition[9];
+
+
+        println!("Definition of relation: {:?}", top_definition);
         let criteria_dir = relation_dir.get_dir_relative(&mut HBAMPath::new(vec![&[3]])).unwrap();
         let criterias = match criteria_dir.get_all_simple_keyvalues() {
             Some(inner) => inner,
@@ -130,6 +123,17 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
 
         let id_ = relation_dir.path.components.last().unwrap();
 
+        let mut from_relation = Relation {
+            id: get_path_int(id_) as u32,
+            other_occurrence: to as u32,
+            criteria: vec![],
+        };
+
+        let mut to_relation = Relation {
+            id: get_path_int(id_) as u32,
+            other_occurrence: from as u32,
+            criteria: vec![],
+        };
 
         for criteria in criterias {
             let comparison_ = match criteria.1[0] {
@@ -149,13 +153,32 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> (HashMap<usi
             let len2 = criteria.1[start1 + len1] as usize;
             let n1 = get_path_int(&criteria.1[start1..start1 + len1]);
             let n2 = get_path_int(&criteria.1[start2..start2 + len2]);
-            let field1_ = n1 as u16 - 128;
-            let field2_ = n2 as u16 - 128;
-            relations.get_mut(&get_path_int(id_)).unwrap()
-                .criterias.push(RelationCriteria::ById { field1: field1_, field2: field2_, comparison: comparison_ });
+            let from_field = n1 as u16 - 128;
+            let to_field = n2 as u16 - 128;
+
+            from_relation.criteria.push(
+                RelationCriteria {
+                    field_self: from_field as u32,
+                    field_other: to_field as u32,
+                    comparison: comparison_,
+                }
+            );
+
+            to_relation.criteria.push(
+                RelationCriteria {
+                    field_self: to_field as u32,
+                    field_other: from_field as u32,
+                    comparison: comparison_.mirrored(),
+                }
+            );
         }
+
+        let from_occurrence = &mut occurrences.get_mut(&(from as usize)).unwrap().relations;
+        from_occurrence.push(from_relation);
+        let to_occurrence = &mut occurrences.get_mut(&(to as usize)).unwrap().relations;
+        to_occurrence.push(to_relation);
     }
-    (occurrences, relations)
+    occurrences
 }
 
 pub fn get_datasource_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, DataSource> {
@@ -321,7 +344,9 @@ pub fn set_keyvalue<'a>(key: Key, val: Value) -> Result<(), BPlusTreeErr> {
 mod tests {
 
     use super::{get_keyvalue, get_table_catalog, get_script_catalog, get_datasource_catalog, KeyValue, PageStore};
-    use crate::{hbam2::{api::get_occurrence_catalog, path::HBAMPath}, schema::TableOccurrence};
+    use crate::hbam2::{api::get_occurrence_catalog, path::HBAMPath};
+    use crate::dbobjects::schema::relationgraph::{table_occurrence::TableOccurrence, relation::*};
+    use crate::dbobjects::reference::TableReference;
     #[test]
     fn get_keyval_test() {
 
@@ -387,33 +412,65 @@ mod tests {
         assert_eq!(3, result.len());
     }
 
-    //#[test]
-    //fn get_table_occurrence_catalog_test() {
-    //    let mut cache = PageStore::new();
-    //    let (occurrences, relations) = get_occurrence_catalog(&mut cache, "test_data/input/relation.fmp12");
-    //    assert_eq!(3, occurrences.len());
-    //    assert_eq!(*occurrences.get(&129).unwrap(), TableOccurrence {
-    //        id: 129,
-    //        name: String::from("blank"),
-    //        base_table: crate::schema::DBObjectReference { 
-    //            data_source: 0, 
-    //            top_id: 129, 
-    //            inner_id: 0, 
-    //        },
-    //        created_by: String::from("admin"),
-    //        modified_by: String::from("Admin"),
-    //    });
-    //    assert_eq!(*occurrences.get(&130).unwrap(), TableOccurrence {
-    //        id: 130,
-    //        name: String::from("blank 2"),
-    //        base_table: crate::schema::DBObjectReference { 
-    //            data_source: 0, 
-    //            top_id: 129, 
-    //            inner_id: 0, 
-    //        },
-    //        created_by: String::from("admin"),
-    //        modified_by: String::from("Admin"),
-    //    });
-    //    assert_eq!(2, relations.len());
-    //}
+    #[test]
+    fn get_table_occurrence_catalog_test() {
+       let mut cache = PageStore::new();
+       let occurrences = get_occurrence_catalog(&mut cache, "test_data/input/relation.fmp12");
+       assert_eq!(4, occurrences.len());
+       assert_eq!(*occurrences.get(&1).unwrap(), TableOccurrence {
+           id: 1,
+           name: String::from("blank"),
+           base: TableReference{
+               data_source: 0, 
+               table_id: 1, 
+           },
+           relations: vec![
+               Relation {
+                   id: 1,
+                   other_occurrence: 2,
+                   criteria: vec![
+                       RelationCriteria {
+                           field_self: 1,
+                           field_other: 1,
+                           comparison: RelationComparison::Equal,
+                       }
+                   ],
+               },
+               Relation {
+                   id: 3,
+                   other_occurrence: 3,
+                   criteria: vec![
+                       RelationCriteria {
+                           field_self: 6,
+                           field_other: 1,
+                           comparison: RelationComparison::Equal,
+                       }
+                   ],
+
+               },
+
+           ],
+       });
+       assert_eq!(*occurrences.get(&2).unwrap(), TableOccurrence {
+           id: 2,
+           name: String::from("blank 2"),
+           base: TableReference {
+               data_source: 0,
+               table_id: 1,
+           },
+           relations: vec![
+               Relation {
+                   id: 1,
+                   other_occurrence: 1,
+                   criteria: vec![
+                       RelationCriteria {
+                           field_self: 1,
+                           field_other: 1,
+                           comparison: RelationComparison::Equal,
+                       }
+                   ],
+               },
+           ],
+       });
+    }
 }
