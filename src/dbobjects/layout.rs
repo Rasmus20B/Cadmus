@@ -7,3 +7,7 @@ pub struct Layout {
     pub name: String,
     pub occurrence: TableOccurrenceReference,
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct LayoutAttribute {
+}

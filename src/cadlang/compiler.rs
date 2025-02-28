@@ -1,4 +1,6 @@
-use crate::{cadlang::lexer::lex, schema::Schema};
+use crate::cadlang::lexer::lex;
+
+use crate::dbobjects::schema::Schema;
 
 use super::{parser::parse, error::CompileErr}; 
 use super::backend::build_file;

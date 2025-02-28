@@ -6,6 +6,7 @@ use crate::dbobjects::{
     reference::{TableReference, TableOccurrenceReference, FieldReference},
     calculation::Calculation,
     schema::{
+        relationgraph::relation::*,
         table::Table,
         field::*,
         Schema,
@@ -161,13 +162,13 @@ pub fn generate_relation_refs(stage: &Stage, live_occurrences: &mut Vec<TableOcc
                 .unwrap();
 
             let comp = match criteria.comparison {
-                crate::schema::RelationComparison::Equal => RelationComparison::Equal,
-                crate::schema::RelationComparison::NotEqual => RelationComparison::NotEqual,
-                crate::schema::RelationComparison::Less => RelationComparison::Less,
-                crate::schema::RelationComparison::LessEqual => RelationComparison::LessEqual,
-                crate::schema::RelationComparison::Greater => RelationComparison::Greater,
-                crate::schema::RelationComparison::GreaterEqual => RelationComparison::GreaterEqual,
-                crate::schema::RelationComparison::Cartesian => RelationComparison::Cartesian,
+                RelationComparison::Equal => RelationComparison::Equal,
+                RelationComparison::NotEqual => RelationComparison::NotEqual,
+                RelationComparison::Less => RelationComparison::Less,
+                RelationComparison::LessEqual => RelationComparison::LessEqual,
+                RelationComparison::Greater => RelationComparison::Greater,
+                RelationComparison::GreaterEqual => RelationComparison::GreaterEqual,
+                RelationComparison::Cartesian => RelationComparison::Cartesian,
             };
 
             let crit1 = RelationCriteria {

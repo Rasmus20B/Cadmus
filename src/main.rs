@@ -7,11 +7,7 @@ use shell::Shell;
 
 mod cadlang;
 mod util;
-mod staging_buffer;
-mod burn_script;
 mod hbam2;
-mod schema;
-mod fm_script_engine;
 mod dbobjects;
 mod emulator3;
 mod cli;

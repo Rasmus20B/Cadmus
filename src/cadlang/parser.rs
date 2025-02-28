@@ -1,9 +1,20 @@
 use core::fmt;
 use std::collections::BTreeMap;
 
-use crate::{burn_script::compiler::BurnScriptCompiler, schema::{DBObjectReference, LayoutFMAttribute, RelationComparison, Script, TableOccurrence, Test}};
-
-use crate::dbobjects::{schema::field::{DataType, SerialTrigger, ValidationTrigger}, data_source::*};
+use crate::dbobjects::{
+    schema::{
+        relationgraph::{
+            relation::*,
+            table_occurrence::TableOccurrence,
+        },
+        field::{
+            DataType, SerialTrigger, ValidationTrigger
+        },
+    },
+    layout::*,
+    reference::TableReference,
+    data_source::*
+};
 use super::{staging::*, error::CompileErr};
 use super::{cadscript::{compile_cadscript, proto_script::*}, token::{Token, TokenType}};
 
@@ -319,14 +330,6 @@ pub fn parse_extern(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, Data
 }
 
 pub fn parse_table_occurrence(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, StagedOccurrence), CompileErr> {
-
-    let result = TableOccurrence {
-        id: 0,
-        created_by: String::from("admin"),
-        modified_by: String::from("admin"),
-        name: String::new(),
-        base_table: DBObjectReference { data_source: 0, top_id: 0, inner_id: 0 },
-    };
 
     let id_ = expect(tokens, &vec![TokenType::ObjectNumber], info)?.value.parse::<u16>()
         .expect("Unable to parse object id.");
@@ -709,7 +712,7 @@ pub fn parse_relation(tokens: &[Token], info: &mut ParseInfo) -> Result<(u16, St
     }
 }
 
-pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutFMAttribute>, CompileErr> {
+pub fn parse_layout_attributes(tokens: &[Token], info: &mut ParseInfo) -> Result<Vec<LayoutAttribute>, CompileErr> {
     let attributes = vec![];
     while let Some(token) = tokens.get(info.cursor) {
         match token.ttype {
@@ -813,9 +816,15 @@ pub fn parse(tokens: &[Token]) -> Result<Stage, CompileErr> {
 mod tests {
     use std::{collections::BTreeMap, fs::read_to_string};
 
-    use crate::{cadlang::{lexer::lex, token::{Location, Token, TokenType}}, schema::RelationComparison};
+    use crate::cadlang::{lexer::lex, token::{Location, Token, TokenType}};
 
-    use crate::dbobjects::{schema::field::{DataType, SerialTrigger, ValidationTrigger}, data_source::*};
+    use crate::dbobjects::{
+        schema::{
+            relationgraph::relation::*,
+            field::{DataType, SerialTrigger, ValidationTrigger},
+        },
+        data_source::*
+    };
 
     use super::*;
 

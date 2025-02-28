@@ -1,8 +1,18 @@
 use std::collections::btree_map::BTreeMap;
 use super::{token::Token, cadscript::proto_script::ProtoScript, error::CompileErr, parser::FMObjType};
-use crate::schema::{DBObjectReference, RelationCriteria, Relation, RelationComparison, Schema, Table, Field, LayoutFM, AutoEntry, AutoEntryType, Validation, ValidationType, TableOccurrence, Test, Script};
 
-use crate::dbobjects::{schema::field::{AutoEntryDataPresets, DataType, SerialTrigger, ValidationTrigger}, data_source::*};
+use crate::dbobjects::{
+    schema::{
+        relationgraph::relation::*,
+        field::{
+            AutoEntryDataPresets,
+            DataType,
+            SerialTrigger,
+            ValidationTrigger
+        },
+    },
+    data_source::*
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StagedTable {
