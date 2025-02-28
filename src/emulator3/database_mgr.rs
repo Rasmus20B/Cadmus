@@ -1,8 +1,12 @@
 
 use std::collections::HashMap;
 
+use crate::emulator3::record_store::*;
 use crate::dbobjects::reference::{TableReference, FieldReference, TableOccurrenceReference};
-use crate::dbobjects::schema::relationgraph::relation::*;
+use crate::dbobjects::schema::{Schema, relationgraph::{graph::*, relation::*}};
+use crate::dbobjects::file::File;
+
+use crate::hbam2::{page_store::*, api::*};
 
 use super::database::Database;
 use super::record_store::Record;
@@ -212,7 +216,46 @@ impl DatabaseMgr {
             self.databases.get(path).unwrap()
         } else if path.ends_with(".fmp12") {
             // TODO: load hbam file
-            todo!()
+            let mut cache = PageStore::new();
+            let data_sources_ = get_datasource_catalog(&mut cache, path)
+                .into_iter()
+                .map(|ds| ds.1)
+                .collect::<Vec<_>>();
+            let tables_ = get_table_catalog(&mut cache, path)
+                .into_iter()
+                .map(|table| table.1)
+                .collect::<Vec<_>>();
+            let relation_graph_ = get_occurrence_catalog(&mut cache, path)
+                .into_iter()
+                .map(|node| node.1)
+                .collect::<Vec<_>>();
+            let scripts_ = get_script_catalog(&mut cache, path)
+                .into_iter()
+                .map(|node| node.1)
+                .collect::<Vec<_>>();
+            let layouts_ = get_layout_catalog(&mut cache, path)
+                .into_iter()
+                .map(|node| node.1)
+                .collect::<Vec<_>>();
+
+            let database = Database {
+                records: RecordStore::new(&tables_),
+                file: File {
+                    name: String::new(),
+                    schema: Schema {
+                        tables: tables_,
+                        relation_graph: RelationGraph {
+                            nodes: relation_graph_,
+                        },
+                    },
+                    data_sources: data_sources_,
+                    layouts: layouts_,
+                    scripts: scripts_,
+                    tests: vec![],
+                },
+            };
+            self.databases.insert(path.to_string(), database);
+            self.databases.get(path).unwrap()
         } else {
             todo!()
         }

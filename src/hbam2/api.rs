@@ -1,4 +1,21 @@
-use crate::{dbobjects::{reference::TableReference, schema::relationgraph::relation::Relation}, fm_script_engine::fm_script_engine_instructions::*, hbam2::bplustree::get_view_from_key, schema::{AutoEntry, AutoEntryType, DBObjectReference, DataSource, DataSourceType, DataType, LayoutFM, Script, Validation, ValidationTrigger}, util::{calc_bytecode::*, encoding_util::{fm_string_decrypt, get_path_int}}};
+use crate::{dbobjects::{
+    reference::*,
+    data_source::*,
+    layout::*,
+    scripting::{
+        script::*,
+        instructions::*,
+    },
+    metadata::Metadata,
+    calculation::Calculation,
+    schema::relationgraph::relation::Relation
+    },
+    hbam2::bplustree::get_view_from_key,
+    util::encoding_util::{
+        fm_string_decrypt,
+        get_path_int
+    }
+};
 
 use super::{bplustree::{self, search_key, BPlusTreeErr}, page_store::PageStore, path::HBAMPath};
 
@@ -74,7 +91,6 @@ pub fn get_occurrence_catalog(cache: &mut PageStore, file: &str) -> HashMap<usiz
             Some(inner) => inner,
             None => return HashMap::new()
         };
-    let mut relations = HashMap::<usize, Relation>::new();
     let mut occurrences = HashMap::<usize, TableOccurrence>::new();
 
     // 1. Get all occurrences as they are in HashMap.
@@ -209,9 +225,9 @@ pub fn get_datasource_catalog(cache: &mut PageStore, file: &str) -> HashMap::<us
         let end = start + filename_size;
         let filename = &definition[start..end];
         result.insert(id_, DataSource {
-            id: id_,
+            id: id_ as u32,
             name: fm_string_decrypt(name),
-            filename: fm_string_decrypt(filename),
+            paths: vec![fm_string_decrypt(filename)],
             dstype: DataSourceType::FileMaker
         });
     }
@@ -246,12 +262,12 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
         //    println!("{}::{:?}", script_view.path, chunk);
         //}
 
-        let steps = Vec::<ScriptStep>::new();
+        let mut steps = Vec::<ScriptStep>::new();
 
         for step in code.chunks(28) {
             let mut args = Vec::<String>::new();
             let step_id = step[2];
-            let instruction = INSTRUCTIONMAP[step[21] as usize].expect("Unknown script step.");
+            let instruction = step[21] as usize;
             let step_storage = match script_view.get_dir_relative(&mut HBAMPath::new(vec![&[5], &[step_id]])) {
                 Some(inner) => inner,
                 None => continue
@@ -259,7 +275,7 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
 
 
             match instruction {
-                Instruction::SetVariable => {
+                /* SetVariable */ 141 => {
                     let variable = step_storage
                         .get_dir_relative(&mut HBAMPath::new(vec![&[0, 0]])).unwrap();
                     let variable_name = fm_string_decrypt(variable.get_value(1).unwrap());
@@ -267,9 +283,16 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
                     let expr_storage = step_storage
                         .get_dir_relative(&mut HBAMPath::new(vec![&[0, 1], &[5]])).unwrap();
                     let expr = expr_storage.get_value(5).unwrap();
-                    let expr_decoded = decompile_calculation(expr);
-                    args.push(variable_name);
-                    args.push(expr_decoded);
+
+                    steps.push(
+                        ScriptStep {
+                            id: step_id as u32,
+                            instruction: Instruction::SetVariable {
+                                name: variable_name,
+                                value: Calculation(expr.to_vec()),
+                                repetition: Calculation(vec![]),
+                            },
+                    });
                 },
                 _ => continue
             }
@@ -280,11 +303,13 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
 
         let script = Script {
             name: name_,
-            id: id_ as u16,
+            id: id_ as u32,
             instructions: steps,
-            created_by: fm_string_decrypt(created_by_), 
-            modified_by: fm_string_decrypt(modified_by_),
-            arguments: vec![],
+            metadata: Metadata {
+                created_by: fm_string_decrypt(created_by_), 
+                modified_by: fm_string_decrypt(modified_by_),
+            },
+            args: vec![],
         };
         result.insert(id_, script);
     }
@@ -292,7 +317,7 @@ pub fn get_script_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
     result
 }
 
-pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, LayoutFM> {
+pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize, Layout> {
     let mut result = HashMap::new();
     let layout_view = match get_view_from_key(&HBAMPath::new(vec![&[4], &[1], &[7]]), cache, file).expect("Unable to read layout catalog") {
         Some(inner) => inner,
@@ -304,15 +329,13 @@ pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
         let meta_definition = layout.get_value(2).unwrap();
         let name_ = fm_string_decrypt(layout.get_value(16).unwrap());
 
-        result.insert(id_, LayoutFM{
-            id: id_,
+        result.insert(id_, Layout {
+            id: id_ as u32,
             name: name_,
-            table_occurrence: DBObjectReference {
+            occurrence: TableOccurrenceReference {
                 data_source: 0,
-                top_id: meta_definition[1] as u16,
-                inner_id: 0,
+                table_occurrence_id: meta_definition[1] as u32,
             },
-            table_occurrence_name: String::new(),
         });
     }
     result
@@ -400,7 +423,7 @@ mod tests {
         assert_eq!(2, result.len());
 
         for (_, ds) in result {
-            println!("{} :: {:?}", ds.name, ds.filename);
+            println!("{} :: {:?}", ds.name, ds.paths);
         }
     }
 
