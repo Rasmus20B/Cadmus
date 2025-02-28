@@ -1,6 +1,6 @@
 
-extern %1 Customers : "test_data/cad_files/multi_file_solution/customers.cad" 
-extern %2 Materials : "test_data/cad_files/multi_file_solution/materials.cad"
+extern %1 Customers : "customers.cad" 
+extern %2 Materials : "materials.cad"
 
 table %1 Quotes = {
   field %1 id = {

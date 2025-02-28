@@ -242,8 +242,8 @@ mod tests {
     fn quotes_make_10_quotes() {
         let mut emulator = Emulator::new();
         let mut stored_tests = vec![];
-        let code = read_to_string(Path::new("test_data/cad_files/multi_file_solution/quotes.cad")).unwrap();
-        stored_tests.extend(crate::cadlang::compiler::compile_to_file(code).unwrap().tests);
+        let path = Path::new("test_data/cad_files/multi_file_solution/quotes.cad");
+        stored_tests.extend(crate::cadlang::compiler::compile_to_file(path).unwrap().tests);
 
 
         emulator.run_test_on_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");

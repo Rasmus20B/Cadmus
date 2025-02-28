@@ -13,6 +13,8 @@ use super::emulator3::database::Database;
 use super::emulator3::script_mgr::ScriptMgr;
 use super::emulator3::window_mgr::WindowMgr;
 
+use std::path::{Path, PathBuf};
+
 use crate::shell::Host;
 
 struct ManagerRefs<'a> {
@@ -65,8 +67,10 @@ impl Emulator {
         // For now, we will assume all external files are needed as soon
         // as the specified file is opened.
 
+        let working_dir_str = db.file.working_dir.clone();
+        let working_dir = Path::new(&working_dir_str);
         for externs in db.file.data_sources.clone() {
-            self.database_mgr.load_file(&externs.paths[0]);
+            self.database_mgr.load_file(working_dir.join(Path::new(&externs.paths[0])).to_str().unwrap());
         }
         self.database_mgr.databases.get(path).unwrap()
     }

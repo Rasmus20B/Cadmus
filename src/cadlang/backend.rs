@@ -1,4 +1,6 @@
 
+use std::path::Component;
+
 use crate::dbobjects::{
     file::*,
     layout::Layout, 
@@ -31,16 +33,18 @@ use super::{lexer::*, parser::*};
 use std::path::Path;
 use std::fs::read_to_string;
 
-pub fn compile_external_cad_data_sources(stage: &Stage) -> HashMap<u32, Stage> {
+pub fn compile_external_cad_data_sources(stage: &Stage, working_dir: &Path) -> HashMap<u32, Stage> {
     let mut result = HashMap::new();
 
     let mut set = HashSet::<String>::new();
 
     for (i, source) in &stage.data_sources {
         for path in &source.paths {
-            if !set.contains(path) {
-                set.insert(path.clone());
-                let stage = parse(&lex(&read_to_string(&Path::new(&path)).unwrap()).unwrap()).unwrap();
+            let full_path = working_dir.join(Path::new(path));
+            println!("Looking at path: {:?}", full_path.as_path());
+            if !set.contains(&full_path.to_str().unwrap().to_string()) {
+                set.insert(full_path.to_str().unwrap().to_string());
+                let stage = parse(&lex(&read_to_string(&Path::new(&full_path)).unwrap()).unwrap()).unwrap();
                 result.insert(*(i) as u32, stage);
             }
         }
@@ -203,8 +207,8 @@ pub fn generate_table_occurrences(stage: &Stage, externs: &HashMap<u32, Stage> )
     live_occurrences
 }
 
-pub fn load_externs(stage: &Stage) -> HashMap::<u32, Stage> {
-    compile_external_cad_data_sources(stage)
+pub fn load_externs(stage: &Stage, working_dir: &Path) -> HashMap::<u32, Stage> {
+    compile_external_cad_data_sources(stage, working_dir)
 }
 
 pub fn encode_calculation(code: &str, schema: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Calculation {
@@ -471,9 +475,9 @@ fn build_tests(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGra
     finished_scripts
 }
 
-pub fn build_file(stage: &Stage) -> File {
+pub fn build_file(stage: &Stage, working_dir: &Path) -> File {
     let mut layouts_ = vec![];
-    let externs = load_externs(stage);
+    let externs = load_externs(stage, working_dir);
     let schema_ = build_schema(&stage, &externs);
 
     for (i, layout) in &stage.layouts {
@@ -497,6 +501,7 @@ pub fn build_file(stage: &Stage) -> File {
 
     File {
         name: String::new(),
+        working_dir: working_dir.to_str().unwrap().to_string(),
         schema: schema_,
         data_sources: stage.data_sources.iter().map(|ds| ds.1.clone()).collect(),
         layouts: layouts_,
@@ -514,7 +519,8 @@ mod tests {
     fn basic_multi_file() {
         let file = read_to_string("./test_data/cad_files/multi_file_solution/quotes.cad").unwrap();
         let mut stage = parse(&lex(&file).unwrap()).unwrap();
-        let file = build_file(&mut stage);
+        let mut working_dir = Path::new("./test_data/cad_files/multi_file_solution/quotes.cad").parent().unwrap();
+        let file = build_file(&mut stage, working_dir);
 
         let expected_data_sources = vec![
                 DataSource {
@@ -522,7 +528,7 @@ mod tests {
                     name: String::from("Customers"),
                     dstype: DataSourceType::Cadmus,
                     paths: vec![
-                        String::from("test_data/cad_files/multi_file_solution/customers.cad")
+                        String::from("customers.cad")
                     ],
                 },
                 DataSource {
@@ -530,7 +536,7 @@ mod tests {
                     name: String::from("Materials"),
                     dstype: DataSourceType::Cadmus,
                     paths: vec![
-                        String::from("test_data/cad_files/multi_file_solution/materials.cad")
+                        String::from("materials.cad")
                     ],
                 },
             ];

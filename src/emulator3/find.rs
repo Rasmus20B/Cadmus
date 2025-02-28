@@ -60,7 +60,7 @@ mod tests {
     use super::{Database, super::window::Window};
     #[test]
     fn basic_find() {
-        let db_file = crate::cadlang::compiler::compile_to_file(read_to_string(Path::new("test_data/cad_files/multi_file_solution/customers.cad")).unwrap()).unwrap();
+        let db_file = crate::cadlang::compiler::compile_to_file(Path::new("test_data/cad_files/multi_file_solution/customers.cad")).unwrap();
         let mut database = Database::from_file(db_file);
         let mut window = Window::new()
             .name(database.file.name.clone())

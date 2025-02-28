@@ -1,5 +1,6 @@
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::emulator3::record_store::*;
 use crate::dbobjects::reference::{TableReference, FieldReference, TableOccurrenceReference};
@@ -85,8 +86,9 @@ impl DatabaseMgr {
                         .find(|source| source.id == next_table_ref.data_source)
                         .unwrap().paths[0];
 
+                    let target_file = db.file.working_dir.clone() + "/" + target_file;
                     println!("looking for related records in: {}", target_file);
-                    self.databases.get(target_file).unwrap()
+                    self.databases.get(&target_file).unwrap()
                 };
 
                 let next_records = next_db.records.records_by_table.get(&next_table_ref.table_id).unwrap();
@@ -181,7 +183,7 @@ impl DatabaseMgr {
         };
 
         let cur_db = self.databases.get(active_database).unwrap();
-        let other_db_path = cur_db.file.data_sources.iter().find(|source| source.id == to.data_source).unwrap()
+        let other_db_path = cur_db.file.working_dir.clone() + "/" + &cur_db.file.data_sources.iter().find(|source| source.id == to.data_source).unwrap()
             .paths[0].clone();
         let other_table = cur_db.file.schema.relation_graph.nodes
             .iter()
@@ -209,8 +211,7 @@ impl DatabaseMgr {
 
         if path.ends_with(".cad") {
             // load cad file
-            let cadcode = read_to_string(&path).unwrap();
-            let file = crate::cadlang::compiler::compile_to_file(cadcode).unwrap();
+            let file = crate::cadlang::compiler::compile_to_file(Path::new(path)).unwrap();
             let database = Database::from_file(file);
             self.databases.insert(path.to_string(), database);
             self.databases.get(path).unwrap()
@@ -238,10 +239,12 @@ impl DatabaseMgr {
                 .map(|node| node.1)
                 .collect::<Vec<_>>();
 
+            let parent_dir = Path::new(path).parent().unwrap().to_str().unwrap().to_string();
             let database = Database {
                 records: RecordStore::new(&tables_),
                 file: File {
                     name: String::new(),
+                    working_dir: parent_dir,
                     schema: Schema {
                         tables: tables_,
                         relation_graph: RelationGraph {
