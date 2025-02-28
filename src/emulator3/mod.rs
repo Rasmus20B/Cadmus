@@ -70,12 +70,8 @@ impl Emulator {
         let working_dir_str = db.file.working_dir.clone();
         let working_dir = Path::new(&working_dir_str);
         for externs in db.file.data_sources.clone() {
-<<<<<<< HEAD
-            self.database_mgr.load_file(working_dir.join(Path::new(&externs.paths[0])).to_str().unwrap());
-=======
-            let ex = self.database_mgr.load_file(&externs.paths[0]);
+            let ex = self.database_mgr.load_file(&(working_dir.to_str().unwrap().to_string() + "/" + &externs.paths[0]));
             self.window_mgr.add_window(ex);
->>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
         }
         self.database_mgr.databases.get(path).unwrap()
     }

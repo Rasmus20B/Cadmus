@@ -5,6 +5,8 @@ use super::EmulatorState;
 use super::context::EmulatorContext;
 use super::ManagerRefs;
 
+use std::path::Path;
+
 use crate::dbobjects::scripting::arguments::ScriptSelection;
 use crate::dbobjects::scripting::{script::Script, instructions::Instruction};
 use crate::dbobjects::calculation::Calculation;
@@ -90,13 +92,16 @@ impl ScriptMgr {
                                     .find(|search| search.id == script.data_source)
                                     .unwrap();
 
-
-                                state.active_database = data_source.paths[0].clone();
+                                println!("looking @ {}", state.active_database);
+                                let working_dir = Path::new(&state.active_database).parent().unwrap();
+                                state.active_database = working_dir.to_str().unwrap().to_string() + "/" + &data_source.paths[0].clone();
+                                println!("looking @ {}", state.active_database);
                                 state.active_window = *window_mgr.windows.iter()
+                                    .inspect(|win| println!("{}", win.1.database))
                                     .find(|window| window.1.database == state.active_database)
                                     .unwrap().0;
 
-                                db_mgr.databases.get(&data_source.paths[0]).unwrap()
+                                db_mgr.databases.get(&state.active_database).unwrap()
                                     .file.scripts
                                     .iter()
                                     .find(|search| search.id == script.script_id)

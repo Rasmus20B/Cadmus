@@ -209,13 +209,10 @@ impl DatabaseMgr {
 
         if path.ends_with(".cad") {
             // load cad file
-<<<<<<< HEAD
-            let file = crate::cadlang::compiler::compile_to_file(Path::new(path)).unwrap();
-=======
+            println!("path: {}", path);
             let cadcode = read_to_string(&path).unwrap();
-            let mut file = crate::cadlang::compiler::compile_to_file(cadcode).unwrap();
+            let mut file = crate::cadlang::compiler::compile_to_file(Path::new(path)).unwrap();
             file.name = path.to_string();
->>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
             let database = Database::from_file(file);
             self.databases.insert(path.to_string(), database);
             self.databases.get(path).unwrap()

@@ -2,29 +2,29 @@
 use std::path::Component;
 
 use crate::dbobjects::{
-<<<<<<< HEAD
     file::*,
     layout::Layout, 
-    scripting::{script::*, instructions::*, arguments::*},
-    reference::{TableReference, TableOccurrenceReference, FieldReference},
+    scripting::{
+        script::*,
+        instructions::*,
+        arguments::*
+    },
+    reference::{
+        FieldReference,
+        ScriptReference,
+        TableReference,
+        TableOccurrenceReference,
+    },
     calculation::Calculation,
     schema::{
-        relationgraph::relation::*,
-        table::Table,
-        field::*,
-        Schema,
-        relationgraph::{
-=======
-    calculation::Calculation, file::*, layout::Layout, reference::{FieldReference, ScriptReference, TableOccurrenceReference, TableReference}, schema::{
         field::*, relationgraph::{
->>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
             graph::RelationGraph,
             relation::{
                 Relation, RelationComparison, RelationCriteria
             },
             table_occurrence::TableOccurrence
         }, table::Table, Schema
-    }, scripting::{arguments::*, instructions::*, script::*}
+    },
 };
 use super::{cadscript::proto_instruction::ProtoScriptSelection, staging::*};
 use super::cadscript::proto_instruction::{ProtoInstruction, ProtoFieldSelection};
@@ -186,7 +186,7 @@ pub fn generate_relation_refs(stage: &Stage, live_occurrences: &mut Vec<TableOcc
             let crit2 = RelationCriteria {
                 field_self: (*field2) as u32,
                 field_other: (*field1) as u32,
-                comparison: comp,
+                comparison: comp.mirrored(),
             };
 
             tmp1.criteria.push(crit1);
