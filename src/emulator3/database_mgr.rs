@@ -93,9 +93,9 @@ impl DatabaseMgr {
 
                 let next_records = next_db.records.records_by_table.get(&next_table_ref.table_id).unwrap();
                 println!("next tables records\n===========");
-                for record in next_records {
-                    println!("{:?}", record);
-                }
+                // for record in next_records {
+                //     println!("{:?}", record);
+                // }
 
                 let relation = db.file.schema.relation_graph.nodes
                     .iter()
@@ -110,7 +110,6 @@ impl DatabaseMgr {
                             // TODO: current field value can be cached
                             let cur_field = record.fields.iter().find(|field| field.0 == criteria.field_self).unwrap();
                             let next_field = other.fields.iter().find(|field| field.0 == criteria.field_other).unwrap();
-                            println!("{} == {}", cur_field.1, next_field.1);
                             if match criteria.comparison {
                                 RelationComparison::Equal => cur_field.1 == next_field.1,
                                 RelationComparison::NotEqual => cur_field.1 != next_field.1,
@@ -204,14 +203,19 @@ impl DatabaseMgr {
     }
 
     pub fn load_file(&mut self, path: &str) -> &Database {
-        println!("opening {}", path);
         if self.databases.contains_key(path) {
             return self.databases.get(path).unwrap()
         }
 
         if path.ends_with(".cad") {
             // load cad file
+<<<<<<< HEAD
             let file = crate::cadlang::compiler::compile_to_file(Path::new(path)).unwrap();
+=======
+            let cadcode = read_to_string(&path).unwrap();
+            let mut file = crate::cadlang::compiler::compile_to_file(cadcode).unwrap();
+            file.name = path.to_string();
+>>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
             let database = Database::from_file(file);
             self.databases.insert(path.to_string(), database);
             self.databases.get(path).unwrap()

@@ -11,7 +11,7 @@ pub trait CalculationContext {
     fn get_var(&self, name: &str) -> Option<String>;
     fn get_global_var(&self, name: &str) -> Option<String>;
 
-    fn lookup_field(&self, reference: FieldReference) -> Option<String>;
+    fn lookup_field(&self, reference: FieldReference) -> Result<Option<String>, String>;
 }
 
 pub struct DummyContext {
@@ -35,5 +35,5 @@ impl CalculationContext for DummyContext {
     fn get_var(&self, name: &str) -> Option<String> { todo!() }
     fn get_global_var(&self, name: &str) -> Option<String> { todo!() }
 
-    fn lookup_field(&self, reference: FieldReference) -> Option<String> { todo!() }
+    fn lookup_field(&self, reference: FieldReference) -> Result<Option<String>, String> { todo!() }
 }

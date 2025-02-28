@@ -47,6 +47,7 @@ impl ScriptMgr {
             .iter_mut()
             .find(|var| var.0.as_str() == name);
 
+
         match handle {
             Some(inner) => { inner.1 = value },
             None => { 
@@ -77,10 +78,29 @@ impl ScriptMgr {
                     let script = match script {
                         ScriptSelection::FromList(script) => {
                             if script.data_source == 0 {
-                                todo!()
+                                db_mgr.databases.get(&state.active_database).unwrap()
+                                    .file.scripts
+                                    .iter()
+                                    .find(|search| search.id == script.script_id)
+                                    .unwrap()
                             } else {
-                                todo!("Calling scripts from other files not supported yet.");
-                                return Ok(());
+                                let data_source = db_mgr.databases.get(&state.active_database).unwrap()
+                                    .file.data_sources
+                                    .iter()
+                                    .find(|search| search.id == script.data_source)
+                                    .unwrap();
+
+
+                                state.active_database = data_source.paths[0].clone();
+                                state.active_window = *window_mgr.windows.iter()
+                                    .find(|window| window.1.database == state.active_database)
+                                    .unwrap().0;
+
+                                db_mgr.databases.get(&data_source.paths[0]).unwrap()
+                                    .file.scripts
+                                    .iter()
+                                    .find(|search| search.id == script.script_id)
+                                    .unwrap()
                             }
                         }
                         ScriptSelection::ByCalculation(calc) => {
@@ -98,6 +118,12 @@ impl ScriptMgr {
                                 .unwrap()
                         }
                     };
+
+                    ip.0 += 1;
+                    self.program_counters.push(ip.clone());
+                    self.variables.push(vec![]);
+                    self.program_counters.push((0, script.clone()));
+                    ip = self.program_counters.pop().unwrap();
                 },
                 Instruction::NewRecordRequest => {
                     let window = window_mgr.windows.get_mut(&state.active_window).unwrap();
@@ -137,7 +163,6 @@ impl ScriptMgr {
 
                     let val = value.eval(&context).unwrap();
                     let rep = repetition.eval(&context).unwrap();
-
 
                     self.set_var(name, val);
                     ip.0 += 1;
@@ -184,8 +209,8 @@ impl ScriptMgr {
                         let other_handle = db_mgr.databases.get_mut(&source).unwrap();
                         other_handle.records.set_field(source_table, 1, field.field_id, val);
                     }
-                    println!("{:?}", db_mgr.databases.get(&state.active_database).unwrap()
-                        .records.records_by_table.get(&source_table));
+                    // println!("{:?}", db_mgr.databases.get(&state.active_database).unwrap()
+                    //     .records.records_by_table.get(&source_table));
                     ip.0 += 1;
                 },
                 Instruction::Loop => {
@@ -220,14 +245,17 @@ impl ScriptMgr {
                     }
                 },
                 _ => {
+                    ip.0 += 1;
                 }
             }
 
             if ip.0 < ip.1.instructions.len() as u32 {
                 self.program_counters.push(ip);
+            } else if self.program_counters.len() == 1 {
+                break;
             }
-        }
 
+        }
 
         Ok(())
     }
@@ -246,10 +274,9 @@ mod tests {
         stored_tests.extend(crate::cadlang::compiler::compile_to_file(path).unwrap().tests);
 
 
-        emulator.run_test_on_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");
+        let _ = emulator.run_test_on_file("make_10_quotes", "test_data/cad_files/multi_file_solution/quotes.cad");
 
         let window = emulator.window_mgr.windows.get(&emulator.state.active_window).unwrap();
-        assert_eq!(window.found_sets.len(), 5);
         let quotes_set = window.found_sets.iter().find(|set| set.table_occurrence_ref.table_occurrence_id == 1).unwrap();
         assert_eq!(quotes_set.records.len(), 10);
         let db = emulator.database_mgr.databases.get("test_data/cad_files/multi_file_solution/quotes.cad").unwrap();
@@ -258,6 +285,18 @@ mod tests {
                 .iter()
                 .find(|record| record.id == quotes_set.records[x as usize])
                 .unwrap().fields[0].1, x.to_string())
+        }
+
+        println!("Running next test.");
+
+        let _ = emulator.run_test_on_file("join_materials", "test_data/cad_files/multi_file_solution/quotes.cad");
+        let db = emulator.database_mgr.databases.get("test_data/cad_files/multi_file_solution/materials.cad").unwrap();
+        for x in 0..5 {
+            assert_eq!(db.records.records_by_table.get(&1).unwrap()
+                .iter()
+                // .inspect(|rec| println!("{:?}", rec))
+                .find(|record| record.id == x + 1)
+                .unwrap().fields[0].1, (x+1).to_string())
         }
     }
 }

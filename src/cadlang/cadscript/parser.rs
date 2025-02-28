@@ -1,5 +1,5 @@
 
-use crate::dbobjects::{calculation::{Calculation, CalculationString}, scripting::{instructions::Instruction, arguments::*, script::Script}};
+use crate::{cadlang::cadscript::proto_instruction::ProtoScriptSelection, dbobjects::{calculation::{Calculation, CalculationString}, scripting::{arguments::*, instructions::Instruction, script::Script}}};
 use super::token::TokenVal;
 use super::proto_instruction::{ProtoInstruction, ProtoFieldSelection, ProtoLayoutSelection};
 
@@ -216,6 +216,28 @@ pub fn parse(tokens: Vec<TokenVal>) -> Result<Vec<ProtoInstruction>, ParseErr> {
 
         let arguments = parse_args(instr, &tokens, &mut info).unwrap();
         instructions.push(match instr.as_str() {
+            "perform_script" => {
+                println!("FOUND ARGS: {:?}", arguments);
+                let script_ = match &arguments.iter().find(|arg| arg.label == "script").unwrap().value {
+                    TokenVal::CalculationArg(calc) => ProtoScriptSelection::Calculation(CalculationString(calc.to_string())),
+                    TokenVal::FieldReference(file, script_name) => ProtoScriptSelection::UnresolvedReference { 
+                        data_source: file.to_string(),
+                        script: script_name.to_string() 
+                    },
+                    _ => todo!("Error handling.")
+                };
+                let args = arguments.iter().find(|arg| arg.label == "args");
+                let args_ = match args {
+                    Some(args) => args,
+                    None => &ArgKeyVal { 
+                        label: String::from("args"),
+                        value: TokenVal::CalculationArg(String::new()) 
+                    },
+                };
+                ProtoInstruction::PerformScript { 
+                    script: script_,
+                    args: CalculationString(args_.value.get_value().unwrap()) }
+            }
             "set_variable" => {
                 let name = arguments.iter().find(|arg| arg.label == "var").unwrap();
                 let val = arguments.iter().find(|arg| arg.label == "expr").unwrap();

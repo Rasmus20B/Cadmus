@@ -53,7 +53,6 @@ impl Calculation {
         let mut result = vec![];
         let mut ptr = 0;
         while ptr < self.0.len() {
-            //println!("{}", self.0[ptr]);
             match self.0[ptr] {
                 0x4 => {
                     result.push(Token::OpenParen);
@@ -73,6 +72,14 @@ impl Calculation {
                     ptr += 1;
                     if self.0[ptr] != 0 { } // error
                     ptr += 1;
+                }
+                0x16 => {
+                    result.push(Token::ResolvedFieldReference(crate::dbobjects::reference::FieldReference {
+                        data_source: 0,
+                        table_occurrence_id: 2,
+                        field_id: 2,
+                    }));
+                    ptr += 12;
                 }
                 0x2d => {
                     result.push(Token::Function(Function::Abs));
@@ -196,7 +203,9 @@ impl Calculation {
 
 
 impl Expr {
-    pub fn eval<T>(&self, ctx: &T) -> Result<Value, String> where T: CalculationContext {
+    pub fn eval<T>(&self, ctx: &T) -> Result<Value, String> 
+        where T: CalculationContext 
+    {
         match self {
             Expr::Number(n) => Ok(Value::Text(n.to_string())), // Numbers are stored as text initially
             Expr::String(s) => Ok(Value::Text(s.to_string())),
@@ -211,9 +220,16 @@ impl Expr {
 
             Expr::FieldReference(reference) => {
                 // Query database manager
-                ctx.lookup_field(reference.clone())
-                .map(|val| Value::Text(val))
-                .ok_or_else(|| format!("Field not found: {:?}", reference))
+                let res = ctx.lookup_field(reference.clone());
+                let val = match res {
+                    Ok(inner) => inner,
+                    Err(e) => return Err(format!("Field not found: {:?}", reference))
+                };
+
+                match val {
+                    Some(inner) => Ok(Value::Text(inner.clone())),
+                    None => Ok(Value::Text(String::new())),
+                }
             }
 
             Expr::BinaryOp { left, op, right } => {
@@ -344,7 +360,6 @@ pub fn lex_text(code: &str) -> Vec<Token> {
             c if c.is_numeric() => {
                 buffer.push(c);
                 while let Some(name_char) = iter.peek() {
-                    println!("char: {}", name_char);
                     if name_char.is_numeric() {
                         buffer.push(*name_char);
                         iter.next();
@@ -352,7 +367,6 @@ pub fn lex_text(code: &str) -> Vec<Token> {
                         break;
                     }
                 }
-                println!("buffer: {}", buffer);
                 result.push(Token::Number(buffer.parse::<f64>().unwrap().clone()))
             }
             c if c.is_alphabetic() => {

@@ -70,7 +70,12 @@ impl Emulator {
         let working_dir_str = db.file.working_dir.clone();
         let working_dir = Path::new(&working_dir_str);
         for externs in db.file.data_sources.clone() {
+<<<<<<< HEAD
             self.database_mgr.load_file(working_dir.join(Path::new(&externs.paths[0])).to_str().unwrap());
+=======
+            let ex = self.database_mgr.load_file(&externs.paths[0]);
+            self.window_mgr.add_window(ex);
+>>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
         }
         self.database_mgr.databases.get(path).unwrap()
     }
@@ -85,12 +90,6 @@ impl Emulator {
                 None => return Err(EmulatorErr::UnknownTest(test_name.to_string()))
         };
         println!("Running test: {} on file: {}", test.name, path);
-        //for instr in &test.instructions {
-        //    println!("{:?}", instr);
-        //}
-        for (name, _) in &self.database_mgr.databases {
-            println!("{}", name);
-        }
         let status = self.script_mgr.run_script(test.clone(), ManagerRefs { window_mgr: &mut self.window_mgr, database_mgr: &mut self.database_mgr },  &mut self.state);
         Ok(())
     }

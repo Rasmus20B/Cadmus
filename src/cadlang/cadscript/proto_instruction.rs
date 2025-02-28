@@ -14,8 +14,14 @@ pub enum ProtoFieldSelection {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ProtoScriptSelection {
+    UnresolvedReference { data_source: String, script: String },
+    Calculation(CalculationString)
+}
+
+#[derive(Debug, Clone, PartialEq)]
 #[repr(u16)] pub enum ProtoInstruction {
-	PerformScript { script: ScriptSelection, args: CalculationString },
+	PerformScript { script: ProtoScriptSelection, args: CalculationString },
 	SaveACopyAsXml,
 	GoToNextField,
 	GoToPreviousField,

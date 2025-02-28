@@ -2,6 +2,7 @@
 use std::path::Component;
 
 use crate::dbobjects::{
+<<<<<<< HEAD
     file::*,
     layout::Layout, 
     scripting::{script::*, instructions::*, arguments::*},
@@ -13,17 +14,19 @@ use crate::dbobjects::{
         field::*,
         Schema,
         relationgraph::{
+=======
+    calculation::Calculation, file::*, layout::Layout, reference::{FieldReference, ScriptReference, TableOccurrenceReference, TableReference}, schema::{
+        field::*, relationgraph::{
+>>>>>>> dd8a33e (bug commit. Perform script mostly implemented.)
             graph::RelationGraph,
             relation::{
-                Relation,
-                RelationCriteria,
-                RelationComparison
+                Relation, RelationComparison, RelationCriteria
             },
             table_occurrence::TableOccurrence
-        }
-    }
+        }, table::Table, Schema
+    }, scripting::{arguments::*, instructions::*, script::*}
 };
-use super::staging::*;
+use super::{cadscript::proto_instruction::ProtoScriptSelection, staging::*};
 use super::cadscript::proto_instruction::{ProtoInstruction, ProtoFieldSelection};
 
 use std::collections::{HashSet, HashMap, BTreeMap};
@@ -222,6 +225,8 @@ pub fn encode_calculation(code: &str, schema: &Stage, externs: &HashMap<u32, Sta
                     .find(|search_occ| search_occ.name == occurrence)
                     .unwrap();
 
+                println!("NODE FOUND IN THE REFERENCE::{:?}", node);
+
                 // If the table is local to the file
                 let table = if node.base.data_source == 0 {
                     schema.tables
@@ -237,6 +242,11 @@ pub fn encode_calculation(code: &str, schema: &Stage, externs: &HashMap<u32, Sta
                     .find(|search_field| search_field.1.name.value == field)
                     .unwrap();
 
+                println!("Resolved field ref to: {:?}", FieldReference {
+                    data_source: node.base.data_source,
+                    table_occurrence_id: node.id,
+                    field_id: field.1.id as u32,
+                });
                 return crate::dbobjects::calculation::token::Token::ResolvedFieldReference(
                     FieldReference {
                         data_source: node.base.data_source,
@@ -328,9 +338,9 @@ pub fn build_schema(stage: &Stage, externs: &HashMap<u32, Stage>) -> Schema {
     result
 }
 
-fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Vec<Script> {
+fn build_script_objects(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Vec<(u32, Script)> {
     let mut finished_scripts = vec![];
-    for (i, script) in &stage.scripts {
+    for (t, (i, script)) in stage.scripts.iter().map(|script| (0, script)).chain(stage.tests.iter().map(|test| (1, test)).into_iter()) {
         let mut tmp = Script {
             id: (*i) as u32,
             name: script.name.clone(),
@@ -344,6 +354,34 @@ fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationG
 
         tmp.instructions = script.instructions.iter().enumerate().map(|(i, instr)| {
            ScriptStep { id: i as u32, instruction: match instr {
+                ProtoInstruction::PerformScript { script, args } => {
+                    println!("DOes get here into the PERFORM SCRIPT SCIRPTIPSIPCISPCIPSCSCPI");
+                    let script_ = match script {
+                        ProtoScriptSelection::UnresolvedReference { data_source, script } => {
+                            let ds = stage.data_sources.iter()
+                                .find(|ds| ds.1.name == *data_source)
+                                .unwrap();
+
+                            let script_id_ = externs.iter()
+                                .find(|e| *e.0 == ds.1.id)
+                                .unwrap()
+                                .1.scripts.iter()
+                                .find(|script_| script_.1.name == *script)
+                                .unwrap()
+                                .0;
+
+                            ScriptSelection::FromList( ScriptReference {
+                                data_source: ds.1.id,
+                                script_id: (*script_id_) as u32,
+                            })
+                        }
+                        _ => { todo!() }
+                    };
+                    Instruction::PerformScript { 
+                        script: script_,
+                        args: encode_calculation(&args.0, stage, externs, graph) 
+                    }
+                },
                 ProtoInstruction::NewRecordRequest => Instruction::NewRecordRequest,
                 ProtoInstruction::SetField { field, value, repetition } => Instruction::SetField {
                     field: match field {
@@ -396,81 +434,7 @@ fn build_scripts(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationG
            }
            }
         }).collect();
-        finished_scripts.push(tmp);
-    }
-    finished_scripts
-}
-
-fn build_tests(stage: &Stage, externs: &HashMap<u32, Stage>, graph: &RelationGraph) -> Vec<Script> {
-    let mut finished_scripts = vec![];
-    for (i, script) in &stage.tests {
-        let mut tmp = Script {
-            id: (*i) as u32,
-            name: script.name.clone(),
-            args: vec![],
-            instructions: vec![],
-            metadata: crate::dbobjects::metadata::Metadata {
-                created_by: String::new(),
-                modified_by: String::new(),
-            }
-        };
-
-        tmp.instructions = script.instructions.iter().enumerate().map(|(i, instr)| {
-           ScriptStep { id: i as u32, instruction: match instr {
-                ProtoInstruction::NewRecordRequest => Instruction::NewRecordRequest,
-                ProtoInstruction::SetField { field, value, repetition } => Instruction::SetField {
-                    field: match field {
-                        ProtoFieldSelection::UnresolvedReference { occurrence, field } => {
-                            let node = graph.nodes
-                                .iter()
-                                .find(|search_occ| search_occ.name == *occurrence)
-                                .unwrap();
-
-                            let occ_id = node.id;
-                            let (external_ds, table_id) = (node.base.data_source, node.base.table_id);
-
-                            let field_id_ = if external_ds == 0 {
-                                stage.tables.get(&(table_id as u16)).unwrap()
-                                    .fields.iter()
-                                    .find(|search| search.1.name.value == *field)
-                                    .map(|f| f.1.id)
-                                    .unwrap()
-                            } else {
-                                let data_source = externs.get(&external_ds).unwrap();
-                                data_source.tables.get(&(table_id as u16)).unwrap()
-                                    .fields.iter()
-                                    .find(|search| search.1.name.value == *field)
-                                    .map(|f| f.1.id)
-                                    .unwrap()
-                            };
-
-                            FieldReference { 
-                                data_source: external_ds,
-                                table_occurrence_id: occ_id, 
-                                field_id: field_id_ as u32,
-                            }
-
-                        },
-                    },
-                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
-                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph),
-                },
-                ProtoInstruction::SetVariable { name, value, repetition }  => Instruction::SetVariable { 
-                    name: name.to_string(),
-                    value: encode_calculation(value.0.as_str(), stage, externs, graph),
-                    repetition: encode_calculation(repetition.0.as_str(), stage, externs, graph)
-                },
-                ProtoInstruction::Loop => Instruction::Loop,
-                ProtoInstruction::EndLoop => Instruction::EndLoop,
-                ProtoInstruction::ExitLoopIf { condition } => Instruction::ExitLoopIf {
-                    condition: encode_calculation(condition.0.as_str(), stage, externs, graph),
-                },
-                _ => Instruction::Print,
-           }
-           }
-        }).collect();
-
-        finished_scripts.push(tmp);
+        finished_scripts.push((t, tmp));
     }
     finished_scripts
 }
@@ -496,8 +460,8 @@ pub fn build_file(stage: &Stage, working_dir: &Path) -> File {
         layouts_.push(tmp);
     }
 
-    let scripts_ = build_scripts(stage, &externs, &schema_.relation_graph );
-    let tests_ = build_tests(stage, &externs, &schema_.relation_graph );
+    let (scripts_, tests_): (Vec<_>, Vec<_>) = build_script_objects(stage, &externs, &schema_.relation_graph)
+        .into_iter().partition(|(t, _)| *t == 0);
 
     File {
         name: String::new(),
@@ -505,8 +469,8 @@ pub fn build_file(stage: &Stage, working_dir: &Path) -> File {
         schema: schema_,
         data_sources: stage.data_sources.iter().map(|ds| ds.1.clone()).collect(),
         layouts: layouts_,
-        scripts: scripts_,
-        tests: tests_,
+        scripts: scripts_.into_iter().map(|(_, script)| script).collect(),
+        tests: tests_.into_iter().map(|(_, script)| script).collect(),
     }
 }
 
