@@ -6,6 +6,8 @@ use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 use tonic::include_proto;
 
+mod project_store;
+
 // Import your generated gRPC service traits
 mod monitor_proto {
     tonic::include_proto!("monitor");
@@ -56,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Run both servers concurrently
     let _ = tokio::try_join!(
-        tokio::spawn(http_server),
+        http_server,
         tokio::spawn(grpc_server) 
     );
 

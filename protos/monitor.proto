@@ -1,0 +1,32 @@
+syntax = "proto3";
+package monitor;
+
+service Monitor {
+  rpc ReportUpdate(UpdateRequest) returns (UpdateResponse) {}
+}
+
+enum ObjectType {
+  OBJ_Table = 0;
+  OBJ_Field = 1;
+  OBJ_TableOccurrence = 2;
+  OBJ_Relation = 3;
+  OBJ_Script = 4;
+}
+
+message UpdateRequest {
+  bytes agent_token = 1;
+  uint32 project_id = 2;
+  uint32 seq_no = 3;
+  ObjectType type = 4;
+  uint32 object_id = 5;
+}
+
+enum ChangeResult {
+  ChangeSuccess = 0;
+  ChangeFailedAuth = 1;
+  ChangeFailedMalformed = 2;
+}
+
+message UpdateResponse {
+  ChangeResult result = 1;
+}

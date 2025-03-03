@@ -2,7 +2,8 @@
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 
-fn handle_modification() {
+fn handle_modification(path: &Path) {
+    // Maintain a write ahead log for case where we can't connect to the server right now.
 }
 
 fn watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
@@ -16,11 +17,15 @@ fn watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
             Ok(event) => {
                 match event.kind {
                     notify::EventKind::Modify(_) => {
+                        // If we see a modify, start counting down a timer
+                        // If there hasn't been another modification for that
+                        // path in the next 2 seconds, then we're good to do some 
                         eprintln!("modified: {:?}", event.paths);
+                        handle_modification(&event.paths[0]);
                     }
                     _ => {}
                 }
-                //println!("Change: {event:?}")
+                println!("Change: {event:?}")
             }
             Err(error) => eprintln!("Error: {error:?}"),
         }
