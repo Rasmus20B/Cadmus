@@ -191,7 +191,7 @@ impl Calculation {
         result
     }
 
-    pub fn eval<T>(&self, ctx: &T) -> Result<String, String> where T: CalculationContext {
+    pub fn eval<T: CalculationContext>(&self, ctx: &T) -> Result<String, String> {
         let tokens = self.lex();
         let ast = parser::Parser::new(&tokens).parse();
         match ast.eval(ctx) {

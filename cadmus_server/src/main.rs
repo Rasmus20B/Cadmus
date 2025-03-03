@@ -1,0 +1,64 @@
+
+use axum::{routing::get, Router};
+use std::net::SocketAddr;
+use tokio::task;
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
+use tonic::include_proto;
+
+// Import your generated gRPC service traits
+mod monitor_proto {
+    tonic::include_proto!("monitor");
+}
+
+use monitor_proto::greeter_server::{Greeter, GreeterServer};
+use monitor_proto::{HelloRequest, HelloReply};
+
+// Implement the gRPC service
+#[derive(Default)]
+struct MyServiceImpl;
+
+#[tonic::async_trait]
+impl Greeter for MyServiceImpl {
+    async fn say_hello(
+        &self,
+        request: Request<HelloRequest>,
+    ) -> Result<Response<HelloReply>, Status> {
+        let req = request.into_inner();
+        println!("Received update: {:?}", req);
+
+        Ok(Response::new(HelloReply {
+            message: "Update received".into(),
+        }))
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Axum server setup
+    let app = Router::new().route("/", get(|| async { "Hello from Axum!" }));
+
+    let http_addr: SocketAddr = "0.0.0.0:3000".parse().unwrap();
+    let grpc_addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
+
+    // Spawn the Axum server in a separate task
+    let http_server = task::spawn(async move {
+        let listener = tokio::net::TcpListener::bind(&http_addr).await.unwrap();
+
+        axum::serve(listener, app.into_make_service())
+    });
+
+    // Set up the Tonic gRPC server
+    let grpc_service = MyServiceImpl::default();
+    let grpc_server = Server::builder()
+        .add_service(GreeterServer::new(grpc_service))
+        .serve(grpc_addr);
+
+    // Run both servers concurrently
+    let _ = tokio::try_join!(
+        tokio::spawn(http_server),
+        tokio::spawn(grpc_server) 
+    );
+
+    Ok(())
+}

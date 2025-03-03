@@ -1,0 +1,13 @@
+[package]
+name = "cadmus_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+axum = "0.8.1"
+prost = "0.13.5"
+tonic = "0.12.3"
+
+[build-dependencies]
+tonic-build = "*"

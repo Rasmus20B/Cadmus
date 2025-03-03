@@ -1,3 +1,11 @@
+[workspace]
+members = [
+  "cadmus_cli",
+  "cadmus_server",
+  "cadmus_test",
+  "cadmus_monitor",
+]
+
 [package]
 name = "fmc"
 version = "0.1.0"
