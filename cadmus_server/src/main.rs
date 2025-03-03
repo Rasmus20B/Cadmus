@@ -13,27 +13,27 @@ mod monitor_proto {
     tonic::include_proto!("monitor");
 }
 
-use monitor_proto::greeter_server::{Greeter, GreeterServer};
-use monitor_proto::{HelloRequest, HelloReply};
+//use monitor_proto::greeter_server::{Greeter, GreeterServer};
+//use monitor_proto::{HelloRequest, HelloReply};
 
 // Implement the gRPC service
-#[derive(Default)]
-struct MyServiceImpl;
-
-#[tonic::async_trait]
-impl Greeter for MyServiceImpl {
-    async fn say_hello(
-        &self,
-        request: Request<HelloRequest>,
-    ) -> Result<Response<HelloReply>, Status> {
-        let req = request.into_inner();
-        println!("Received update: {:?}", req);
-
-        Ok(Response::new(HelloReply {
-            message: "Update received".into(),
-        }))
-    }
-}
+//#[derive(Default)]
+//struct MyServiceImpl;
+//
+//#[tonic::async_trait]
+//impl Greeter for MyServiceImpl {
+//    async fn say_hello(
+//        &self,
+//        request: Request<HelloRequest>,
+//    ) -> Result<Response<HelloReply>, Status> {
+//        let req = request.into_inner();
+//        println!("Received update: {:?}", req);
+//
+//        Ok(Response::new(HelloReply {
+//            message: "Update received".into(),
+//        }))
+//    }
+//}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -51,15 +51,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Set up the Tonic gRPC server
-    let grpc_service = MyServiceImpl::default();
-    let grpc_server = Server::builder()
-        .add_service(GreeterServer::new(grpc_service))
-        .serve(grpc_addr);
+    //let grpc_service = MyServiceImpl::default();
+    //let grpc_server = Server::builder()
+    //    .add_service(GreeterServer::new(grpc_service))
+    //    .serve(grpc_addr);
 
     // Run both servers concurrently
     let _ = tokio::try_join!(
         http_server,
-        tokio::spawn(grpc_server) 
+        //tokio::spawn(grpc_server) 
     );
 
     Ok(())

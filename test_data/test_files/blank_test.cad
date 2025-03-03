@@ -1,6 +1,0 @@
-test %1 blank_test = {
-  define blank_test() {
-    set_variable($x, 20);
-    assert($x == 20);
-  }
-}

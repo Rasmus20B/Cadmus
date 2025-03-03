@@ -2,6 +2,8 @@
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 
+use common::hbam2;
+
 fn handle_modification(path: &Path) {
     // Maintain a write ahead log for case where we can't connect to the server right now.
 }

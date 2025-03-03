@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = { version = "0.1.0", path = "../common" }
 notify = "8.0.0"
 prost = "0.13.5"
 tokio = { version = "1.43.0", features = [ "macros", "rt-multi-thread" ] }
