@@ -1,5 +1,6 @@
 
 use axum::{routing::get, Router};
+use tower_http::cors::CorsLayer;
 use std::net::SocketAddr;
 use tokio::task;
 use tonic::transport::Server;
@@ -42,8 +43,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let grpc_addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
     // Axum server setup
     let app = Router::new()
-        .route("/", get(|| async { "Hello from Axum!" }));
-
+        .route("/", get(|| async { "Hello from Axum!" }))
+        .route("/projects", get(|| async { "Heres some projects bruh!" }))
+        .layer(CorsLayer::very_permissive());
 
     // Spawn the Axum server in a separate task
     let http_server = async move {

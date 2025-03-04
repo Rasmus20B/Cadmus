@@ -23,6 +23,8 @@
           pkgs.postgresql
           pkgs.docker
           pkgs.docker-compose
+
+          pkgs.nodejs
         ];
 
         shellHook = ''
