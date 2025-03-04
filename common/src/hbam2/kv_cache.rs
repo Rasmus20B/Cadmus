@@ -1,4 +1,4 @@
-use super::api::Key;
+use super::Key;
 
 pub struct CachedKeyLocation {
     pub key: Key,

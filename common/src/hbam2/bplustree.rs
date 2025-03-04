@@ -2,7 +2,8 @@ use std::{collections::HashSet, fs::File, io::{Read, Seek}, path::Path, sync::Ar
 
 use crate::util::encoding_util::get_int; 
 
-use super::{api::{Key, KeyValue}, chunk::{Chunk, ChunkContents, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}, path::HBAMPath, view::View};
+use super::{Key, KeyValue};
+use super::{chunk::{Chunk, ChunkContents, ParseErr}, page::{Page, PageHeader, PageType}, page_store::{PageIndex, PageStore}, path::HBAMPath, view::View};
 
 type Offset = usize;
 
@@ -334,7 +335,7 @@ pub fn print_tree(cache: &mut PageStore, file: &str) {
 #[cfg(test)]
 mod tests {
     use std::{fs::File, io::{BufReader, Read, Seek}};
-    use crate::hbam2::{api::KeyValue, page::Page, path::HBAMPath};
+    use crate::hbam2::{KeyValue, page::Page, path::HBAMPath};
     use super::{search_key_in_page, search_index_page};
  
     #[test]
