@@ -37,18 +37,19 @@ mod monitor_proto {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Axum server setup
-    let app = Router::new().route("/", get(|| async { "Hello from Axum!" }));
 
     let http_addr: SocketAddr = "0.0.0.0:3000".parse().unwrap();
     let grpc_addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
+    // Axum server setup
+    let app = Router::new()
+        .route("/", get(|| async { "Hello from Axum!" }));
+
 
     // Spawn the Axum server in a separate task
-    let http_server = task::spawn(async move {
+    let http_server = async move {
         let listener = tokio::net::TcpListener::bind(&http_addr).await.unwrap();
-
         axum::serve(listener, app.into_make_service())
-    });
+    };
 
     // Set up the Tonic gRPC server
     //let grpc_service = MyServiceImpl::default();
@@ -57,10 +58,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //    .serve(grpc_addr);
 
     // Run both servers concurrently
-    let _ = tokio::try_join!(
-        http_server,
+    let _ = tokio::join!(
+        http_server.await,
         //tokio::spawn(grpc_server) 
     );
+
 
     Ok(())
 }
