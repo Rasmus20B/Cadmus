@@ -21,11 +21,14 @@
           pkgs.sqlx-cli
           pkgs.openssl
           pkgs.postgresql
+          pkgs.docker
+          pkgs.docker-compose
         ];
 
         shellHook = ''
-          export DATABASE_URL=postrges://user:password@localhost/dbname
-          alias v="nvim" #bruh
+          export DATABASE_URL=postgres://user:password@localhost/dbname
+          echo "Starting postgres docker container..."
+          docker-compose up -d
           echo "Development environment ready!"
         '';
         };

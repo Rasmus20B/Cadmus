@@ -8,6 +8,7 @@ tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
 axum = "0.8.1"
 prost = "0.13.5"
 tonic = "0.12.3"
+sqlx = { version = "0.7", features = [ "postgres", "runtime-tokio", "migrate" ] }
 
 [build-dependencies]
 tonic-build = "*"
