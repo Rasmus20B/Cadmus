@@ -13,6 +13,9 @@ enum ObjectType {
   OBJ_Script = 4;
 }
 
+message Change {
+}
+
 message UpdateRequest {
   bytes agent_token = 1;
   uint32 project_id = 2;
