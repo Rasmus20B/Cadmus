@@ -20,6 +20,7 @@ use tonic::include_proto;
 use sqlx::{pool::Pool, postgres::{Postgres, PgPoolOptions}};
 
 mod project_store;
+use project_store::project::get_projects;
 
 // Import your generated gRPC service traits
 mod monitor_proto {
@@ -48,24 +49,6 @@ mod monitor_proto {
 //    }
 //}
 
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-struct ProjectInfo {
-    id: i32,
-    name: String,
-    owner_id: i32,
-    project_path: String,
-    metadata: JsonValue,
-}
-unsafe impl Send for ProjectInfo {}
-unsafe impl Sync for ProjectInfo {}
-
-async fn get_projects(State(pool): State<PgPool>) -> Result<axum::Json<Vec<ProjectInfo>>, String> {
-    Ok(query_as!(ProjectInfo, "SELECT id, name, owner_id, project_path, metadata FROM projects")
-        .fetch_all(&pool)
-        .await
-        .map(|projects| axum::Json(projects))
-        .unwrap())
-}
 
 
 #[tokio::main]
@@ -90,7 +73,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Axum!" }))
-        .route("/projects", get(get_projects))
+        .route("/projects/retrieve_projects", get(get_projects))
+        .route("/projects/create_project", get(get_projects))
         .layer(CorsLayer::permissive())
         .with_state(db);
 

@@ -1,2 +1,2 @@
 
-mod project;
+pub(crate) mod project;
