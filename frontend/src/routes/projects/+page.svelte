@@ -1,18 +1,27 @@
 
 <script>
   async function fetchProjects() {
-    return fetch('http://localhost:3000/projects').then(res => res.text());
+    return await fetch('http://localhost:3000/projects').then((res) => res.json());
   }
-
-  const data = fetchProjects();
 </script>
 
 <button on:click={()=>{fetchProjects()}}>
   Get Projects
 </button>
 
-{#await data}
-  <p>Fetching projects...</p>
+<div>
+{#await fetchProjects()}
+  <p>loading projects...</p>
 {:then data}
-  <p>{data}</p>
+<div style='background="#ffaaff"'>
+  <ul>
+    {#each data as item}
+      {console.log(data)}
+      <li>Project: {item.name}</li>
+    {/each}
+  </ul>
+</div>
+{:catch}
+  <p>Could not load projects :(</p>
 {/await}
+</div>

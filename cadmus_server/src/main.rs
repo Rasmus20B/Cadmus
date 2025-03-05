@@ -1,11 +1,23 @@
 
+use serde::{Serialize, Deserialize};
+use serde_json::json;
+use axum::extract::State;
+use axum::Json;
 use axum::{routing::get, Router};
+use sqlx::prelude::FromRow;
+use sqlx::types::chrono::NaiveDateTime;
+use sqlx::types::{JsonValue, time::PrimitiveDateTime};
+use sqlx::{query, query_as, PgPool};
 use tower_http::cors::CorsLayer;
+use std::env;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tokio::task;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 use tonic::include_proto;
+
+use sqlx::{pool::Pool, postgres::{Postgres, PgPoolOptions}};
 
 mod project_store;
 
@@ -36,16 +48,51 @@ mod monitor_proto {
 //    }
 //}
 
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+struct ProjectInfo {
+    id: i32,
+    name: String,
+    owner_id: i32,
+    project_path: String,
+    metadata: JsonValue,
+}
+unsafe impl Send for ProjectInfo {}
+unsafe impl Sync for ProjectInfo {}
+
+async fn get_projects(State(pool): State<PgPool>) -> Result<axum::Json<Vec<ProjectInfo>>, String> {
+    Ok(query_as!(ProjectInfo, "SELECT id, name, owner_id, project_path, metadata FROM projects")
+        .fetch_all(&pool)
+        .await
+        .map(|projects| axum::Json(projects))
+        .unwrap())
+}
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let http_addr: SocketAddr = "0.0.0.0:3000".parse().unwrap();
     let grpc_addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
     // Axum server setup
+
+    let database_url = env::var("DATABASE_URL").unwrap();
+    let database_url = database_url.as_str();
+
+    println!("Connecting to: {}", database_url);
+
+    let db = PgPoolOptions::new()
+        .connect(database_url)
+        .await
+        .expect("Unable to connect to database");
+
+    sqlx::migrate!("../migrations/").run(&db).await
+        .expect("Unable to perform database migration.");
+
     let app = Router::new()
         .route("/", get(|| async { "Hello from Axum!" }))
-        .route("/projects", get(|| async { "Heres some projects bruh!" }))
-        .layer(CorsLayer::very_permissive());
+        .route("/projects", get(get_projects))
+        .layer(CorsLayer::permissive())
+        .with_state(db);
 
     // Spawn the Axum server in a separate task
     let http_server = async move {
@@ -64,7 +111,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         http_server.await,
         //tokio::spawn(grpc_server) 
     );
-
-
     Ok(())
 }
