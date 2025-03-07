@@ -1,99 +1,51 @@
 
-use serde::{Serialize, Deserialize};
-use serde_json::json;
-use axum::extract::State;
-use axum::Json;
-use axum::{routing::get, Router};
-use sqlx::prelude::FromRow;
-use sqlx::types::chrono::NaiveDateTime;
-use sqlx::types::{JsonValue, time::PrimitiveDateTime};
-use sqlx::{query, query_as, PgPool};
-use tower_http::cors::CorsLayer;
-use std::env;
+mod config;
+mod error;
+mod ctx;
+mod model;
+mod monitor_service;
+mod store;
+mod web;
+
+pub mod _dev_utils;
+
+pub use self::error::{Error, Result};
+pub use config::config;
+
+use crate::model::ModelManager;
+use crate::web::mw_auth::mw_ctx_resolve;
+use crate::web::mw_res_map::mw_response_map;
+use crate::web::{routes_login, routes_static};
+use axum::{middleware, Router};
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 use std::net::SocketAddr;
-use std::path::PathBuf;
-use tokio::task;
-use tonic::transport::Server;
-use tonic::{Request, Response, Status};
-use tonic::include_proto;
-
-use sqlx::{pool::Pool, postgres::{Postgres, PgPoolOptions}};
-
-mod project_store;
-use project_store::project::get_projects;
-
-// Import your generated gRPC service traits
-mod monitor_proto {
-    tonic::include_proto!("monitor");
-}
-
-//use monitor_proto::greeter_server::{Greeter, GreeterServer};
-//use monitor_proto::{HelloRequest, HelloReply};
-
-// Implement the gRPC service
-//#[derive(Default)]
-//struct MyServiceImpl;
-//
-//#[tonic::async_trait]
-//impl Greeter for MyServiceImpl {
-//    async fn say_hello(
-//        &self,
-//        request: Request<HelloRequest>,
-//    ) -> Result<Response<HelloReply>, Status> {
-//        let req = request.into_inner();
-//        println!("Received update: {:?}", req);
-//
-//        Ok(Response::new(HelloReply {
-//            message: "Update received".into(),
-//        }))
-//    }
-//}
-
-
+use tower_cookies::CookieManagerLayer;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
-    let http_addr: SocketAddr = "0.0.0.0:3000".parse().unwrap();
-    let grpc_addr: SocketAddr = "0.0.0.0:50051".parse().unwrap();
-    // Axum server setup
+    //_dev_utils::init_dev().await;
 
-    let database_url = env::var("DATABASE_URL").unwrap();
-    let database_url = database_url.as_str();
+    let mm = ModelManager::new().await?;
 
-    println!("Connecting to: {}", database_url);
+    let routes_all = Router::new()
+        .merge(routes_login::routes())
+        .layer(middleware::map_response(mw_response_map))
+        .layer(middleware::from_fn_with_state(mm.clone(), mw_ctx_resolve))
+        .layer(CookieManagerLayer::new())
+        .fallback_service(routes_static::serve_dir());
 
-    let db = PgPoolOptions::new()
-        .connect(database_url)
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+    info!("{:<12} - {addr}\n", "LISTENING");
+
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    axum::serve(listener, routes_all)
         .await
-        .expect("Unable to connect to database");
-
-    sqlx::migrate!("../migrations/").run(&db).await
-        .expect("Unable to perform database migration.");
-
-    let app = Router::new()
-        .route("/", get(|| async { "Hello from Axum!" }))
-        .route("/projects/retrieve_projects", get(get_projects))
-        .route("/projects/create_project", get(get_projects))
-        .layer(CorsLayer::permissive())
-        .with_state(db);
-
-    // Spawn the Axum server in a separate task
-    let http_server = async move {
-        let listener = tokio::net::TcpListener::bind(&http_addr).await.unwrap();
-        axum::serve(listener, app.into_make_service())
-    };
-
-    // Set up the Tonic gRPC server
-    //let grpc_service = MyServiceImpl::default();
-    //let grpc_server = Server::builder()
-    //    .add_service(GreeterServer::new(grpc_service))
-    //    .serve(grpc_addr);
-
-    // Run both servers concurrently
-    let _ = tokio::join!(
-        http_server.await,
-        //tokio::spawn(grpc_server) 
-    );
+        .unwrap();
     Ok(())
 }

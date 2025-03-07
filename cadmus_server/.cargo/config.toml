@@ -1,0 +1,6 @@
+
+[env]
+RUST_LOG="cadmus_server=debug"
+
+SERVICE_WEB_FOLDER="web-folder/"
+SERVICE_DB_URL="postgres://user:password@localhost/cadmus_db"

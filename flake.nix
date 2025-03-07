@@ -28,7 +28,7 @@
         ];
 
         shellHook = ''
-          export DATABASE_URL=postgres://user:password@localhost/dbname
+          export DATABASE_URL=postgres://user:password@localhost/cadmus_db
           echo "Starting postgres docker container..."
           docker-compose up -d
           echo "Development environment ready!"

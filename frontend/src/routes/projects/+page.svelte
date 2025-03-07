@@ -3,12 +3,17 @@
   import { onMount } from 'svelte';
   
   async function fetchProjects() {
-    return await fetch('http://localhost:3000/projects/retrieve_projects')
+    await fetch('http://localhost:3000/projects/retrieve_projects')
     .then((res) => res.json())
     .then(data => {
       console.log(data);
       return data;
     });
+  }
+
+  async function createProject() {
+    await fetch('http://localhost:3000/projects/create_project')
+    .then((res) => res.json())
   }
 
   let data = $state();
@@ -17,8 +22,8 @@
   });
 </script>
 
-<button onclick={()=>{console.log("AHHHHH")}}>
-  Get Projects
+<button onclick={()=>{console.log("AHHHHH"); }}>
+  Add New Project
 </button>
 
 <div>

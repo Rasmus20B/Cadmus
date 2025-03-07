@@ -28,8 +28,10 @@ enum ChangeResult {
   ChangeSuccess = 0;
   ChangeFailedAuth = 1;
   ChangeFailedMalformed = 2;
+  ChangeFailedOutOfSequence = 3;
 }
 
 message UpdateResponse {
   ChangeResult result = 1;
+  string message = 2;
 }
