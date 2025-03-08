@@ -2,6 +2,7 @@
 mod base;
 mod error;
 pub mod project;
+pub mod user;
 mod store;
 use store::{new_db_pool, Db};
 

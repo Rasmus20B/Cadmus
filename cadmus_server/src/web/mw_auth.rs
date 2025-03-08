@@ -1,6 +1,8 @@
+use crate::crypt::token::{validate_web_token, Token};
 use crate::ctx::Ctx;
+use crate::model::user::{UserBMC, UserForAuth};
 use crate::model::ModelManager;
-use crate::web::{AUTH_TOKEN, Error, Result};
+use crate::web::{set_token_cookie, Error, Result, AUTH_TOKEN};
 use async_trait::async_trait;
 use axum::body::Body;
 use axum::extract::{FromRequestParts, State};
@@ -24,23 +26,44 @@ pub async fn mw_ctx_require(
 }
 
 pub async fn mw_ctx_resolve(
-    _mm: State<ModelManager>,
+    mm: State<ModelManager>,
     cookies: Cookies,
     mut req: Request<Body>,
     next: Next
 ) -> Result<Response> {
+    async fn _ctx_resolve(mm: State<ModelManager>, cookies: &Cookies) -> CtxExtResult {
+        let token = cookies
+            .get(AUTH_TOKEN)
+            .map(|c| c.value().to_string())
+            .ok_or(CtxExtError::TokenNotInCookie)?;
+
+        let token: Token = token.parse().map_err(|_| CtxExtError::TokenWrongFormat)?;
+
+        let user: UserForAuth = 
+            UserBMC::first_by_username(&Ctx::root_ctx(), &mm, &token.ident)
+            .await
+            .map_err(|e| CtxExtError::ModelAccessError(e.to_string()))?
+            .ok_or(CtxExtError::UserNotFound)?;
+
+        validate_web_token(&token, &user.token_salt.to_string())
+            .map_err(|_| CtxExtError::FailValidate)?;
+
+        set_token_cookie(cookies, &user.username, &user.token_salt.to_string())
+            .map_err(|_| CtxExtError::CannotSetTokenCookie)?;
+
+        Ctx::new(user.id).map_err(|e| CtxExtError::CtxCreateFail(e.to_string()))
+    }
     debug!("{:<12} - mw_ctx_resolve ", "MIDDLEWARE");
 
-    let auth_token = cookies.get(AUTH_TOKEN).map(|c| c.value().to_string());
+    let ctx_ext_result = _ctx_resolve(mm, &cookies).await;
 
-    let result_ctx =
-        Ctx::new(100).map_err(|e| CtxExtError::CtxCreateFail(e.to_string()));
-
-    if result_ctx.as_ref().is_err_and(|r| !matches!(result_ctx, Err(CtxExtError::TokenNotInCookie))) {
-        cookies.remove(Cookie::build(AUTH_TOKEN).into())
+    if ctx_ext_result.is_err() 
+    && !matches!(ctx_ext_result, Err(CtxExtError::TokenNotInCookie)) {
+        cookies.remove(Cookie::from(AUTH_TOKEN))
     }
 
-    req.extensions_mut().insert(result_ctx);
+    req.extensions_mut().insert(ctx_ext_result);
+
     Ok(next.run(req).await)
 
 }
@@ -62,6 +85,13 @@ type CtxExtResult = core::result::Result<Ctx, CtxExtError>;
 #[derive(Debug, Serialize, Clone)]
 pub enum CtxExtError {
     TokenNotInCookie,
+    TokenWrongFormat,
+
+    UserNotFound,
+    ModelAccessError(String),
+    FailValidate,
+    CannotSetTokenCookie,
+
     CtxNotInRequestExt,
     CtxCreateFail(String),
 }

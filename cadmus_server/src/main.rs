@@ -1,16 +1,19 @@
 
 mod config;
+mod crypt;
 mod error;
 mod ctx;
 mod model;
 mod monitor_service;
-mod store;
+mod utils;
 mod web;
 
 pub mod _dev_utils;
 
 pub use self::error::{Error, Result};
+use axum::response::Html;
 pub use config::config;
+use web::mw_auth::mw_ctx_require;
 
 use crate::model::ModelManager;
 use crate::web::mw_auth::mw_ctx_resolve;
@@ -33,8 +36,13 @@ async fn main() -> Result<()> {
 
     let mm = ModelManager::new().await?;
 
+    let routes_hello = Router::new()
+        .route("/hello", axum::routing::get(|| async { Html("Hello World") }))
+        .route_layer(middleware::from_fn(mw_ctx_require));
+
     let routes_all = Router::new()
-        .merge(routes_login::routes())
+        .merge(routes_login::routes(mm.clone()))
+        .merge(routes_hello)
         .layer(middleware::map_response(mw_response_map))
         .layer(middleware::from_fn_with_state(mm.clone(), mw_ctx_resolve))
         .layer(CookieManagerLayer::new())
