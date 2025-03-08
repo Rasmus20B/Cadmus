@@ -4,3 +4,8 @@ RUST_LOG="cadmus_server=debug"
 
 SERVICE_WEB_FOLDER="web-folder/"
 SERVICE_DB_URL="postgres://user:password@localhost/cadmus_db"
+
+SERVICE_PWD_KEY="BYXrrnHsg-lmngYjOF0fJ0yTMZ4a39oh31qUGWp38aZqEGLlVMYAx4O8OfRIqBxmnUeZUF12-suzRRsT-VUk_Q"
+
+SERVICE_TOKEN_KEY="iPzBOOXwczggY1_n-LKYJVv-jau4nnjw_SwD_VZqbD9g2u-CZNn4ZnCDSslXUVWDlmMglpRb8y0Gsv9MNWc2Ng"
+SERVICE_TOKEN_DURATION_SEC="1800"
