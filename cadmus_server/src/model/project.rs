@@ -2,66 +2,56 @@
 use crate::{ctx::Ctx, model::{ModelManager, Error, Result}};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use sqlb::Fields;
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+use super::base::{self, DbBMC};
+
+#[derive(Fields, Debug, Clone, FromRow, Serialize)]
 pub struct Project {
     pub id: i64,
     pub name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Fields, Deserialize)]
 pub struct ProjectForCreate {
     pub name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Fields, Deserialize)]
 pub struct ProjectForUpdate {
     pub name: Option<String>,
 }
 
 pub struct ProjectBMC;
 
+impl DbBMC for ProjectBMC {
+    const TABLE: &'static str = "projects";
+}
+
 impl ProjectBMC {
     pub async fn create(
-        _ctx: &Ctx,
+        ctx: &Ctx,
         mm: &ModelManager,
         project_c: ProjectForCreate,
     ) -> Result<i64> {
-        let db = mm.db();
-        let (id, ) = sqlx::query_as::<_, (i64,)>(
-            "INSERT INTO project (name) VALUES ($1) returning id"
-        )
-        .bind(project_c.name)
-        .fetch_one(db).await?;
-
-        Ok(id)
+        base::create::<Self, _>(ctx, mm, project_c).await
     }
 
-    pub async fn get(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<Project> {
-        let db = mm.db();
-
-        let project: Project = sqlx::query_as("SELECT * FROM projects WHERE id = $1")
-            .bind(id)
-            .fetch_optional(db)
-            .await?
-            .ok_or(Error::EntityNotFound { entity: "project", id })?;
-
-        Ok(project)
+    pub async fn get(ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<Project> {
+        base::get::<Self, _>(ctx, mm, id).await
     }
 
-    pub async fn delete(_ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<()> {
-        let db = mm.db();
-        let count = sqlx::query("DELETE FROM projects WHERE id = $1")
-            .bind(id)
-            .execute(db)
-            .await?
-            .rows_affected();
+    pub async fn list(ctx: &Ctx, mm: &ModelManager) -> Result<Vec<Project>> {
+        base::list::<Self, _>(ctx, mm).await
+    }
 
-        if count == 0 {
-            return Err(Error::EntityNotFound { entity: "project", id  })
-        }
+    pub async fn update(ctx: &Ctx, mm: &ModelManager, id: i64, project_u: ProjectForUpdate) -> Result<()> {
+        base::update::<Self, _>(ctx, mm, id, project_u).await
 
-        Ok(())
+    }
+
+    pub async fn delete(ctx: &Ctx, mm: &ModelManager, id: i64) -> Result<()> {
+        base::delete::<Self>(ctx, mm, id).await
     }
 }
 

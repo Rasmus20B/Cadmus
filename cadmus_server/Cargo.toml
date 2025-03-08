@@ -21,6 +21,7 @@ strum_macros = "0.27.1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 serial_test = "3.2.0"
+sqlb = "0.4.0"
 
 [build-dependencies]
 tonic-build = "*"

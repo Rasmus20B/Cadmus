@@ -1,6 +1,7 @@
 
+mod base;
 mod error;
-mod project;
+pub mod project;
 mod store;
 use store::{new_db_pool, Db};
 
