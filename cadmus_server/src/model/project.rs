@@ -19,6 +19,7 @@ pub struct ProjectForCreate {
 
 #[derive(Fields, Deserialize)]
 pub struct ProjectForUpdate {
+    pub id: i64,
     pub name: Option<String>,
 }
 

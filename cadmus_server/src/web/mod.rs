@@ -1,5 +1,6 @@
 
 mod error;
+mod rest;
 pub mod mw_auth;
 pub mod mw_res_map;
 pub mod routes_static;
