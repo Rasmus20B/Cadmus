@@ -1,5 +1,5 @@
 
-mod disk_manager;
+pub mod error;
 mod frame;
 mod manager;
 pub mod page_guard;

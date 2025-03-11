@@ -4,7 +4,7 @@ members = [
   "cadmus_server",
   "cadmus_test",
   "cadmus_monitor",
-  "common",
+  "common", "cadmus_hbam",
 ]
 resolver  = "2"
 
