@@ -44,8 +44,7 @@ impl DiskManager {
         let mut table = HashMap::new();
         const PAGE_SIZE: u64 = 4096;
 
-        let file_size = file.metadata().unwrap().len();
-        println!("Filesize: {file_size}");
+        let file_size = file.metadata()?.len();
         let pages_n = file_size / PAGE_SIZE;
 
         let root_page = PAGE_SIZE * 1;
@@ -92,7 +91,15 @@ impl DiskIO for DiskManager {
     }
 
     fn read_page(&self, page_id: usize) -> Result<[u8; 4096]> {
-        todo!()
+        let mut reader = BufReader::new(&self.file);
+        let Some(position) = self.page_offsets.get(&page_id) else {
+            return Err(Error::CorruptedFile)
+        };
+
+        let mut data = [0u8; 4096];
+        reader.seek(std::io::SeekFrom::Start(*position as u64))?;
+        reader.read_exact(&mut data)?;
+        Ok(data)
     }
 
     fn delete_page(&self, page_id: usize) -> Result<()> {
