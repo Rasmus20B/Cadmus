@@ -14,6 +14,20 @@ pub enum RelationComparison {
     Cartesian
 }
 
+impl core::fmt::Display for RelationComparison {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RelationComparison::Equal => write!(f, "=="),
+            RelationComparison::NotEqual => write!(f, "!="),
+            RelationComparison::Less => write!(f, "<"),
+            RelationComparison::LessEqual => write!(f, "<="),
+            RelationComparison::Greater => write!(f, ">"),
+            RelationComparison::GreaterEqual => write!(f, ">="),
+            RelationComparison::Cartesian => write!(f, "*"),
+        }
+    }
+}
+
 impl RelationComparison {
     pub fn mirrored(&self) -> Self {
         match self {

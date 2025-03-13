@@ -1,6 +1,8 @@
 
 use serde::{Serialize, Deserialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+
+use crate::dbobjects::file::File;
 
 use super::field::Field;
 
@@ -31,5 +33,16 @@ impl Table {
     pub fn name(mut self, name: String) -> Self {
         self.name = name;
         self
+    }
+
+    pub fn to_cad(&self, file: &File, externs: &HashMap<usize, File>) -> String {
+        let mut buffer = String::new();
+        buffer.push_str(&format!("table %{} {} = {{\n", self.id, self.name));
+        for (_, field) in &self.fields {
+            buffer.push_str(&format!("    {}\n", &field.to_cad(file, externs)));
+        }
+
+        buffer.push_str("}");
+        buffer
     }
 }
