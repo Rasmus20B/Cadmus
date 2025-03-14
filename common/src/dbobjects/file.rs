@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use crate::cadlang;
+use crate::{cadlang, hbam2};
 
 use super::schema::Schema;
 use super::scripting::script::Script;
@@ -24,7 +24,21 @@ impl File {
         let mut buffer = String::new();
 
         buffer.push_str(&self.data_sources.iter().map(|ds| ds.to_cad()).collect::<Vec<String>>().join(&"\n"));
-        let externs = &self.data_sources.iter().map(|ds| (ds.id as usize, cadlang::compiler::compile_to_file(Path::new(&(self.working_dir.clone() + "/" + &ds.paths[0]))).unwrap())).collect::<HashMap::<usize, File>>();
+        let externs = &self.data_sources.iter().map(|ds| (ds.id as usize, 
+                match ds.dstype {
+                    DataSourceType::FileMaker => {
+                        let mut ctx = hbam2::Context::new();
+                        ctx.get_schema_contents(&(self.working_dir.clone() + "/" + &ds.paths[0] + ".fmp12"))
+                    },
+                    DataSourceType::Cadmus => {
+                        cadlang::compiler::compile_to_file(
+                            Path::new(&(self.working_dir.clone() + "/" + &ds.paths[0])))
+                            .unwrap()
+                    }
+                    _ => {
+                        todo!()
+                    },
+        })).collect::<HashMap<usize, File>>();
         buffer.push_str("\n\n");
         buffer.push_str(&self.schema.to_cad(self, externs));
         buffer.push_str("\n\n");

@@ -63,8 +63,8 @@ impl RelationGraph {
         let mut relation_buffer = String::new();
         let mut relation_set = HashSet::new();
         for node in &self.nodes {
-
             if node.base.data_source == 0 {
+                println!("TO: {}", node.name);
                 let table = file.schema.tables.iter().find(|table| table.id == node.base.table_id).unwrap();
                 buffer.push_str(&format!("table_occurrence %{} {} : {}\n", node.id, node.name, table.name));
             } else {

@@ -476,7 +476,8 @@ mod tests {
         assert_eq!(2, result.len());
 
         for (_, ds) in result {
-            println!("{} :: {:?}", ds.name, ds.paths);
+            println!("{:?} !!!!====!!!!! {} :: {:?}", ds, ds.name, ds.paths);
+
         }
     }
 
