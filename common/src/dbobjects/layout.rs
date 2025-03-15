@@ -1,7 +1,7 @@
 
 use super::reference::TableOccurrenceReference;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Layout {
     pub id: u32,
     pub name: String,

@@ -9,7 +9,7 @@ use super::file::File;
 use super::schema::relationgraph::graph::RelationGraph;
 use super::schema::table::Table;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Schema {
     pub tables: Vec<Table>,
     pub relation_graph: RelationGraph,

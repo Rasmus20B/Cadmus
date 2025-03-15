@@ -10,8 +10,8 @@ pub fn init_cadmus_repo(path: &PathBuf) -> Result<()> {
     let test_dir = cad_dir.clone().join("tests");
     let gen_dir = cad_dir.clone().join("gen");
     std::fs::create_dir(cad_dir.clone())?;
-    std::fs::create_dir(gen_dir)?;
-    std::fs::create_dir(test_dir)?;
+    std::fs::create_dir(gen_dir.clone())?;
+    std::fs::create_dir(test_dir.clone())?;
 
     println!("Path: {:?}", path);
     let mut files = vec![];
@@ -23,13 +23,12 @@ pub fn init_cadmus_repo(path: &PathBuf) -> Result<()> {
             let mut hbam_ctx = hbam2::Context::new();
             files.push((f.path(), hbam_ctx.get_schema_contents(f.path().to_str().unwrap())));
         }
-        //if let Ok(ft) = f.file_type() {
-        //    if ft.is_file() && f.path().ends_with(".fmp12") {
-        //    }
-        //}
     }
 
-    for (path, file) in files {
+    for (path, file) in &files {
+        let mut path = path.clone();
+        path.set_extension("cad");
+        let path = gen_dir.to_path_buf().join(Path::new(&path.file_name().unwrap()));
         println!("writing {:?}...", path);
         let handle = std::fs::OpenOptions::new()
             .create(true)
@@ -37,7 +36,7 @@ pub fn init_cadmus_repo(path: &PathBuf) -> Result<()> {
             .open(path).unwrap();
 
         let mut writer = BufWriter::new(handle);
-        writer.write_all(file.to_cad().as_bytes())?;
+        writer.write_all(file.to_cad_with_externs(&files.iter().map(|f| f.1.clone()).collect::<Vec<_>>()).as_bytes())?;
     }
     Ok(())
 }

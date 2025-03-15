@@ -5,7 +5,7 @@ use crate::dbobjects::file::File;
 use super::{table_occurrence::TableOccurrence, relation::Relation};
 use std::collections::VecDeque;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RelationGraph {
     pub nodes: Vec<TableOccurrence>
 }

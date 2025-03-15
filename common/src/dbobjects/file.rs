@@ -8,7 +8,7 @@ use super::scripting::script::Script;
 use super::layout::Layout;
 use super::data_source::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct File {
     pub name: String,
     pub schema: Schema,
@@ -42,6 +42,31 @@ impl File {
         buffer.push_str("\n\n");
         buffer.push_str(&self.schema.to_cad(self, externs));
         buffer.push_str("\n\n");
+        buffer
+    }
+
+    pub fn to_cad_with_externs(&self, externs: &Vec<File>) -> String {
+        let mut buffer = String::new();
+
+        for file in externs {
+            println!("file: {}", file.name);
+        }
+        
+        let extern_map = self.data_sources
+            .iter()
+            .map(|ds| (ds.id, externs
+                    .iter()
+                    .inspect(|e| println!("{} == {}?", (self.working_dir.clone() + "/" + &ds.name + ".fmp12"), e.name))
+                    .find(|e| ds.paths
+                        .iter()
+                        .find(|p| **p == Path::new(&e.name).to_path_buf().file_stem().unwrap().to_string_lossy()).is_some())
+            ))
+            .filter(|e| e.1.is_some())
+            .map(|e| (e.0 as usize, e.1.unwrap().clone()))
+            .collect::<HashMap<usize, File>>();
+
+        buffer.push_str(&self.schema.to_cad(self, &extern_map));
+        buffer.push_str("\n\n");
 
         buffer
     }
@@ -59,7 +84,6 @@ mod tests {
     fn quotes_file_test() {
         let code = std::fs::read_to_string(Path::new("test_data/cad_files/multi_file_solution/quotes.cad")).unwrap();
         let file = cadlang::compiler::compile_to_file(Path::new("test_data/cad_files/multi_file_solution/quotes.cad")).unwrap();
-
         println!("{}", file.to_cad());
     }
 }
