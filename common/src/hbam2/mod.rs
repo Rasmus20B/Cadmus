@@ -45,7 +45,7 @@ pub fn emit_file(file: &str) {
 }
 
 pub struct Context {
-    cache: PageStore,
+    pub cache: PageStore,
 }
 
 impl Context {
@@ -54,6 +54,11 @@ impl Context {
             cache: PageStore::new()
         }
     }
+
+    pub fn print_full(&mut self, file: &str) {
+        bplustree::print_tree(&mut self.cache, file)
+    }
+
     pub fn get_schema_contents(&mut self, file: &str) -> File {
 
         File {
@@ -100,12 +105,12 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
             }
         };
 
+
     let mut result = HashMap::new();
     for dir in view_option.get_dirs().unwrap() {
         let path_id =  &dir.path.components[dir.path.components.len()-1];
-        let id_ = get_path_int(&dir.path.components[dir.path.components.len()-1]);
+        let id_ = get_path_int(&dir.path.components[dir.path.components.len()-1]) - 128;
         let field_path = HBAMPath::new(vec![path_id.as_slice(), &[3], &[5]]);
-
         let field_view = match get_view_from_key(&field_path, cache, file)
             .expect("Unable to get fields for table.") {
                 Some(inner) => inner,
@@ -114,6 +119,9 @@ pub fn get_table_catalog(cache: &mut PageStore, file: &str) -> HashMap<usize, Ta
                 }
         };
         let mut fields_ = BTreeMap::new();
+        for chunk in &field_view.chunks {
+            println!("{}", chunk);
+        }
 
         for field in field_view.get_dirs().unwrap() {
             let path_id = field.path.components.last().unwrap();
@@ -456,10 +464,10 @@ mod tests {
     #[test]
     fn get_table_catalog_split_page_test() {
         let mut cache = PageStore::new();
-        let result = get_table_catalog(&mut cache, "test_data/fmp_files/mixed.fmp12");
+        let result = get_table_catalog(&mut cache, "test_data/fmp_files/relation.fmp12");
         assert_eq!(2, result.len());
 
-        assert_eq!(result.get(&129).unwrap().fields.len(), 5);
+        assert_eq!(result.get(&1).unwrap().fields.len(), 6);
         for (_, table) in result {
             println!("Table: {:?}", table.name);
             for (_, field) in table.fields {

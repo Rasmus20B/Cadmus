@@ -190,7 +190,7 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
      * then skip pushes in next page until we reach the same path or 
      * get to a path that is after in the order. */
 
-    let mut cached_path: HBAMPath;
+    let mut cached_path = HBAMPath::new(vec![]);
     let mut offset = PageHeader::SIZE as usize;
     loop {
         while offset < Page::SIZE as usize {
@@ -215,6 +215,7 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
             match chunk.contents {
                 ChunkContents::Push { key } => {
                     current_path.components.push(key.to_vec());
+                    cached_path = current_path.clone();
                 },
                 ChunkContents::Pop => {
                     current_path.components.pop();
@@ -223,13 +224,12 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
             }
         }
         if current_page.header.next == 0 { return Ok(None) }
-        cached_path = current_path.clone();
         current_path.components.clear();
         current_page = get_page(current_page.header.next.into(), cache, file)?;
         offset = PageHeader::SIZE as usize;
         while offset < Page::SIZE as usize
-            && (current_path.components <= cached_path.components)
-            && (current_path <= cached_path) {
+            && ((current_path.components != cached_path.components)
+            && (current_path <= cached_path)) {
             let chunk = match Chunk::from_bytes(&current_page.data, &mut offset) {
                 Ok(inner) => inner,
                 Err(ParseErr::EndChunk) => {
@@ -237,6 +237,7 @@ pub fn get_view_from_key<'a, 'b>(key: &HBAMPath, cache: &mut PageStore, file: &s
                 }
                 Err(e) => return Err(BPlusTreeErr::InvalidChunkComposition(e)),
             };
+            println!("skipping: {}", chunk);
             match chunk.contents {
                 ChunkContents::Push { key } => {
                     current_path.components.push(key.to_vec());

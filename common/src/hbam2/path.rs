@@ -152,6 +152,7 @@ mod tests {
         assert!(HBAMPath::new(vec![&[3], &[17], &[5]]).partial_cmp(&HBAMPath::new(vec![&[3], &[17]])) == Some(Ordering::Equal));
         assert!(HBAMPath::new(vec![&[128, 1], &[3], &[5]]).partial_cmp(&HBAMPath::new(vec![&[128, 1]])) == Some(Ordering::Equal));
         assert!(HBAMPath::new(vec![&[128, 1], &[3], &[5]]) == HBAMPath::new(vec![&[128, 1]]));
+        assert!(HBAMPath::new(vec![&[128, 1], &[3], &[5]]) == HBAMPath::new(vec![&[128, 1], &[3], &[5], &[6]]));
         assert!(HBAMPath::new(vec![&[128, 1]]) == HBAMPath::new(vec![&[128, 1], &[3], &[5]]));
         assert!(HBAMPath::new(vec![&[128, 2]]) >= HBAMPath::new(vec![&[128, 1]]));
         assert!(HBAMPath::new(vec![&[128, 1]]) <= HBAMPath::new(vec![&[128, 2]]));
