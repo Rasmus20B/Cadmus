@@ -1,7 +1,10 @@
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::dbobjects::calculation::Calculation;
+use crate::dbobjects::file::File;
 use crate::dbobjects::reference::*;
 
 use super::arguments::*;
@@ -200,6 +203,12 @@ use super::arguments::*;
 	PerformScriptOnServerWithCallback,
 	TriggerClarisConnectFlow,
         Assert { expr: Calculation },
+}
+
+impl Instruction {
+    pub fn to_cad(&self, file: File, externs: HashMap<usize, File>) -> String {
+        todo!()
+    }
 }
 
 //impl FromStr for Instruction {

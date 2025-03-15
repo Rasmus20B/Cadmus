@@ -1,0 +1,45 @@
+table %1 blank = {
+    field %1 PrimaryKey = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %2 CreationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %3 CreatedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %4 ModificationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %5 ModifiedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+}
+
+table_occurrence %1 blank : blank
+
+
+
+
+layout %1 blank : blank = {}
+

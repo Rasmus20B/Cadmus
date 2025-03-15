@@ -1,0 +1,112 @@
+table %2 second_table = {
+    field %1 PrimaryKey = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %2 CreationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %3 CreatedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %4 ModificationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %5 ModifiedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %6 add = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+}
+table %1 blank = {
+    field %1 PrimaryKey = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %2 CreationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %3 CreatedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %4 ModificationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %5 ModifiedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %6 salary = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+}
+
+table_occurrence %3 blank 2 : blank
+table_occurrence %2 second_table : second_table
+table_occurrence %1 blank : blank
+
+
+relation %2 = blank 2::PrimaryKey == salary::blank
+relation %1 = second_table::PrimaryKey == PrimaryKey::blank
+
+
+layout %1 blank : blank = {}
+layout %2 second_table : second_table = {}
+
+script %1 funny = {
+    SetVariable { name: "$x", value: Calculation([16, 2, 0, 1, 0, 16, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32]), repetition: Calculation([]) }    SetVariable { name: "$y", value: Calculation([16, 2, 0, 1, 0, 16, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32]), repetition: Calculation([]) }
+
+
+script %4 nah it's real = {
+    SetVariable { name: "$x", value: Calculation([16, 2, 0, 1, 0, 16, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32]), repetition: Calculation([]) }    SetVariable { name: "$x", value: Calculation([26, 2, 126, 34, 12, 19, 1, 122, 0, 37, 12, 19, 1, 122, 0, 16, 2, 0, 1, 0, 16, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32]), repetition: Calculation([]) }
+
+
+script %5 testing = {
+    SetVariable { name: "$x", value: Calculation([22, 4, 4, 3, 208, 0, 1, 2, 1, 1, 0, 1]), repetition: Calculation([]) }    SetVariable { name: "$x", value: Calculation([22, 4, 4, 3, 208, 0, 3, 2, 1, 1, 0, 1]), repetition: Calculation([]) }
+

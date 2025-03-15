@@ -1,0 +1,99 @@
+table %2 other_table = {
+    field %1 PrimaryKey = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %2 CreationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %3 CreatedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %4 ModificationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %5 ModifiedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+}
+table %1 blank = {
+    field %1 PrimaryKey = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %2 CreationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %3 CreatedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %4 ModificationTimestamp = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %5 ModifiedBy = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+    field %6 other_key = {
+        datatype = Text,
+        nomodify = false
+        trigger = on_entry,
+        user_override = true,
+        message = "",
+    }
+}
+
+table_occurrence %3 other_table : other_table
+table_occurrence %1 blank : blank
+table_occurrence %2 blank 2 : blank
+table_occurrence %4 second_table : other_table
+
+
+relation %3 = other_table::PrimaryKey == other_key::blank
+relation %4 = other_table::PrimaryKey == CreationTimestamp::second_table
+relation %1 = blank::PrimaryKey == PrimaryKey::blank 2
+
+
+layout %2 other_table : other_table = {}
+layout %1 blank : blank = {}
+
+script %1 New Script = {
+
+

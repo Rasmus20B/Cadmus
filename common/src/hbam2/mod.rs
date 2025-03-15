@@ -395,7 +395,7 @@ pub fn get_layout_catalog(cache: &mut PageStore, file: &str) -> HashMap::<usize,
             name: name_,
             occurrence: TableOccurrenceReference {
                 data_source: 0,
-                table_occurrence_id: meta_definition[1] as u32,
+                table_occurrence_id: meta_definition[1] as u32 - 128,
             },
         });
     }

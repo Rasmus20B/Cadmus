@@ -42,6 +42,9 @@ impl File {
         buffer.push_str("\n\n");
         buffer.push_str(&self.schema.to_cad(self, externs));
         buffer.push_str("\n\n");
+        buffer.push_str(&self.layouts.iter()
+            .map(|layout| layout.to_cad(self))
+            .collect::<Vec<String>>().join(&"\n"));
         buffer
     }
 
@@ -67,7 +70,14 @@ impl File {
 
         buffer.push_str(&self.schema.to_cad(self, &extern_map));
         buffer.push_str("\n\n");
+        buffer.push_str(&self.layouts.iter()
+            .map(|layout| layout.to_cad(self))
+            .collect::<Vec<String>>().join(&"\n"));
+        buffer.push_str("\n\n");
 
+        buffer.push_str(&self.scripts.iter()
+            .map(|layout| layout.to_cad(self, extern_map.clone()))
+            .collect::<Vec<String>>().join(&"\n"));
         buffer
     }
 }
