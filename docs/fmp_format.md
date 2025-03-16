@@ -26,10 +26,20 @@
 <a id="Metadata"></a>
 # Metadata and embedded XML
 
-- FileMaker version : [2]::3
+## FileMaker Version
+
+The version of FileMaker that generated this file. It is stored in the FileMaker 0x5A string encoding scheme.
+**Path: [2]::3**
 
 <a id="Tables"></a>
 # Tables
+
+<a id="Fields"></a>
+# Fields
+
+## Field type options
+
+- Field Type Definition
 
 ## Field type switches (Found at key 2 for field definition)
 
