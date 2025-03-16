@@ -6,8 +6,8 @@
 
 ## File Tree Structure
 
-- Printing API Information: [2]
-- Tables: [3].[16].[5]
+- Metadata and Printing API Information: [2]
+- [Tables: [3].[16].[5]](#Tables)
 - Relationships: [3].[17].[5]
 - Layout info: [4].[1].[7]
 - Theme info: [6].[5]
@@ -20,7 +20,9 @@
 - Fields: [tableid].[3].[5]
 - Data: [tableid].[5].[recordid]
 
-# Table Information
+
+<a id="Tables"></a>
+# Tables
 
 ## Field type switches (Found at key 2 for field definition)
 
