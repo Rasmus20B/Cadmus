@@ -34,6 +34,30 @@ The version of FileMaker that generated this file. It is stored in the FileMaker
 <a id="Tables"></a>
 # Tables
 
+## Double-byte-encoded table names
+
+These are encoded for use in the FileMaker application, and are stored in long key-value pairs. The key is the name of the table in the encoding scheme, and the value is a numerical form of identification for the table.
+
+
+> **Path:** ``[3].[16].[1].[1]::[encoded_name]``  
+###### TODO: Figure out encoding scheme for numerical identification
+
+## Table metadata
+
+This directory stores information about each table including it's 0x5A encoded name, the timestamp it was last edited, the user that last edited it, etc.
+
+> **Path:** ``[3].[16].[5].[table_id]``
+
+| Key   | Value                                        |
+| ---   | ------------------                           |
+| 16    | Table name (0x5A)                            | 
+| 216   | Unknown, probably consistency related        | 
+| 252   | Unknown, probably consistency related        |
+| 64513 | Username of creator                          |
+| 64514 | Username of last modifier                    |
+| 64515 | Timestamp of last modified (Variable length) | 
+
+
 <a id="Fields"></a>
 # Fields
 
