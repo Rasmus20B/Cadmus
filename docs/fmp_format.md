@@ -3,23 +3,29 @@
 ## Style
 
 - Whenever byte indexes are written about, I'm using 1 based indexing. I.e. the 3rd byte of the array [3, 1, 5, 2, 4, 2, 1] is 5.
+- "Directories" in the abstract file system are denoted as "[label]", with label being one or multiple bytes. an example of a directory path would be: [3].[16].[5].
+- Key-value pair keys are denoted by "::key". an example of a key-value pair stored inside a directory would be: [3].[16].[5]::0.
 
 ## File Tree Structure
 
-- Metadata and Printing API Information: [2]
+- [Metadata and embedded XML](#Metadata)
 - [Tables: [3].[16].[5]](#Tables)
-- Relationships: [3].[17].[5]
+- [Relationships: [3].[17].[5]](#Relationships)
 - Layout info: [4].[1].[7]
 - Theme info: [6].[5]
 - Scripts: [17]
 - Security: [23]
 - Fonts: [25]
-- External Data Sources: [32]
+- [Data Sources: [32]](#Data Sources)
 - value lists: [33]
 - Toolbar information: [65]
 - Fields: [tableid].[3].[5]
 - Data: [tableid].[5].[recordid]
 
+<a id="Metadata"></a>
+# Metadata and embedded XML
+
+- FileMaker version : [2]::3
 
 <a id="Tables"></a>
 # Tables
@@ -163,6 +169,7 @@
 ### 25:
 - byte 25 simply states how many repetitions the field has
 
+<a id="Relationships"></a>
 # Relationships
 
 ## Relationship Structure
@@ -441,7 +448,8 @@ the file value to append to the path above.
 
 ## Security Information
 
-## External Data Sources
+<a id="Data Sources"></a>
+# External Data Sources
 
 - Found @ [32]
 
