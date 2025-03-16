@@ -3,8 +3,9 @@
 ## Style
 
 - Whenever byte indexes are written about, I'm using 1 based indexing. I.e. the 3rd byte of the array [3, 1, 5, 2, 4, 2, 1] is 5.
-- "Directories" in the abstract file system are denoted as "[label]", with label being one or multiple bytes. an example of a directory path would be: [3].[16].[5].
+- "Directories" in the abstract file system are denoted as "[label]", with label being one or multiple comma separated bytes. an example of a directory path would be: [3].[16].[5].
 - Key-value pair keys are denoted by "::key". an example of a key-value pair stored inside a directory would be: [3].[16].[5]::0.
+- Long key-value pair keys are denoted by "::[component, ...]". An example of a long key-value pair stored inside a directory would be: [3].[16].[1].[1]::[18, 37, 19, 48].
 
 ## File Tree Structure
 
