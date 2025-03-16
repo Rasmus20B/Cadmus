@@ -29,7 +29,7 @@
 ## FileMaker Version
 
 The version of FileMaker that generated this file. It is stored in the FileMaker 0x5A string encoding scheme.\
-> Path ``[2]::3``
+> **Path:** ``[2]::3``
 
 <a id="Tables"></a>
 # Tables
