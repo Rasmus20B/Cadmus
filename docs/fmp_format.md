@@ -17,7 +17,7 @@
 - Scripts: [17]
 - Security: [23]
 - Fonts: [25]
-- [Data Sources: [32]](#Data Sources)
+- [Data Sources](#Data Sources)
 - value lists: [33]
 - Toolbar information: [65]
 - Fields: [tableid].[3].[5]
@@ -367,13 +367,30 @@ the file value to append to the path above.
 
 - Found @ [32]
 
-- [32].[1].[1] -> Variable length encoded strings of the Data Source names.
-- [32].[1].[3] -> first 4 bytes indicate order number. size prefixed number after this indicate ID of data source used in data directory ([5]).
-- [32].[5].[ID]:
-    - {16} -> name of data source
-    - first {130} -> OS Path to data source, relative. Stored as an 'encrypted' string.
-        - File handles are stored as 0, 0, 0, 1, 4, file, length of path, ':', PATH, '/', length of filename, FILENAME
+## Variable Length Encoded Datasource Names
 
+Variable length encoded for use with the FileMaker application. 
+
+> **Path:** ``[32].[1].[1]``
+
+## IDs For Use With Data Directory
+
+The first 4 bytes indicate an ordering of sources. The variable length encoded number after this indicate the ID of the data source for the data directory.
+
+> **Path:** ``[32].[1].[3]``
+
+## Datasource Data Directory
+
+This directory stores information about each data source including it's 0x5A encoded name, the path to the file, etc.
+
+> **Path:** ``[32].[5].[ID]``
+
+| Key | Value           |
+| --- | ---             |
+| 16  | Datasource name |
+| 130 (first) | 0x5A encoded (*see note*). OS Path to data source |
+
+> *Note:* File paths are stored as [0, 0, 0, 1, 4].[file].[length of path].[':'].[PATH].['/'].[length of filename].[FILENAME]
 
 ## ToolBar Information
 
