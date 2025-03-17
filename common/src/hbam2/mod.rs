@@ -6,6 +6,7 @@ pub mod page_store;
 pub(crate) mod chunk;
 pub mod path;
 mod view;
+mod generate;
 
 use crate::{dbobjects::{
     calculation::Calculation, data_source::*, layout::*, metadata::Metadata, reference::*, schema::{relationgraph::relation::Relation, Schema}, scripting::{
