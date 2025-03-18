@@ -90,6 +90,36 @@ impl From<File> for DataBTree {
             }
         }
 
+        let mut occurrence_count = 0;
+
+        for occurrence in value.schema.relation_graph.nodes {
+            occurrence_count += 1;
+            result.insert(
+                HBAMPath::new(vec![&[3], &[17], &[1], &[1]]),
+                LocalChunkContents::SimpleData { 
+                    data: (occurrence.name + &occurrence.id.to_string()).as_bytes().to_vec() 
+                },
+            ).unwrap();
+
+            result.insert(
+                HBAMPath::new(vec![&[3], &[17], &[1], &[3]]), 
+                LocalChunkContents::SimpleData { 
+                    data: (occurrence_count.to_string() + &occurrence.id.to_string()).as_bytes().to_vec()
+                }
+            ).unwrap();
+
+            result.insert(
+                HBAMPath::new(vec![&[3], &[17], &[5], &[occurrence.id as u8]]), 
+                LocalChunkContents::SimpleRef { 
+                    key: 2,
+                    data: (
+                        occurrence.base.data_source.to_string() 
+                        + ":" +
+                        &occurrence.base.table_id.to_string()).as_bytes().to_vec() 
+                }
+                ).unwrap();
+        }
+
         result
     }
 }
