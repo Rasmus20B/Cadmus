@@ -175,13 +175,13 @@ the file value to append to the path above.
 | 9 | Delete Record/Request | | |
 | 10 | Delete All Records | | |
 | 11 | Insert From Index  | | |
-| 12 | Insert From Last Visited | |
+| 12 | Insert From Last Visited | | |
 | 13 | Insert Current Date | | |
-| 14 | Insert Current Time | |
+| 14 | Insert Current Time | | |
 | 16 | Go to Record/Request/Page | | |
-| 17 | Go to Field | |
+| 17 | Go to Field | | |
 | 18 | Check Selection | | |
-| 19 | Check Record | |
+| 19 | Check Record | | |
 | 20 | Check Found Set | | |
 | 21 | Unsort Records | | | 
 | 22 | Enter Find Mode | | |
