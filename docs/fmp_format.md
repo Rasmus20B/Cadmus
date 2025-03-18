@@ -11,6 +11,7 @@
 
 - [Metadata and embedded XML](#Metadata)
 - [Tables](#Tables)
+- [Table Occurrences](#Table_Occurrences)
 - [Relationships](#Relationships)
 - Layout info: [4].[1].[7]
 - Theme info: [6].[5]
@@ -82,6 +83,51 @@ This tuple defines data type of the field. Auto-entry, validation, data type, et
 | 14 | Validation behaviour | 0 = Only validate during data entry, 1 = Member of a value list, 2 = Maximum character count, 4 = Always validated, 16 = Strictly Numeric, 32 = Stringly 4 Digit Year, 64 = Strictly Time of Day |
 | 15 | More validation | 0 = User can override, 1 = Validated by calculation, 4 = User cannot override, 8 = Required Value, 16 = Unique Value, 32 = Existing Value, 64 = Within a range of values, 128 = Display a validation error message |
 | 25 | Number of repetitions | | 
+
+<a id="Table_Occurrences"></a>
+# Table Occurrences
+
+## Double-byte-encoded Table Occurrence Names 
+
+These are the names of each table occurrence, followed by its ID number. These are stored as simple data without keys.
+
+> **Path:** ``[3].[17].[1].[1]``
+
+## Ordering of IDs
+
+More strings of simple data chunks. The first 4 bytes indicate the order number, and the latter 4 bytes indicate table occurrence ID.
+
+> **Path:** ``[3].[17].[1].[3]``
+
+###### TODO: More research on ordering numbers needed
+
+## Table Occurrence Storage Catalog
+
+This is where metadata for each table occurrence resides including the location of the underlying table, names in 0x5A encoding, modification timestamps, etc.
+
+> **Path:** ``[3].[17].[5]``
+
+## Table Occurrence Storage Directory
+
+This is an individual storage directory for a given occurrence. See next section for relationship information.
+
+| Key | Value Description | 
+| --- |     ----          |
+|  2  | Definition of occurrence, and where the underlying table can be Found. Byte 3 denotes the data source, and byte 7 denotes the table ID. |
+| 16  | name of occurrence in 0x5A encoding |
+| 64513 | Username of last modifier |
+| 64514 | Account name of last modifier |
+| 64515 | Timestamp of last modification |
+
+> **Path:** ``[3].[17].[5].[occurrence_id]``
+
+###### TODO: What do the other bytes in the definition mean?
+
+## Table Occurrence Relationships
+
+The related occurrences for a given occurrence are located here as simple data chunks. This directory can be used to construct a graph of related nodes.
+
+> **Path:** ``[3].[17].[5].[occurrence_id].[251]``
 
 <a id="Relationships"></a>
 # Relationships
