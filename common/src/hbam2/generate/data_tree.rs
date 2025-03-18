@@ -66,10 +66,16 @@ impl From<File> for DataBTree {
     fn from(value: File) -> Self {
         let mut result = DataBTree::default();
 
-        let _ = result.insert(HBAMPath::new(vec![&[3], &[16], &[1]]), LocalChunkContents::SimpleRef {
+        result.insert(
+            HBAMPath::new(vec![&[2]]), 
+            LocalChunkContents::SimpleRef { key: 3, data: "20.1".as_bytes().to_vec() }
+        )
+        .unwrap();
+
+        result.insert(HBAMPath::new(vec![&[3], &[16], &[1]]), LocalChunkContents::SimpleRef {
             key: 0,
             data: put_path_int(value.schema.tables.len() as u32)
-        });
+        }).unwrap();
 
         for table in value.schema.tables {
             result.insert(HBAMPath::new(vec![&[3], &[16], &[5], &[table.id as u8]]), 
