@@ -405,7 +405,29 @@ the file value to append to the path above.
 ### [17].[5].[script].[5] - The Instruction Directory |
 - The "data" for each script step is located in this folder.
 
-## Security Information
+# Security Information
+
+Stores users, password hashes, permissions, role, etc.
+
+> **Path:** ``[23]``
+
+## Changes Made to Security
+
+This stores the amount of modifications made to top level of the security catalog.
+
+> **Path:** ``[23].[1].[1]::0``
+
+## Double-byte-encoded usernames
+
+The user names for each user are stored as Double-byte-encoded strings in simple data chunks.
+
+> **Path:** ``[23].[1].[1].[1]``
+
+## Security Data Directory
+
+This stores the main content of each user.
+
+> **Path:** ``[23].[1].[5]``
 
 <a id="Data Sources"></a>
 # External Data Sources 
