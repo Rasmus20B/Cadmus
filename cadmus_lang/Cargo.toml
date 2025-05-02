@@ -1,0 +1,7 @@
+[package]
+name = "cadmus_lang"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cadmus_objects = { version = "0.1.0", path = "../cadmus_objects" }
