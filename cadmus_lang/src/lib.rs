@@ -1,6 +1,9 @@
 mod cache;
 mod compiler;
+mod diagnostic;
 mod error;
 mod lexer;
+mod parsed_file;
+mod parser_worker;
 mod proto_schema;
 mod token;

@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 
 use crate::{
+    diagnostic::Diagnostic,
     error::Result,
     token::{match_keyword, SourceLoc, Token, TokenValue, KEYWORD_MAP},
 };
@@ -56,7 +57,7 @@ impl<'a> Iterator for LexIter<'a> {
     }
 }
 
-pub fn lex(text: &str) -> Result<Vec<Token>> {
+pub fn lex(text: &str, diagnostics: &mut Vec<Diagnostic>) -> Result<Vec<Token>> {
     let mut tokens = Vec::<Token>::new();
     let mut iter = LexIter::new(text);
     while let Some((c, line, col)) = iter.next() {
@@ -138,7 +139,8 @@ mod tests {
     #[test]
     fn multi_word_identifier() {
         let text = "table %1 Quotes Machines 2";
-        let tokens = lex(text).unwrap();
+        let mut diags = vec![];
+        let tokens = lex(text, &mut diags).unwrap();
         assert_eq!(tokens[0].token_val, TokenValue::Table);
         assert_eq!(tokens[1].token_val, TokenValue::ObjectNumber(1));
         assert_eq!(
@@ -150,7 +152,8 @@ mod tests {
     #[test]
     fn multi_word_identifier_after_keyword() {
         let text = "table Quotes Machines %1 Quotes Machines 2";
-        let tokens = lex(text).unwrap();
+        let mut diags = vec![];
+        let tokens = lex(text, &mut diags).unwrap();
         assert_eq!(tokens[0].token_val, TokenValue::Table);
         assert_eq!(
             tokens[1].token_val,
@@ -166,7 +169,8 @@ mod tests {
     #[test]
     fn keyword_repeated() {
         let text = "table table table %1 Quotes = {}";
-        let tokens = lex(text).unwrap();
+        let mut diags = vec![];
+        let tokens = lex(text, &mut diags).unwrap();
         assert_eq!(tokens[0].token_val, TokenValue::Table);
         assert_eq!(tokens[1].token_val, TokenValue::Table);
         assert_eq!(tokens[2].token_val, TokenValue::Table);

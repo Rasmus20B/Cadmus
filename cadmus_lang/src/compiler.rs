@@ -1,28 +1,26 @@
-use std::path::Path;
-
-use cadmus_objects::schema::Schema;
-
 use super::cache;
 use super::error::Result;
 use crate::cache::ProtoSchemaCache;
 use crate::error::Error;
+use crate::parser_worker::ParserWorker;
 use crate::proto_schema::ProtoSchema;
+use cadmus_objects::schema::Schema;
+use std::path::Path;
 
-fn compile_file_to_proto_schema(path: &Path) -> Result<ProtoSchema> {
-    todo!()
-}
+use rayon::prelude::*;
 
 pub fn compile_project(path: &Path) -> Result<Schema> {
     let proto_cache = ProtoSchemaCache::new();
-    for file in std::fs::read_dir(path).map_err(Error::Fs)? {
-        match file {
-            Ok(inner) => {
-                println!("Found file: {:?}", inner);
-                // compile_file_to_proto_schema(inner.path().as_path())?;
-            }
-            Err(e) => println!("Error: {:?}", e),
-        }
-    }
+    let paths = std::fs::read_dir(path)
+        .map_err(Error::Fs)?
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .collect::<Vec<_>>();
+
+    let worker_results = paths
+        .par_iter()
+        .map(|path| ParserWorker::new().with_path(path.clone()).build())
+        .collect::<Vec<_>>();
+
     Ok(Schema::new())
 }
 
@@ -32,4 +30,9 @@ mod tests {
 
     use super::super::error::Result;
     use super::compile_project;
+
+    #[test]
+    fn basic() {
+        let _ = compile_project(Path::new("./test_data/multi_file_solution"));
+    }
 }
