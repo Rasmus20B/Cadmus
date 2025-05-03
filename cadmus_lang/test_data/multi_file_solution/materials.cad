@@ -1,0 +1,37 @@
+
+table %1 Materials = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    }
+    unique = true,
+    required = true,
+  },
+  field %2 name = {
+    datatype = Text,
+  }
+}
+
+table_occurrence %1 Materials : Materials
+
+layout %1 mats : Materials = {
+}
+
+script %1 make_10_materials = {
+  set_variable($i, |0|)
+  loop {
+    exit_loop_if(|$i = 5|)
+    set_variable($i, |$i + 1|)
+    new_record()
+    set_field(Materials::id, |$i|)
+  }
+}
+
+
+
+
+
+

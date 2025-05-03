@@ -2,11 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use cadmus_objects::schema::Schema;
 
+use crate::proto_schema::ProtoSchema;
 
-pub struct SchemaCache {
-    map: HashMap<String, Schema>
-}
-
-pub struct ProtoSchemaCache {
-    map: HashMap<String, Schema>
-}
+pub type ProtoSchemaCache = HashMap<String, ProtoSchema>;
+pub type SchemaCache = HashMap<String, Schema>;

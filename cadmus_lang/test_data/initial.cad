@@ -1,0 +1,132 @@
+table %1 Person = {
+  field %1 id = {
+    datatype = Number,
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    }
+    unique = true,
+    required = true,
+  },
+  field %2 first_name = {
+    datatype = Text,
+  },
+  field %3 surname = {
+    datatype = Text,
+  },
+  field %4 job_id = {
+    datatype = Text,
+  }
+}
+
+table %2 Job = {
+  field %1 id = {
+    serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    },
+    datatype = Number,
+    unique = true,
+    required = true,
+    validation_message = "Invalid ID chosen.",
+  },
+  field %2 title = {
+    datatype = Text,
+  }
+  field %3 salary = {
+    datatype = Number,
+    validation_calc = |this >= 0|,
+  }
+}
+
+table %3 SalaryLevel = {
+  field %1 id = {
+    datatype = Number,
+    Serial = {
+      generate = on_creation,
+      next = 1,
+      increment = 1,
+    },
+    unique = true,
+    required = true,
+    validation_message = "Invalid ID chosen.",
+  }
+  field %2 title = {
+    dataType = Text,
+  },
+  field %3 start = {
+    dataType = Number,
+    unique = true,
+  },
+  field %4 end = {
+    dataType = Number,
+    unique = true,
+  },
+}
+
+table_occurrence %1 Person_occ : Person
+table_occurrence %2 Job_occ : Job
+table_occurrence %3 Salary_occ : SalaryLevel
+
+// Basic value list with custom values
+value_list %1 gender = {
+  "male", "female"
+}
+
+// Value list that returns all value pairs of id and name
+// from Job_occ. By default all values are brought in. 
+// To bring in related we use the "from" key.
+value_list %3 all_jobs : Job_occ::id, Job_occ::name
+
+// Value list based on related Job_occ records starting
+// from Salary_occ occurrence.
+value_list %2 contained_jobs : Job_occ::name = {
+  from = Salary_occ
+}
+
+// Relation based on single criteria does not require 
+// compound attribute brace.
+relation %1 = Person_occ::job_id == Job_occ::id
+
+// Dual criteria relation to based on range of values.
+relation %2 = {
+  Job_occ::salary >= Salary_occ::start,
+  Job_occ::salary <= Salary_occ::end,
+}
+
+layout %1 Person : Person_occ = {
+  // Layout object definitions can go here
+}
+
+layout %2 Job : Job_occ = {
+  // Layout object definitions can go here
+}
+
+layout %3 Salary : Salary_occ = {
+  // Layout object definitions can go here
+}
+
+script %1 make_10_people = {
+  set_variable($x, |0|)
+  go_to_layout(Person)
+  loop {
+    exit_loop_if(|$x == 10|)
+    new_record_request()
+    if($x == 7) {
+        set_field(Person_occ::first_name, |"Kevin"|)
+    } elif($x == 1) {
+        set_field(Person_occ::first_name, |"alvin" & " Presley"|)
+    } else {
+        set_field(Person_occ::first_name, |"Jeff"|)
+        set_field(Person_occ::surname, |"Keighly"|)
+    }
+    set_variable($x, |$x + 1|)
+  }
+}
+
+
+
+
+
