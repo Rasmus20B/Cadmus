@@ -124,6 +124,7 @@ pub fn lex(text: &str, diagnostics: &mut Vec<Diagnostic>) -> Result<Vec<Token>> 
                 TokenValue::CloseBrace,
                 SourceLoc::new(line, col),
             )),
+            ',' => tokens.push(Token::new(TokenValue::Comma, SourceLoc::new(line, col))),
             _ => {}
         }
     }

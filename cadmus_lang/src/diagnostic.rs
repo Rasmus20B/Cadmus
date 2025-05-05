@@ -7,4 +7,5 @@ pub enum DiagnosticCategory {
 pub struct Diagnostic {
     category: DiagnosticCategory,
     location: SourceLoc,
+    snippet: String,
 }

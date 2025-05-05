@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceLoc {
     line: u32,
     column: u32,
